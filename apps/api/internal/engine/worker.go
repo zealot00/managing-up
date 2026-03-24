@@ -59,6 +59,9 @@ func (w *Worker) processPending() {
 func (w *Worker) processWaitingApproval() {
 	executions := w.repo.ListWaitingApprovalExecutions()
 	for _, exec := range executions {
-		w.logger.Info("checking waiting execution for resume", "execution_id", exec.ID)
+		w.logger.Info("resuming execution after approval", "execution_id", exec.ID)
+		if err := w.engine.Resume(context.Background(), exec.ID); err != nil {
+			w.logger.Error("failed to resume execution", "execution_id", exec.ID, "error", err)
+		}
 	}
 }

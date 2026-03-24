@@ -150,6 +150,7 @@ make serve-pg DATABASE_URL="postgres://localhost:5432/skillhub?sslmode=disable"
 | POST | `/api/v1/skills` | Create skill |
 | GET | `/api/v1/skills/{id}` | Get skill details |
 | GET | `/api/v1/skills/{id}/spec` | Download skill YAML spec |
+| GET | `/api/v1/skill-versions` | List skill versions |
 | POST | `/api/v1/executions` | Trigger execution |
 | GET | `/api/v1/executions/{id}` | Get execution status |
 | POST | `/api/v1/executions/{id}/approve` | Approve/reject |
@@ -157,6 +158,8 @@ make serve-pg DATABASE_URL="postgres://localhost:5432/skillhub?sslmode=disable"
 | POST | `/api/v1/agents` | Register agent |
 | GET | `/api/v1/approvals` | List approvals |
 | GET | `/api/v1/dashboard` | Dashboard metrics |
+| GET | `/api/v1/meta` | API metadata |
+| GET | `/api/v1/procedure-drafts` | List procedure drafts |
 | GET | `/api/v1/tasks` | List evaluation tasks |
 | POST | `/api/v1/tasks` | Create task |
 | GET | `/api/v1/tasks/{id}` | Get task |
@@ -164,9 +167,15 @@ make serve-pg DATABASE_URL="postgres://localhost:5432/skillhub?sslmode=disable"
 | DELETE | `/api/v1/tasks/{id}` | Delete task |
 | GET | `/api/v1/metrics` | List metric definitions |
 | POST | `/api/v1/evaluations` | Run evaluation |
+| GET | `/api/v1/task-executions` | List task executions |
+| GET | `/api/v1/task-executions/{id}` | Get task execution |
 | GET | `/api/v1/experiments` | List experiments |
 | POST | `/api/v1/experiments` | Create experiment |
 | GET | `/api/v1/experiments/{id}` | Get experiment results |
+| GET | `/api/v1/experiments/{id}/compare?compare_with={other_id}` | Compare two experiments |
+| POST | `/api/v1/check-regression` | Check score regression |
+| GET | `/api/v1/replay-snapshots` | List replay snapshots |
+| GET | `/api/v1/replay-snapshots/{id}` | Get replay snapshot |
 
 ---
 
@@ -257,12 +266,12 @@ managing-up/
 │   │   ├── internal/
 │   │   │   ├── server/          # HTTP handlers + routing
 │   │   │   ├── service/         # Domain logic (execution, task, metric, skill)
-│   │   │   ├── runtime/         # Execution engine + trace + replay
-│   │   │   ├── evaluation/       # Evaluators + evaluation runner
+│   │   │   ├── engine/         # Execution engine + trace + replay
+│   │   │   ├── evaluator/       # Evaluators + evaluation runner
 │   │   │   ├── generator/        # LLM skill generator (SOP → YAML)
 │   │   │   ├── llm/             # LLM provider clients (10 providers)
-│   │   │   └── persistence/      # PostgreSQL repository
-│   │   ├── migrations/          # SQL migrations (006+)
+│   │   │   └── repository/      # PostgreSQL repository
+│   │   ├── migrations/          # SQL migrations (0001-0007)
 │   │   └── openapi/            # OpenAPI spec
 │   └── web/
 │       └── app/                 # Next.js frontend

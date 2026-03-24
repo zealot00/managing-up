@@ -96,6 +96,19 @@ func (e *EmbeddingSimilarityEvaluator) Evaluate(ctx context.Context, input any, 
 		return Score{Value: 0, Details: map[string]any{"error": "non-string values"}}, nil
 	}
 
+	// Fallback to word-set similarity when no embedding API available
+	if e.client == nil {
+		similarity := calculateCosineSimilarity(expectedStr, outputStr)
+		return Score{
+			Value: similarity,
+			Details: map[string]any{
+				"similarity": similarity,
+				"threshold":  e.threshold,
+				"passed":     similarity >= e.threshold,
+			},
+		}, nil
+	}
+
 	// Get embeddings
 	expectedVec, err := e.getEmbedding(ctx, expectedStr)
 	if err != nil {
@@ -261,7 +274,7 @@ func calculateCosineSimilarity(s1, s2 string) float64 {
 	norm1 := float64(len(words1))
 	norm2 := float64(len(words2))
 
-	return float64(intersection) / (norm1 * norm2 / float64(intersection+1))
+	return float64(intersection) / (math.Sqrt(norm1) * math.Sqrt(norm2))
 }
 
 func wordSet(s string) map[string]bool {

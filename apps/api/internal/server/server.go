@@ -125,12 +125,198 @@ func (a repoToExecutionRepoAdapter) ApproveExecution(executionID string, req ser
 	}, true
 }
 
+type repoToTaskRepoAdapter struct {
+	repo Repository
+}
+
+func (a repoToTaskRepoAdapter) CreateTask(svcTask service.Task) (service.Task, error) {
+	serverTask := Task{
+		ID:          svcTask.ID,
+		Name:        svcTask.Name,
+		Description: svcTask.Description,
+		Tags:        svcTask.Tags,
+		CreatedAt:   svcTask.CreatedAt,
+		UpdatedAt:   svcTask.UpdatedAt,
+		TaskType:    svcTask.TaskType,
+		Input: TaskInput{
+			Source: svcTask.Input.Source,
+			Path:   svcTask.Input.Path,
+			Format: svcTask.Input.Format,
+		},
+		Gold: GoldConfig{
+			Type: svcTask.Gold.Type,
+			Data: svcTask.Gold.Data,
+		},
+		Scoring: ScoringConfig{
+			PrimaryMetric:    svcTask.Scoring.PrimaryMetric,
+			SecondaryMetrics: svcTask.Scoring.SecondaryMetrics,
+			Threshold: Threshold{
+				Pass:            svcTask.Scoring.Threshold.Pass,
+				RegressionAlert: svcTask.Scoring.Threshold.RegressionAlert,
+			},
+		},
+		Execution: ExecutionConfig{
+			Model:       svcTask.Execution.Model,
+			Temperature: svcTask.Execution.Temperature,
+			MaxTokens:   svcTask.Execution.MaxTokens,
+			Seed:        svcTask.Execution.Seed,
+		},
+		SkillID:    svcTask.SkillID,
+		Difficulty: svcTask.Difficulty,
+		TestCases:  toServerTestCases(svcTask.TestCases),
+	}
+	task, err := a.repo.CreateTask(serverTask)
+	if err != nil {
+		return service.Task{}, err
+	}
+	return toServiceTask(task), nil
+}
+
+func (a repoToTaskRepoAdapter) GetTask(id string) (service.Task, bool) {
+	task, ok := a.repo.GetTask(id)
+	if !ok {
+		return service.Task{}, false
+	}
+	return toServiceTask(task), true
+}
+
+func (a repoToTaskRepoAdapter) ListTasks(skillID string, difficulty string) []service.Task {
+	tasks := a.repo.ListTasks(skillID, difficulty)
+	result := make([]service.Task, len(tasks))
+	for i, t := range tasks {
+		result[i] = toServiceTask(t)
+	}
+	return result
+}
+
+func (a repoToTaskRepoAdapter) UpdateTask(svcTask service.Task) error {
+	serverTask := Task{
+		ID:          svcTask.ID,
+		Name:        svcTask.Name,
+		Description: svcTask.Description,
+		Tags:        svcTask.Tags,
+		CreatedAt:   svcTask.CreatedAt,
+		UpdatedAt:   svcTask.UpdatedAt,
+		TaskType:    svcTask.TaskType,
+		Input: TaskInput{
+			Source: svcTask.Input.Source,
+			Path:   svcTask.Input.Path,
+			Format: svcTask.Input.Format,
+		},
+		Gold: GoldConfig{
+			Type: svcTask.Gold.Type,
+			Data: svcTask.Gold.Data,
+		},
+		Scoring: ScoringConfig{
+			PrimaryMetric:    svcTask.Scoring.PrimaryMetric,
+			SecondaryMetrics: svcTask.Scoring.SecondaryMetrics,
+			Threshold: Threshold{
+				Pass:            svcTask.Scoring.Threshold.Pass,
+				RegressionAlert: svcTask.Scoring.Threshold.RegressionAlert,
+			},
+		},
+		Execution: ExecutionConfig{
+			Model:       svcTask.Execution.Model,
+			Temperature: svcTask.Execution.Temperature,
+			MaxTokens:   svcTask.Execution.MaxTokens,
+			Seed:        svcTask.Execution.Seed,
+		},
+		SkillID:    svcTask.SkillID,
+		Difficulty: svcTask.Difficulty,
+		TestCases:  toServerTestCases(svcTask.TestCases),
+	}
+	return a.repo.UpdateTask(serverTask)
+}
+
+func (a repoToTaskRepoAdapter) DeleteTask(id string) error {
+	return a.repo.DeleteTask(id)
+}
+
+func toServiceTask(t Task) service.Task {
+	testCases := make([]service.TestCase, len(t.TestCases))
+	for i, tc := range t.TestCases {
+		testCases[i] = service.TestCase{
+			Input:    tc.Input,
+			Expected: tc.Expected,
+		}
+	}
+	return service.Task{
+		ID:          t.ID,
+		Name:        t.Name,
+		Description: t.Description,
+		Tags:        t.Tags,
+		CreatedAt:   t.CreatedAt,
+		UpdatedAt:   t.UpdatedAt,
+		TaskType:    t.TaskType,
+		Input: service.TaskInput{
+			Source: t.Input.Source,
+			Path:   t.Input.Path,
+			Format: t.Input.Format,
+		},
+		Gold: service.GoldConfig{
+			Type: t.Gold.Type,
+			Data: t.Gold.Data,
+		},
+		Scoring: service.ScoringConfig{
+			PrimaryMetric:    t.Scoring.PrimaryMetric,
+			SecondaryMetrics: t.Scoring.SecondaryMetrics,
+			Threshold: service.Threshold{
+				Pass:            t.Scoring.Threshold.Pass,
+				RegressionAlert: t.Scoring.Threshold.RegressionAlert,
+			},
+		},
+		Execution: service.ExecutionConfig{
+			Model:       t.Execution.Model,
+			Temperature: t.Execution.Temperature,
+			MaxTokens:   t.Execution.MaxTokens,
+			Seed:        t.Execution.Seed,
+		},
+		SkillID:    t.SkillID,
+		Difficulty: t.Difficulty,
+		TestCases:  testCases,
+	}
+}
+
+func toServiceCreateTaskRequest(req CreateTaskRequest) service.CreateTaskRequest {
+	return service.CreateTaskRequest{
+		Name:        req.Name,
+		Description: req.Description,
+		SkillID:     req.SkillID,
+		Tags:        req.Tags,
+		Difficulty:  req.Difficulty,
+		TestCases:   toServiceTestCases(req.TestCases),
+	}
+}
+
+func toServiceTestCases(testCases []TestCase) []service.TestCase {
+	result := make([]service.TestCase, len(testCases))
+	for i, tc := range testCases {
+		result[i] = service.TestCase{
+			Input:    tc.Input,
+			Expected: tc.Expected,
+		}
+	}
+	return result
+}
+
+func toServerTestCases(svcTestCases []service.TestCase) []TestCase {
+	result := make([]TestCase, len(svcTestCases))
+	for i, tc := range svcTestCases {
+		result[i] = TestCase{
+			Input:    tc.Input,
+			Expected: tc.Expected,
+		}
+	}
+	return result
+}
+
 // Server wraps the HTTP server and route registration for the API service.
 type Server struct {
 	httpServer *http.Server
 	repo       Repository
 	skillSvc   *service.SkillService
 	execSvc    *service.ExecutionService
+	taskSvc    *service.TaskService
 	closeFn    func() error
 }
 
@@ -147,6 +333,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error)
 		closeFn:  closeFn,
 		skillSvc: service.NewSkillService(repoToSkillRepoAdapter{repo}),
 		execSvc:  service.NewExecutionService(repoToExecutionRepoAdapter{repo}),
+		taskSvc:  service.NewTaskService(repoToTaskRepoAdapter{repo}),
 	}
 
 	mux.HandleFunc("/healthz", handleHealth)
@@ -657,27 +844,16 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 			return
 		}
-		now := time.Now()
-		task := Task{
-			ID:          fmt.Sprintf("task_%d", time.Now().UnixNano()),
-			Name:        req.Name,
-			Description: req.Description,
-			SkillID:     req.SkillID,
-			Tags:        req.Tags,
-			Difficulty:  req.Difficulty,
-			TestCases:   req.TestCases,
-			CreatedAt:   now,
-			UpdatedAt:   now,
-		}
-		if task.Tags == nil {
-			task.Tags = []string{}
-		}
-		if task.Difficulty == "" {
-			task.Difficulty = "medium"
-		}
-		task, err := s.repo.CreateTask(task)
+		task, err := s.taskSvc.CreateTask(toServiceCreateTaskRequest(req))
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to create task.")
+			switch {
+			case errors.Is(err, service.ErrTaskNameRequired):
+				writeError(w, http.StatusBadRequest, "BAD_REQUEST", "name is required.")
+			case errors.Is(err, service.ErrInvalidDifficulty):
+				writeError(w, http.StatusBadRequest, "BAD_REQUEST", "difficulty must be one of easy, medium, hard.")
+			default:
+				writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to create task.")
+			}
 			return
 		}
 		writeEnvelope(w, http.StatusCreated, generateRequestID(), task)

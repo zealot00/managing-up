@@ -27,7 +27,7 @@ function SkeletonDashboard() {
       </section>
 
       <section className="hero">
-        <p className="eyebrow">Enterprise Skill Governance Platform</p>
+        <p className="eyebrow">Enterprise AI Quality Infrastructure</p>
         <div className="loading-pulse" style={{ width: 560, height: 48, marginBottom: 16 }} />
         <div className="loading-pulse loading-pulse-long" style={{ marginBottom: 8 }} />
         <div className="loading-pulse loading-pulse-medium" />
@@ -103,7 +103,7 @@ async function DashboardContent() {
       </section>
 
       <section className="hero">
-        <p className="eyebrow">Enterprise Skill Governance Platform</p>
+        <p className="eyebrow">Enterprise AI Quality Infrastructure</p>
         <h1>Convert SOPs into executable skills.</h1>
         <p className="lede">
           Registry, execute, and observe AI agent skills with enterprise-grade controls.
