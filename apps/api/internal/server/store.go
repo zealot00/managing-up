@@ -523,6 +523,10 @@ func (s *store) CreateExperiment(exp Experiment) (Experiment, error) {
 	return Experiment{}, nil
 }
 
+func (s *store) ListExperimentRuns(experimentID string) []ExperimentRun {
+	return []ExperimentRun{}
+}
+
 func (s *store) ListReplaySnapshots(executionID string) []ReplaySnapshot {
 	return []ReplaySnapshot{}
 }

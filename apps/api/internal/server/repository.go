@@ -35,6 +35,7 @@ type Repository interface {
 	ListExperiments() []Experiment
 	GetExperiment(id string) (Experiment, bool)
 	CreateExperiment(exp Experiment) (Experiment, error)
+	ListExperimentRuns(experimentID string) []ExperimentRun
 	ListReplaySnapshots(executionID string) []ReplaySnapshot
 	GetReplaySnapshot(id string) (ReplaySnapshot, bool)
 	CreateReplaySnapshot(snap ReplaySnapshot) (ReplaySnapshot, error)

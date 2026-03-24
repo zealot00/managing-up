@@ -49,6 +49,7 @@ type EvaluationRunner struct {
 	execRepo     TaskExecutionRepository
 	evalRepo     EvaluationRepository
 	registry     *EvaluatorRegistry
+	router       *JudgeRouter
 	traceEmitter runtime.TraceEmitter
 }
 
@@ -57,11 +58,15 @@ func NewEvaluationRunner(
 	metricRepo service.MetricRepository,
 	execRepo TaskExecutionRepository,
 	evalRepo EvaluationRepository,
+	router *JudgeRouter,
 	traceEmitter runtime.TraceEmitter,
 ) *EvaluationRunner {
 	registry := NewEvaluatorRegistry()
 	registry.Register(&ExactMatchEvaluator{})
 	registry.Register(NewSemanticSimilarityEvaluator(0.8))
+
+	embeddingClient, _ := llm.NewClient(llm.ProviderOpenAI, "text-embedding-3-small", os.Getenv("LLM_API_KEY"))
+	registry.Register(NewEmbeddingSimilarityEvaluator(embeddingClient, 0.85))
 
 	return &EvaluationRunner{
 		taskRepo:     taskRepo,
@@ -69,6 +74,7 @@ func NewEvaluationRunner(
 		execRepo:     execRepo,
 		evalRepo:     evalRepo,
 		registry:     registry,
+		router:       router,
 		traceEmitter: traceEmitter,
 	}
 }

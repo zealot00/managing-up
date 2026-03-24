@@ -770,6 +770,32 @@ func (r *Repository) ListExperiments() []server.Experiment {
 	return items
 }
 
+func (r *Repository) ListExperimentRuns(experimentID string) []server.ExperimentRun {
+	query := `
+		SELECT id, experiment_id, task_id, agent_id, metric_scores, overall_score, duration_ms, status, created_at
+		FROM experiment_runs
+		WHERE ($1 = '' OR experiment_id = $1)
+		ORDER BY created_at DESC
+	`
+	rows, err := r.db.Query(query, experimentID)
+	if err != nil {
+		return []server.ExperimentRun{}
+	}
+	defer rows.Close()
+
+	items := make([]server.ExperimentRun, 0)
+	for rows.Next() {
+		var run server.ExperimentRun
+		var metricScoresJSON []byte
+		if err := rows.Scan(&run.ID, &run.ExperimentID, &run.TaskID, &run.AgentID, &metricScoresJSON, &run.OverallScore, &run.DurationMs, &run.Status, &run.CreatedAt); err != nil {
+			continue
+		}
+		json.Unmarshal(metricScoresJSON, &run.MetricScores)
+		items = append(items, run)
+	}
+	return items
+}
+
 func (r *Repository) CreateReplaySnapshot(snap server.ReplaySnapshot) (server.ReplaySnapshot, error) {
 	id := snap.ID
 	if id == "" {

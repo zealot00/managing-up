@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -169,6 +170,8 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error)
 	mux.HandleFunc("/api/v1/task-executions/", srv.handleTaskExecutionByID)
 	mux.HandleFunc("/api/v1/experiments", srv.handleExperiments)
 	mux.HandleFunc("/api/v1/experiments/", srv.handleExperimentByID)
+	mux.HandleFunc("/api/v1/experiments/{id}/compare", srv.handleExperimentCompare)
+	mux.HandleFunc("/api/v1/check-regression", srv.handleCheckRegression)
 	mux.HandleFunc("/api/v1/replay-snapshots", srv.handleReplaySnapshots)
 	mux.HandleFunc("/api/v1/replay-snapshots/", srv.handleReplaySnapshotByID)
 
@@ -855,6 +858,164 @@ func (s *Server) handleExperimentByID(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeMethodNotAllowed(w, r.Method)
 	}
+}
+
+// handleExperimentCompare handles GET /api/v1/experiments/{id}/compare?compare_with={other_id}
+func (s *Server) handleExperimentCompare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "")
+		return
+	}
+
+	ids := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/v1/experiments/"), "/")
+	if len(ids) < 2 || ids[1] == "" {
+		writeError(w, http.StatusBadRequest, "INVALID_ID", "experiment id required")
+		return
+	}
+	expID := ids[0]
+	compareWithID := r.URL.Query().Get("compare_with")
+
+	if compareWithID == "" {
+		writeError(w, http.StatusBadRequest, "MISSING_PARAM", "compare_with query param required")
+		return
+	}
+
+	exp, ok := s.repo.GetExperiment(expID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "experiment not found")
+		return
+	}
+	other, ok := s.repo.GetExperiment(compareWithID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "compare_with experiment not found")
+		return
+	}
+
+	// Fetch experiment runs for both experiments
+	expRuns := s.repo.ListExperimentRuns(expID)
+	otherRuns := s.repo.ListExperimentRuns(compareWithID)
+
+	// Compute average scores per task for each experiment
+	expAverages := computeTaskAverages(expRuns)
+	otherAverages := computeTaskAverages(otherRuns)
+
+	// Get union of all task IDs
+	allTasks := unionKeys(expAverages, otherAverages)
+
+	// Compute deltas for each task
+	var deltas []taskDelta
+	regressionDetected := false
+
+	for _, taskID := range allTasks {
+		expScore := expAverages[taskID]
+		otherScore := otherAverages[taskID]
+		delta := expScore - otherScore
+
+		deltas = append(deltas, taskDelta{
+			TaskID:     taskID,
+			ExpScore:   round2(expScore),
+			OtherScore: round2(otherScore),
+			Delta:      round2(delta),
+		})
+
+		if detectRegression(delta, 0.02) {
+			regressionDetected = true
+		}
+	}
+
+	writeJSON(w, http.StatusOK, Envelope{
+		Data: map[string]any{
+			"experiment":   exp.Name,
+			"compare_with": other.Name,
+			"deltas":       deltas,
+			"regression":   regressionDetected,
+		},
+	})
+}
+
+type taskDelta struct {
+	TaskID     string  `json:"task_id"`
+	ExpScore   float64 `json:"exp_score"`
+	OtherScore float64 `json:"other_score"`
+	Delta      float64 `json:"delta"`
+}
+
+func round2(f float64) float64 {
+	return math.Round(f*100) / 100
+}
+
+func computeTaskAverages(runs []ExperimentRun) map[string]float64 {
+	sums := make(map[string]float64)
+	counts := make(map[string]int)
+
+	for _, run := range runs {
+		if run.Status == "completed" {
+			sums[run.TaskID] += run.OverallScore
+			counts[run.TaskID]++
+		}
+	}
+
+	averages := make(map[string]float64)
+	for taskID, sum := range sums {
+		if counts[taskID] > 0 {
+			averages[taskID] = sum / float64(counts[taskID])
+		}
+	}
+	return averages
+}
+
+func unionKeys(m1, m2 map[string]float64) []string {
+	keys := make(map[string]bool)
+	for k := range m1 {
+		keys[k] = true
+	}
+	for k := range m2 {
+		keys[k] = true
+	}
+	result := make([]string, 0, len(keys))
+	for k := range keys {
+		result = append(result, k)
+	}
+	return result
+}
+
+func detectRegression(delta, threshold float64) bool {
+	return delta < -threshold
+}
+
+func (s *Server) handleCheckRegression(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "")
+		return
+	}
+
+	var req struct {
+		CurrentScore  float64 `json:"current_score"`
+		BaselineScore float64 `json:"baseline_score"`
+		Threshold     float64 `json:"threshold"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_BODY", err.Error())
+		return
+	}
+
+	if req.Threshold == 0 {
+		req.Threshold = 0.02
+	}
+
+	delta := req.CurrentScore - req.BaselineScore
+	regression := delta < -req.Threshold
+
+	writeJSON(w, http.StatusOK, Envelope{
+		Data: map[string]any{
+			"current_score":  req.CurrentScore,
+			"baseline_score": req.BaselineScore,
+			"delta":          round2(delta),
+			"threshold":      req.Threshold,
+			"regression":     regression,
+			"passed":         !regression,
+		},
+	})
 }
 
 func (s *Server) handleReplaySnapshots(w http.ResponseWriter, r *http.Request) {
