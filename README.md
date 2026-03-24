@@ -1,6 +1,6 @@
 # 🎯 向上管理 (managing-up)
 
-### *一个让你优雅地告诉老板"AI 没用"的工具*
+### *一个既能满足老板既要又要，又真的能用的AI基础设施组件*
 
 [![CI](https://img.shields.io/badge/CI-Skeptical%20AF-B.svg?style=for-the-badge&labelColor=333)](https://github.com)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-b.svg?style=for-the-badge&labelColor=333)](LICENSE)
