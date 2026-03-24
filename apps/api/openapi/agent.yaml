@@ -1,0 +1,326 @@
+openapi: 3.0.3
+info:
+  title: Skill Hub Agent API
+  version: 1.0.0
+  description: |
+    API for AI Agents to discover, download, and execute skills.
+    Designed for programmatic access by agents like OpenClaw, OpenCode, Codex.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://api.example.com
+    description: Production
+
+paths:
+  /api/v1/skills:
+    get:
+      operationId: listSkills
+      summary: List available skills for agent
+      description: |
+        Returns all published skills that agents can use.
+        Only returns skills with status=published.
+      parameters:
+        - name: risk_level
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high]
+        - name: tool_ref
+          in: query
+          schema:
+            type: string
+          description: Filter skills that use a specific tool
+      responses:
+        '200':
+          description: List of skills
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillListResponse'
+
+  /api/v1/skills/{skillId}:
+    get:
+      operationId: getSkill
+      summary: Get skill metadata
+      parameters:
+        - $ref: '#/components/parameters/skillId'
+      responses:
+        '200':
+          description: Skill details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillDetailResponse'
+
+  /api/v1/skills/{skillId}/spec:
+    get:
+      operationId: getSkillSpec
+      summary: Download skill specification (YAML)
+      description: |
+        Returns the executable skill spec in YAML format.
+        Agents parse this to understand how to execute the skill.
+      parameters:
+        - $ref: '#/components/parameters/skillId'
+      responses:
+        '200':
+          description: Skill YAML spec
+          content:
+            application/x-yaml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillSpec'
+
+  /api/v1/executions:
+    post:
+      operationId: createExecution
+      summary: Trigger skill execution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionRequest'
+      responses:
+        '201':
+          description: Execution created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionResponse'
+
+  /api/v1/executions/{executionId}:
+    get:
+      operationId: getExecution
+      summary: Get execution status and result
+      parameters:
+        - $ref: '#/components/parameters/executionId'
+      responses:
+        '200':
+          description: Execution details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionDetailResponse'
+
+  /api/v1/agents:
+    post:
+      operationId: registerAgent
+      summary: Register an agent
+      description: Agents should register themselves before using the platform
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRegistration'
+      responses:
+        '201':
+          description: Agent registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRegistrationResponse'
+
+components:
+  parameters:
+    skillId:
+      name: skillId
+      in: path
+      required: true
+      schema:
+        type: string
+    executionId:
+      name: executionId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    SkillListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            skills:
+              type: array
+              items:
+                $ref: '#/components/schemas/SkillSummary'
+
+    SkillSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        risk_level:
+          type: string
+          enum: [low, medium, high]
+        version:
+          type: string
+        tools:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    SkillDetailResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            owner_team:
+              type: string
+            risk_level:
+              type: string
+              enum: [low, medium, high]
+            status:
+              type: string
+            current_version:
+              type: string
+            created_by:
+              type: string
+            updated_at:
+              type: string
+              format: date-time
+
+    SkillSpec:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        risk_level:
+          type: string
+        description:
+          type: string
+        inputs:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              type: { type: string }
+              required: { type: boolean }
+              description: { type: string }
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              type: { type: string }
+              tool_ref: { type: string }
+              approver_group: { type: string }
+              message: { type: string }
+              timeout_seconds: { type: integer }
+
+    ExecutionRequest:
+      type: object
+      required: [skill_id, agent_id]
+      properties:
+        skill_id:
+          type: string
+        agent_id:
+          type: string
+          description: ID of the agent making the request
+        input:
+          type: object
+          description: Skill input parameters
+        callback_url:
+          type: string
+          description: URL to call when execution completes (optional)
+
+    ExecutionResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            execution_id:
+              type: string
+            status:
+              type: string
+            skill_id:
+              type: string
+            current_step:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+
+    ExecutionDetailResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            skill_id:
+              type: string
+            skill_name:
+              type: string
+            status:
+              type: string
+            triggered_by:
+              type: string
+            current_step_id:
+              type: string
+            started_at:
+              type: string
+              format: date-time
+            input:
+              type: object
+
+    AgentRegistration:
+      type: object
+      required: [agent_id, name]
+      properties:
+        agent_id:
+          type: string
+          description: Unique agent identifier (e.g. "openclaw-v1", "codex-001")
+        name:
+          type: string
+        version:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        callback_url:
+          type: string
+
+    AgentRegistrationResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            agent_id:
+              type: string
+            name:
+              type: string
+            version:
+              type: string
+            capabilities:
+              type: array
+              items:
+                type: string
+            registered_at:
+              type: string
+              format: date-time

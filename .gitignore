@@ -1,0 +1,14 @@
+.DS_Store
+.next
+node_modules
+dist
+coverage
+*.log
+.env
+.env.local
+apps/api/bin
+
+.cache
+__pycache__
+*.pyc
+.ruff_cache/

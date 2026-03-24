@@ -1,0 +1,944 @@
+package postgres
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	_ "github.com/lib/pq"
+
+	"github.com/zealot/managing-up/apps/api/internal/server"
+)
+
+// Repository implements the server.Repository contract with PostgreSQL storage.
+type Repository struct {
+	db *sql.DB
+}
+
+// New opens a PostgreSQL-backed repository and verifies connectivity.
+func New(dsn string) (*Repository, error) {
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open postgres connection: %w", err)
+	}
+
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
+
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ping postgres: %w", err)
+	}
+
+	return &Repository{db: db}, nil
+}
+
+// Close releases the database handle.
+func (r *Repository) Close() error {
+	return r.db.Close()
+}
+
+// ListSkills returns skill metadata records.
+func (r *Repository) ListSkills(status string) []server.Skill {
+	query := `
+		SELECT id, name, owner_team, risk_level, status, current_version, COALESCE(created_by, ''), updated_at
+		FROM skills
+		WHERE ($1 = '' OR status = $1)
+		ORDER BY name
+	`
+
+	rows, err := r.db.Query(query, status)
+	if err != nil {
+		return []server.Skill{}
+	}
+	defer rows.Close()
+
+	items := make([]server.Skill, 0)
+	for rows.Next() {
+		var item server.Skill
+		if err := rows.Scan(&item.ID, &item.Name, &item.OwnerTeam, &item.RiskLevel, &item.Status, &item.CurrentVersion, &item.CreatedBy, &item.UpdatedAt); err != nil {
+			continue
+		}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+// GetSkill returns a single skill record.
+func (r *Repository) GetSkill(id string) (server.Skill, bool) {
+	query := `
+		SELECT id, name, owner_team, risk_level, status, current_version, COALESCE(created_by, ''), updated_at
+		FROM skills
+		WHERE id = $1
+	`
+
+	var item server.Skill
+	err := r.db.QueryRow(query, id).Scan(&item.ID, &item.Name, &item.OwnerTeam, &item.RiskLevel, &item.Status, &item.CurrentVersion, &item.CreatedBy, &item.UpdatedAt)
+	if err != nil {
+		return server.Skill{}, false
+	}
+
+	return item, true
+}
+
+// CreateSkill inserts a draft skill record.
+func (r *Repository) CreateSkill(req server.CreateSkillRequest) server.Skill {
+	id := fmt.Sprintf("skill_%d", time.Now().UnixNano())
+	now := time.Now().UTC()
+	item := server.Skill{
+		ID:             id,
+		Name:           req.Name,
+		OwnerTeam:      req.OwnerTeam,
+		RiskLevel:      req.RiskLevel,
+		Status:         "draft",
+		CurrentVersion: "",
+		CreatedBy:      req.OwnerTeam,
+		UpdatedAt:      now,
+	}
+
+	query := `
+		INSERT INTO skills (id, name, owner_team, risk_level, status, current_version, created_by, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+
+	if _, err := r.db.Exec(query, item.ID, item.Name, item.OwnerTeam, item.RiskLevel, item.Status, item.CurrentVersion, item.CreatedBy, item.UpdatedAt); err != nil {
+		return server.Skill{}
+	}
+
+	return item
+}
+
+// ListSkillVersions returns version rows.
+func (r *Repository) ListSkillVersions(skillID string) []server.SkillVersion {
+	query := `
+		SELECT id, skill_id, version, status, change_summary, approval_required, created_at
+		FROM skill_versions
+		WHERE ($1 = '' OR skill_id = $1)
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.Query(query, skillID)
+	if err != nil {
+		return []server.SkillVersion{}
+	}
+	defer rows.Close()
+
+	items := make([]server.SkillVersion, 0)
+	for rows.Next() {
+		var item server.SkillVersion
+		if err := rows.Scan(&item.ID, &item.SkillID, &item.Version, &item.Status, &item.ChangeSummary, &item.ApprovalRequired, &item.CreatedAt); err != nil {
+			continue
+		}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+// ListProcedureDrafts returns procedure draft rows.
+func (r *Repository) ListProcedureDrafts(status string) []server.ProcedureDraft {
+	query := `
+		SELECT id, procedure_key, title, validation_status, required_tools, source_type, created_at
+		FROM procedure_drafts
+		WHERE ($1 = '' OR validation_status = $1)
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.Query(query, status)
+	if err != nil {
+		return []server.ProcedureDraft{}
+	}
+	defer rows.Close()
+
+	items := make([]server.ProcedureDraft, 0)
+	for rows.Next() {
+		var item server.ProcedureDraft
+		var rawTools []byte
+		if err := rows.Scan(&item.ID, &item.ProcedureKey, &item.Title, &item.ValidationStatus, &rawTools, &item.SourceType, &item.CreatedAt); err != nil {
+			continue
+		}
+		if err := json.Unmarshal(rawTools, &item.RequiredTools); err != nil {
+			item.RequiredTools = []string{}
+		}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+// ListExecutions returns execution rows.
+func (r *Repository) ListExecutions(status string) []server.Execution {
+	query := `
+		SELECT id, skill_id, skill_name, status, triggered_by, started_at, current_step_id, input, COALESCE(created_by, '')
+		FROM executions
+		WHERE ($1 = '' OR status = $1)
+		ORDER BY started_at DESC
+	`
+
+	rows, err := r.db.Query(query, status)
+	if err != nil {
+		return []server.Execution{}
+	}
+	defer rows.Close()
+
+	items := make([]server.Execution, 0)
+	for rows.Next() {
+		var item server.Execution
+		var rawInput []byte
+		if err := rows.Scan(&item.ID, &item.SkillID, &item.SkillName, &item.Status, &item.TriggeredBy, &item.StartedAt, &item.CurrentStepID, &rawInput, &item.CreatedBy); err != nil {
+			continue
+		}
+		if err := json.Unmarshal(rawInput, &item.Input); err != nil {
+			item.Input = map[string]any{}
+		}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+// GetExecution returns one execution row.
+func (r *Repository) GetExecution(id string) (server.Execution, bool) {
+	query := `
+		SELECT id, skill_id, skill_name, status, triggered_by, started_at, current_step_id, input, COALESCE(created_by, '')
+		FROM executions
+		WHERE id = $1
+	`
+
+	var item server.Execution
+	var rawInput []byte
+	err := r.db.QueryRow(query, id).Scan(&item.ID, &item.SkillID, &item.SkillName, &item.Status, &item.TriggeredBy, &item.StartedAt, &item.CurrentStepID, &rawInput, &item.CreatedBy)
+	if err != nil {
+		return server.Execution{}, false
+	}
+
+	if err := json.Unmarshal(rawInput, &item.Input); err != nil {
+		item.Input = map[string]any{}
+	}
+
+	return item, true
+}
+
+// CreateExecution inserts a new execution row for an existing skill.
+func (r *Repository) CreateExecution(req server.CreateExecutionRequest) (server.Execution, bool) {
+	skill, ok := r.GetSkill(req.SkillID)
+	if !ok {
+		return server.Execution{}, false
+	}
+
+	id := fmt.Sprintf("exec_%d", time.Now().UnixNano())
+	now := time.Now().UTC()
+	rawInput, err := json.Marshal(req.Input)
+	if err != nil {
+		return server.Execution{}, false
+	}
+
+	item := server.Execution{
+		ID:            id,
+		SkillID:       skill.ID,
+		SkillName:     skill.Name,
+		Status:        "pending",
+		TriggeredBy:   req.TriggeredBy,
+		StartedAt:     now,
+		CurrentStepID: "queued",
+		Input:         req.Input,
+		CreatedBy:     req.TriggeredBy,
+	}
+
+	query := `
+		INSERT INTO executions (id, skill_id, skill_name, status, triggered_by, started_at, current_step_id, input, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+
+	if _, err := r.db.Exec(query, item.ID, item.SkillID, item.SkillName, item.Status, item.TriggeredBy, item.StartedAt, item.CurrentStepID, rawInput, item.CreatedBy); err != nil {
+		return server.Execution{}, false
+	}
+
+	return item, true
+}
+
+// ListApprovals returns approval rows.
+func (r *Repository) ListApprovals(status string) []server.Approval {
+	query := `
+		SELECT id, execution_id, skill_name, step_id, status, approver_group, requested_at, COALESCE(approved_by, ''), COALESCE(resolution_note, '')
+		FROM approvals
+		WHERE ($1 = '' OR status = $1)
+		ORDER BY requested_at DESC
+	`
+
+	rows, err := r.db.Query(query, status)
+	if err != nil {
+		return []server.Approval{}
+	}
+	defer rows.Close()
+
+	items := make([]server.Approval, 0)
+	for rows.Next() {
+		var item server.Approval
+		if err := rows.Scan(&item.ID, &item.ExecutionID, &item.SkillName, &item.StepID, &item.Status, &item.ApproverGroup, &item.RequestedAt, &item.ApprovedBy, &item.ResolutionNote); err != nil {
+			continue
+		}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+// ApproveExecution updates approval and execution state.
+func (r *Repository) ApproveExecution(executionID string, req server.ApproveExecutionRequest) (server.Approval, bool) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return server.Approval{}, false
+	}
+	defer tx.Rollback()
+
+	status := "running"
+	stepID := "resumed_after_approval"
+	if req.Decision == "rejected" {
+		status = "failed"
+		stepID = "approval_rejected"
+	}
+
+	if _, err := tx.Exec(`UPDATE approvals SET status = $1, approved_by = $2, resolution_note = $3 WHERE execution_id = $4`, req.Decision, req.Approver, req.Note, executionID); err != nil {
+		return server.Approval{}, false
+	}
+
+	if _, err := tx.Exec(`UPDATE executions SET status = $1, current_step_id = $2 WHERE id = $3`, status, stepID, executionID); err != nil {
+		return server.Approval{}, false
+	}
+
+	var item server.Approval
+	err = tx.QueryRow(`
+		SELECT id, execution_id, skill_name, step_id, status, approver_group, requested_at, COALESCE(approved_by, ''), COALESCE(resolution_note, '')
+		FROM approvals
+		WHERE execution_id = $1
+	`, executionID).Scan(&item.ID, &item.ExecutionID, &item.SkillName, &item.StepID, &item.Status, &item.ApproverGroup, &item.RequestedAt, &item.ApprovedBy, &item.ResolutionNote)
+	if err != nil {
+		return server.Approval{}, false
+	}
+
+	if err := tx.Commit(); err != nil {
+		return server.Approval{}, false
+	}
+
+	return item, true
+}
+
+// Dashboard returns homepage metrics using current repository data.
+func (r *Repository) GetSkillVersionForExecution(skillID string) (server.SkillVersion, bool) {
+	query := `
+		SELECT sv.id, sv.skill_id, sv.version, sv.status, sv.change_summary, sv.approval_required, sv.created_at, COALESCE(sv.spec_yaml, '')
+		FROM skill_versions sv
+		JOIN skills s ON s.id = sv.skill_id
+		WHERE sv.skill_id = $1 AND sv.status = 'published'
+		ORDER BY sv.created_at DESC
+		LIMIT 1
+	`
+
+	var item server.SkillVersion
+	var specYaml string
+	err := r.db.QueryRow(query, skillID).Scan(&item.ID, &item.SkillID, &item.Version, &item.Status, &item.ChangeSummary, &item.ApprovalRequired, &item.CreatedAt, &specYaml)
+	if err != nil {
+		return server.SkillVersion{}, false
+	}
+
+	return item, true
+}
+
+func (r *Repository) UpdateExecutionStatus(id string, status string, stepID string, endedAt *time.Time, durationMs *int64) error {
+	query := `
+		UPDATE executions 
+		SET status = $2, current_step_id = $3, ended_at = $4, duration_ms = $5
+		WHERE id = $1
+	`
+	_, err := r.db.Exec(query, id, status, stepID, endedAt, durationMs)
+	return err
+}
+
+func (r *Repository) CreateExecutionStep(step server.ExecutionStep) error {
+	query := `
+		INSERT INTO execution_steps (id, execution_id, step_id, status, tool_ref, started_at, ended_at, duration_ms, output, error, attempt_no)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`
+	var outputJSON []byte
+	var err error
+	if step.Output != nil {
+		outputJSON, err = json.Marshal(step.Output)
+		if err != nil {
+			outputJSON = []byte("{}")
+		}
+	} else {
+		outputJSON = []byte("{}")
+	}
+
+	_, err = r.db.Exec(query, step.ID, step.ExecutionID, step.StepID, step.Status, step.ToolRef, step.StartedAt, step.EndedAt, step.DurationMs, outputJSON, step.Error, step.AttemptNo)
+	return err
+}
+
+func (r *Repository) GetExecutionForResume(id string) (server.Execution, bool) {
+	query := `
+		SELECT id, skill_id, skill_name, status, triggered_by, started_at, current_step_id, input, COALESCE(created_by, '')
+		FROM executions
+		WHERE id = $1 AND status IN ('pending', 'running', 'waiting_approval')
+	`
+
+	var item server.Execution
+	var rawInput []byte
+	err := r.db.QueryRow(query, id).Scan(&item.ID, &item.SkillID, &item.SkillName, &item.Status, &item.TriggeredBy, &item.StartedAt, &item.CurrentStepID, &rawInput, &item.CreatedBy)
+	if err != nil {
+		return server.Execution{}, false
+	}
+
+	if err := json.Unmarshal(rawInput, &item.Input); err != nil {
+		item.Input = map[string]any{}
+	}
+
+	return item, true
+}
+
+func (r *Repository) ListPendingExecutions() []server.Execution {
+	query := `
+		SELECT id, skill_id, skill_name, status, triggered_by, started_at, current_step_id, input, COALESCE(created_by, '')
+		FROM executions
+		WHERE status = 'pending'
+		ORDER BY started_at ASC
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return []server.Execution{}
+	}
+	defer rows.Close()
+
+	items := make([]server.Execution, 0)
+	for rows.Next() {
+		var item server.Execution
+		var rawInput []byte
+		if err := rows.Scan(&item.ID, &item.SkillID, &item.SkillName, &item.Status, &item.TriggeredBy, &item.StartedAt, &item.CurrentStepID, &rawInput, &item.CreatedBy); err != nil {
+			continue
+		}
+		if err := json.Unmarshal(rawInput, &item.Input); err != nil {
+			item.Input = map[string]any{}
+		}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+func (r *Repository) ListWaitingApprovalExecutions() []server.Execution {
+	query := `
+		SELECT id, skill_id, skill_name, status, triggered_by, started_at, current_step_id, input, COALESCE(created_by, '')
+		FROM executions
+		WHERE status = 'waiting_approval'
+		ORDER BY started_at ASC
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return []server.Execution{}
+	}
+	defer rows.Close()
+
+	items := make([]server.Execution, 0)
+	for rows.Next() {
+		var item server.Execution
+		var rawInput []byte
+		if err := rows.Scan(&item.ID, &item.SkillID, &item.SkillName, &item.Status, &item.TriggeredBy, &item.StartedAt, &item.CurrentStepID, &rawInput, &item.CreatedBy); err != nil {
+			continue
+		}
+		if err := json.Unmarshal(rawInput, &item.Input); err != nil {
+			item.Input = map[string]any{}
+		}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+func (r *Repository) Dashboard() server.DashboardData {
+	skills := r.ListSkills("")
+	executions := r.ListExecutions("")
+
+	summary := server.DashboardSummary{
+		SuccessRate:        0.91,
+		AvgDurationSeconds: 84,
+	}
+
+	for _, skill := range skills {
+		if skill.Status != "deprecated" {
+			summary.ActiveSkills++
+		}
+		if skill.CurrentVersion != "" {
+			summary.PublishedVersions++
+		}
+	}
+
+	for _, execution := range executions {
+		switch execution.Status {
+		case "running":
+			summary.RunningExecutions++
+		case "waiting_approval":
+			summary.WaitingApprovals++
+		}
+	}
+
+	if len(executions) > 5 {
+		executions = executions[:5]
+	}
+
+	return server.DashboardData{
+		Summary:          summary,
+		RecentExecutions: executions,
+	}
+}
+
+func (r *Repository) CreateTrace(event server.TraceEvent) error {
+	query := `
+		INSERT INTO execution_traces (id, execution_id, step_id, event_type, event_data, timestamp)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	eventDataJSON, err := json.Marshal(event.EventData)
+	if err != nil {
+		eventDataJSON = []byte("{}")
+	}
+	_, err = r.db.Exec(query, event.ID, event.ExecutionID, event.StepID, event.EventType, eventDataJSON, event.Timestamp)
+	return err
+}
+
+func (r *Repository) ListTraces(executionID string) []server.TraceEvent {
+	query := `
+		SELECT id, execution_id, step_id, event_type, event_data, timestamp
+		FROM execution_traces
+		WHERE execution_id = $1
+		ORDER BY timestamp ASC
+	`
+
+	rows, err := r.db.Query(query, executionID)
+	if err != nil {
+		return []server.TraceEvent{}
+	}
+	defer rows.Close()
+
+	items := make([]server.TraceEvent, 0)
+	for rows.Next() {
+		var item server.TraceEvent
+		var stepID sql.NullString
+		var eventDataJSON []byte
+		if err := rows.Scan(&item.ID, &item.ExecutionID, &stepID, &item.EventType, &eventDataJSON, &item.Timestamp); err != nil {
+			continue
+		}
+		if stepID.Valid {
+			item.StepID = stepID.String
+		}
+		if err := json.Unmarshal(eventDataJSON, &item.EventData); err != nil {
+			item.EventData = map[string]any{}
+		}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+func (r *Repository) CreateTask(task server.Task) (server.Task, error) {
+	id := task.ID
+	if id == "" {
+		id = fmt.Sprintf("task_%d", time.Now().UnixNano())
+	}
+
+	tagsJSON, _ := json.Marshal(task.Tags)
+	testCasesJSON, _ := json.Marshal(task.TestCases)
+
+	query := `
+		INSERT INTO tasks (id, name, description, skill_id, tags, difficulty, test_cases, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+	_, err := r.db.Exec(query, id, task.Name, task.Description, task.SkillID, tagsJSON, task.Difficulty, testCasesJSON, task.CreatedAt, task.UpdatedAt)
+	if err != nil {
+		return server.Task{}, err
+	}
+
+	task.ID = id
+	return task, nil
+}
+
+func (r *Repository) GetTask(id string) (server.Task, bool) {
+	query := `
+		SELECT id, name, description, skill_id, tags, difficulty, test_cases, created_at, updated_at
+		FROM tasks
+		WHERE id = $1
+	`
+
+	var task server.Task
+	var tagsJSON, testCasesJSON []byte
+	var skillID string
+
+	err := r.db.QueryRow(query, id).Scan(
+		&task.ID, &task.Name, &task.Description, &skillID,
+		&tagsJSON, &task.Difficulty, &testCasesJSON, &task.CreatedAt, &task.UpdatedAt,
+	)
+	if err != nil {
+		return server.Task{}, false
+	}
+
+	task.SkillID = skillID
+	json.Unmarshal(tagsJSON, &task.Tags)
+	json.Unmarshal(testCasesJSON, &task.TestCases)
+
+	return task, true
+}
+
+func (r *Repository) ListTasks(skillID string, difficulty string) []server.Task {
+	query := `
+		SELECT id, name, description, skill_id, tags, difficulty, test_cases, created_at, updated_at
+		FROM tasks
+		WHERE ($1 = '' OR skill_id = $1) AND ($2 = '' OR difficulty = $2)
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.Query(query, skillID, difficulty)
+	if err != nil {
+		return []server.Task{}
+	}
+	defer rows.Close()
+
+	items := make([]server.Task, 0)
+	for rows.Next() {
+		var task server.Task
+		var tagsJSON, testCasesJSON []byte
+		var sID string
+
+		if err := rows.Scan(&task.ID, &task.Name, &task.Description, &sID, &tagsJSON, &task.Difficulty, &testCasesJSON, &task.CreatedAt, &task.UpdatedAt); err != nil {
+			continue
+		}
+
+		task.SkillID = sID
+		json.Unmarshal(tagsJSON, &task.Tags)
+		json.Unmarshal(testCasesJSON, &task.TestCases)
+		items = append(items, task)
+	}
+
+	return items
+}
+
+func (r *Repository) UpdateTask(task server.Task) error {
+	tagsJSON, _ := json.Marshal(task.Tags)
+	testCasesJSON, _ := json.Marshal(task.TestCases)
+
+	query := `
+		UPDATE tasks
+		SET name = $2, description = $3, skill_id = $4, tags = $5, difficulty = $6, test_cases = $7, updated_at = $8
+		WHERE id = $1
+	`
+	_, err := r.db.Exec(query, task.ID, task.Name, task.Description, task.SkillID, tagsJSON, task.Difficulty, testCasesJSON, task.UpdatedAt)
+	return err
+}
+
+func (r *Repository) DeleteTask(id string) error {
+	query := `DELETE FROM tasks WHERE id = $1`
+	_, err := r.db.Exec(query, id)
+	return err
+}
+
+func (r *Repository) CreateMetric(metric server.Metric) (server.Metric, error) {
+	id := metric.ID
+	if id == "" {
+		id = fmt.Sprintf("metric_%d", time.Now().UnixNano())
+	}
+
+	configJSON, _ := json.Marshal(metric.Config)
+
+	query := `
+		INSERT INTO metrics (id, name, type, config, created_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	_, err := r.db.Exec(query, id, metric.Name, metric.Type, configJSON, metric.CreatedAt)
+	if err != nil {
+		return server.Metric{}, err
+	}
+
+	metric.ID = id
+	return metric, nil
+}
+
+func (r *Repository) GetMetric(id string) (server.Metric, bool) {
+	query := `
+		SELECT id, name, type, config, created_at
+		FROM metrics
+		WHERE id = $1
+	`
+
+	var metric server.Metric
+	var configJSON []byte
+
+	err := r.db.QueryRow(query, id).Scan(&metric.ID, &metric.Name, &metric.Type, &configJSON, &metric.CreatedAt)
+	if err != nil {
+		return server.Metric{}, false
+	}
+
+	json.Unmarshal(configJSON, &metric.Config)
+	return metric, true
+}
+
+func (r *Repository) ListMetrics() []server.Metric {
+	query := `
+		SELECT id, name, type, config, created_at
+		FROM metrics
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return []server.Metric{}
+	}
+	defer rows.Close()
+
+	items := make([]server.Metric, 0)
+	for rows.Next() {
+		var metric server.Metric
+		var configJSON []byte
+
+		if err := rows.Scan(&metric.ID, &metric.Name, &metric.Type, &configJSON, &metric.CreatedAt); err != nil {
+			continue
+		}
+
+		json.Unmarshal(configJSON, &metric.Config)
+		items = append(items, metric)
+	}
+
+	return items
+}
+
+func (r *Repository) CreateExperiment(exp server.Experiment) (server.Experiment, error) {
+	id := exp.ID
+	if id == "" {
+		id = fmt.Sprintf("exp_%d", time.Now().UnixNano())
+	}
+	taskIDsJSON, _ := json.Marshal(exp.TaskIDs)
+	agentIDsJSON, _ := json.Marshal(exp.AgentIDs)
+
+	query := `
+		INSERT INTO experiments (id, name, description, task_ids, agent_ids, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+	_, err := r.db.Exec(query, id, exp.Name, exp.Description, taskIDsJSON, agentIDsJSON, exp.Status, exp.CreatedAt, exp.UpdatedAt)
+	if err != nil {
+		return server.Experiment{}, err
+	}
+	exp.ID = id
+	return exp, nil
+}
+
+func (r *Repository) GetExperiment(id string) (server.Experiment, bool) {
+	query := `
+		SELECT id, name, description, task_ids, agent_ids, status, created_at, updated_at
+		FROM experiments WHERE id = $1
+	`
+	var exp server.Experiment
+	var taskIDsJSON, agentIDsJSON []byte
+	err := r.db.QueryRow(query, id).Scan(&exp.ID, &exp.Name, &exp.Description, &taskIDsJSON, &agentIDsJSON, &exp.Status, &exp.CreatedAt, &exp.UpdatedAt)
+	if err != nil {
+		return server.Experiment{}, false
+	}
+	json.Unmarshal(taskIDsJSON, &exp.TaskIDs)
+	json.Unmarshal(agentIDsJSON, &exp.AgentIDs)
+	return exp, true
+}
+
+func (r *Repository) ListExperiments() []server.Experiment {
+	query := `SELECT id, name, description, task_ids, agent_ids, status, created_at, updated_at FROM experiments ORDER BY created_at DESC`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return []server.Experiment{}
+	}
+	defer rows.Close()
+
+	items := make([]server.Experiment, 0)
+	for rows.Next() {
+		var exp server.Experiment
+		var taskIDsJSON, agentIDsJSON []byte
+		if err := rows.Scan(&exp.ID, &exp.Name, &exp.Description, &taskIDsJSON, &agentIDsJSON, &exp.Status, &exp.CreatedAt, &exp.UpdatedAt); err != nil {
+			continue
+		}
+		json.Unmarshal(taskIDsJSON, &exp.TaskIDs)
+		json.Unmarshal(agentIDsJSON, &exp.AgentIDs)
+		items = append(items, exp)
+	}
+	return items
+}
+
+func (r *Repository) CreateReplaySnapshot(snap server.ReplaySnapshot) (server.ReplaySnapshot, error) {
+	id := snap.ID
+	if id == "" {
+		id = fmt.Sprintf("rsnap_%d", time.Now().UnixNano())
+	}
+	stateJSON, _ := json.Marshal(snap.StateSnapshot)
+	inputSeedJSON, _ := json.Marshal(snap.InputSeed)
+
+	query := `
+		INSERT INTO replay_snapshots (id, execution_id, skill_id, skill_version, step_index, state_snapshot, input_seed, deterministic_seed, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+	_, err := r.db.Exec(query, id, snap.ExecutionID, snap.SkillID, snap.SkillVersion, snap.StepIndex, stateJSON, inputSeedJSON, snap.DeterministicSeed, snap.CreatedAt)
+	if err != nil {
+		return server.ReplaySnapshot{}, err
+	}
+	snap.ID = id
+	return snap, nil
+}
+
+func (r *Repository) GetReplaySnapshot(id string) (server.ReplaySnapshot, bool) {
+	query := `
+		SELECT id, execution_id, skill_id, skill_version, step_index, state_snapshot, input_seed, deterministic_seed, created_at
+		FROM replay_snapshots WHERE id = $1
+	`
+	var snap server.ReplaySnapshot
+	var stateJSON, inputSeedJSON []byte
+	err := r.db.QueryRow(query, id).Scan(&snap.ID, &snap.ExecutionID, &snap.SkillID, &snap.SkillVersion, &snap.StepIndex, &stateJSON, &inputSeedJSON, &snap.DeterministicSeed, &snap.CreatedAt)
+	if err != nil {
+		return server.ReplaySnapshot{}, false
+	}
+	json.Unmarshal(stateJSON, &snap.StateSnapshot)
+	json.Unmarshal(inputSeedJSON, &snap.InputSeed)
+	return snap, true
+}
+
+func (r *Repository) ListReplaySnapshots(executionID string) []server.ReplaySnapshot {
+	query := `
+		SELECT id, execution_id, skill_id, skill_version, step_index, state_snapshot, input_seed, deterministic_seed, created_at
+		FROM replay_snapshots
+		WHERE ($1 = '' OR execution_id = $1)
+		ORDER BY created_at DESC
+	`
+	rows, err := r.db.Query(query, executionID)
+	if err != nil {
+		return []server.ReplaySnapshot{}
+	}
+	defer rows.Close()
+
+	items := make([]server.ReplaySnapshot, 0)
+	for rows.Next() {
+		var snap server.ReplaySnapshot
+		var stateJSON, inputSeedJSON []byte
+		if err := rows.Scan(&snap.ID, &snap.ExecutionID, &snap.SkillID, &snap.SkillVersion, &snap.StepIndex, &stateJSON, &inputSeedJSON, &snap.DeterministicSeed, &snap.CreatedAt); err != nil {
+			continue
+		}
+		json.Unmarshal(stateJSON, &snap.StateSnapshot)
+		json.Unmarshal(inputSeedJSON, &snap.InputSeed)
+		items = append(items, snap)
+	}
+	return items
+}
+
+func (r *Repository) CreateTaskExecution(ex server.TaskExecution) (server.TaskExecution, error) {
+	id := ex.ID
+	if id == "" {
+		id = fmt.Sprintf("texec_%d", time.Now().UnixNano())
+	}
+	inputJSON, _ := json.Marshal(ex.Input)
+	outputJSON, _ := json.Marshal(ex.Output)
+
+	query := `
+		INSERT INTO task_executions (id, task_id, agent_id, status, input, output, duration_ms, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+	_, err := r.db.Exec(query, id, ex.TaskID, ex.AgentID, ex.Status, inputJSON, outputJSON, ex.DurationMs, ex.CreatedAt)
+	if err != nil {
+		return server.TaskExecution{}, err
+	}
+	ex.ID = id
+	return ex, nil
+}
+
+func (r *Repository) GetTaskExecution(id string) (server.TaskExecution, bool) {
+	query := `
+		SELECT id, task_id, agent_id, status, input, output, duration_ms, created_at
+		FROM task_executions WHERE id = $1
+	`
+	var ex server.TaskExecution
+	var inputJSON, outputJSON []byte
+	err := r.db.QueryRow(query, id).Scan(&ex.ID, &ex.TaskID, &ex.AgentID, &ex.Status, &inputJSON, &outputJSON, &ex.DurationMs, &ex.CreatedAt)
+	if err != nil {
+		return server.TaskExecution{}, false
+	}
+	json.Unmarshal(inputJSON, &ex.Input)
+	json.Unmarshal(outputJSON, &ex.Output)
+	return ex, true
+}
+
+func (r *Repository) ListTaskExecutions() []server.TaskExecution {
+	query := `SELECT id, task_id, agent_id, status, input, output, duration_ms, created_at FROM task_executions ORDER BY created_at DESC`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return []server.TaskExecution{}
+	}
+	defer rows.Close()
+
+	items := make([]server.TaskExecution, 0)
+	for rows.Next() {
+		var ex server.TaskExecution
+		var inputJSON, outputJSON []byte
+		if err := rows.Scan(&ex.ID, &ex.TaskID, &ex.AgentID, &ex.Status, &inputJSON, &outputJSON, &ex.DurationMs, &ex.CreatedAt); err != nil {
+			continue
+		}
+		json.Unmarshal(inputJSON, &ex.Input)
+		json.Unmarshal(outputJSON, &ex.Output)
+		items = append(items, ex)
+	}
+	return items
+}
+
+func (r *Repository) UpdateTaskExecution(ex server.TaskExecution) error {
+	outputJSON, _ := json.Marshal(ex.Output)
+	query := `UPDATE task_executions SET status = $2, output = $3, duration_ms = $4 WHERE id = $1`
+	_, err := r.db.Exec(query, ex.ID, ex.Status, outputJSON, ex.DurationMs)
+	return err
+}
+
+func (r *Repository) CreateEvaluationResult(eval server.Evaluation) (server.Evaluation, error) {
+	id := eval.ID
+	if id == "" {
+		id = fmt.Sprintf("eval_%d", time.Now().UnixNano())
+	}
+	detailsJSON, _ := json.Marshal(eval.Details)
+
+	query := `
+		INSERT INTO evaluations (id, task_execution_id, metric_id, score, details, evaluated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	_, err := r.db.Exec(query, id, eval.TaskExecutionID, eval.MetricID, eval.Score, detailsJSON, eval.EvaluatedAt)
+	if err != nil {
+		return server.Evaluation{}, err
+	}
+	eval.ID = id
+	return eval, nil
+}
+
+func (r *Repository) ListEvaluations(taskExecutionID string) []server.Evaluation {
+	query := `
+		SELECT id, task_execution_id, metric_id, score, details, evaluated_at
+		FROM evaluations
+		WHERE ($1 = '' OR task_execution_id = $1)
+		ORDER BY evaluated_at DESC
+	`
+	rows, err := r.db.Query(query, taskExecutionID)
+	if err != nil {
+		return []server.Evaluation{}
+	}
+	defer rows.Close()
+
+	items := make([]server.Evaluation, 0)
+	for rows.Next() {
+		var eval server.Evaluation
+		var detailsJSON []byte
+		if err := rows.Scan(&eval.ID, &eval.TaskExecutionID, &eval.MetricID, &eval.Score, &detailsJSON, &eval.EvaluatedAt); err != nil {
+			continue
+		}
+		json.Unmarshal(detailsJSON, &eval.Details)
+		items = append(items, eval)
+	}
+	return items
+}

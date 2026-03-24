@@ -1,0 +1,25 @@
+{
+  "name": "@skill-hub/typescript",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for Skill Hub Agent API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "tsc"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "skill-hub",
+    "agent",
+    "api",
+    "sdk"
+  ],
+  "author": "Skill Hub Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
