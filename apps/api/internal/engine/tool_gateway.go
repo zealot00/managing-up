@@ -10,7 +10,7 @@ type ToolGateway struct {
 	httpClient *http.Client
 }
 
-type ToolResult struct {
+type GatewayToolResult struct {
 	Status    string         `json:"status"`
 	Output    map[string]any `json:"output,omitempty"`
 	Error     string         `json:"error,omitempty"`
@@ -18,7 +18,7 @@ type ToolResult struct {
 	EndedAt   time.Time      `json:"ended_at"`
 }
 
-type ToolInvocation struct {
+type GatewayToolInvocation struct {
 	ExecutionID    string         `json:"execution_id"`
 	StepID         string         `json:"step_id"`
 	ToolRef        string         `json:"tool_ref"`
@@ -35,12 +35,12 @@ func NewToolGateway() *ToolGateway {
 	}
 }
 
-func (gw *ToolGateway) Invoke(ctx context.Context, inv ToolInvocation) (*ToolResult, error) {
+func (gw *ToolGateway) Invoke(ctx context.Context, inv GatewayToolInvocation) (*GatewayToolResult, error) {
 	start := time.Now()
 
 	select {
 	case <-ctx.Done():
-		return &ToolResult{
+		return &GatewayToolResult{
 			Status:    "failed",
 			Error:     "context cancelled",
 			StartedAt: start,
@@ -49,7 +49,7 @@ func (gw *ToolGateway) Invoke(ctx context.Context, inv ToolInvocation) (*ToolRes
 	case <-time.After(500 * time.Millisecond):
 	}
 
-	return &ToolResult{
+	return &GatewayToolResult{
 		Status: "succeeded",
 		Output: map[string]any{
 			"mock":         true,
@@ -62,8 +62,8 @@ func (gw *ToolGateway) Invoke(ctx context.Context, inv ToolInvocation) (*ToolRes
 	}, nil
 }
 
-func (gw *ToolGateway) InvokeWithRetry(ctx context.Context, inv ToolInvocation, maxAttempts int, backoffSeconds int) (*ToolResult, error) {
-	var lastResult *ToolResult
+func (gw *ToolGateway) InvokeWithRetry(ctx context.Context, inv GatewayToolInvocation, maxAttempts int, backoffSeconds int) (*GatewayToolResult, error) {
+	var lastResult *GatewayToolResult
 	var lastErr error
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {

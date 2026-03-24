@@ -181,7 +181,7 @@ func (e *ExecutionEngine) executeToolStep(ctx context.Context, executionID strin
 		toolInput[k] = e.interpolateInput(v, inputs, execInput)
 	}
 
-	inv := ToolInvocation{
+	inv := GatewayToolInvocation{
 		ExecutionID:    executionID,
 		StepID:         step.ID,
 		ToolRef:        toolRef,
@@ -189,7 +189,7 @@ func (e *ExecutionEngine) executeToolStep(ctx context.Context, executionID strin
 		TimeoutSeconds: timeout,
 	}
 
-	var result *ToolResult
+	var result *GatewayToolResult
 	var err error
 
 	if maxAttempts > 1 {

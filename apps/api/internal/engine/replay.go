@@ -191,7 +191,7 @@ func (e *DeterministicExecutor) ExecuteFromSnapshot(ctx context.Context, snapsho
 				toolInput[k] = v
 			}
 
-			inv := ToolInvocation{
+			inv := GatewayToolInvocation{
 				ExecutionID:    state.ExecutionID,
 				StepID:         step.ID,
 				ToolRef:        step.ToolRef,

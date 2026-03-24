@@ -9,7 +9,7 @@ import (
 
 func TestToolGateway_Invoke_Success(t *testing.T) {
 	gw := NewToolGateway()
-	inv := ToolInvocation{
+	inv := GatewayToolInvocation{
 		ExecutionID:    "exec-123",
 		StepID:         "step-1",
 		ToolRef:        "test-tool",
@@ -37,7 +37,7 @@ func TestToolGateway_Invoke_Success(t *testing.T) {
 
 func TestToolGateway_Invoke_Timeout(t *testing.T) {
 	gw := NewToolGateway()
-	inv := ToolInvocation{
+	inv := GatewayToolInvocation{
 		ExecutionID:    "exec-123",
 		StepID:         "step-1",
 		ToolRef:        "test-tool",
