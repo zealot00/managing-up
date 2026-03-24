@@ -1,9 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-  <circle cx="16" cy="16" r="3" fill="currentColor"/>
-  <circle cx="10" cy="12" r="2" fill="currentColor" opacity="0.6"/>
-  <circle cx="22" cy="12" r="2" fill="currentColor" opacity="0.6"/>
-  <circle cx="10" cy="20" r="2" fill="currentColor" opacity="0.6"/>
-  <circle cx="22" cy="20" r="2" fill="currentColor" opacity="0.6"/>
-  <path d="M16 13V19M13 16H19" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>managing-up logo</title>
+  <desc>Upward arrow constructed from ascending bar chart bars — data infrastructure meets quality gate</desc>
+  
+  <!-- Bar 1 - shortest -->
+  <rect x="6" y="38" width="10" height="18" rx="2" fill="#0F172A"/>
+  
+  <!-- Bar 2 -->
+  <rect x="20" y="28" width="10" height="28" rx="2" fill="#0F172A"/>
+  
+  <!-- Bar 3 -->
+  <rect x="34" y="18" width="10" height="38" rx="2" fill="#0F172A"/>
+  
+  <!-- Arrow body (Bar 4 extending upward) -->
+  <rect x="48" y="10" width="10" height="32" rx="2" fill="#0F172A"/>
+  
+  <!-- Arrowhead - sharp red accent at the checkpoint -->
+  <path d="M53 10 L53 4 L66 17 L53 10Z" fill="#DC2626"/>
+  
+  <!-- Small checkpoint indicator - the "gate" dot -->
+  <circle cx="53" cy="10" r="2.5" fill="#DC2626"/>
 </svg>
