@@ -156,21 +156,64 @@ type TraceEvent struct {
 
 // Task represents a reusable evaluation task.
 type Task struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	SkillID     string     `json:"skill_id,omitempty"`
-	Tags        []string   `json:"tags"`
-	Difficulty  string     `json:"difficulty"`
-	TestCases   []TestCase `json:"test_cases"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at,omitempty"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Tags        []string  `json:"tags"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at,omitempty"`
+
+	// === New fields (Phase 0.1) ===
+	TaskType  string          `json:"task_type"` // "benchmark" | "regression" | "ablation"
+	Input     TaskInput       `json:"input"`
+	Gold      GoldConfig      `json:"gold"`
+	Scoring   ScoringConfig   `json:"scoring"`
+	Execution ExecutionConfig `json:"execution"`
+
+	// === Legacy fields (kept for backward compatibility) ===
+	SkillID    string     `json:"skill_id,omitempty"`
+	Difficulty string     `json:"difficulty,omitempty"` // deprecated: use Scoring.Threshold instead
+	TestCases  []TestCase `json:"test_cases,omitempty"` // used when Input.Source="inline"
 }
 
 // TestCase represents a test case for task evaluation.
 type TestCase struct {
 	Input    map[string]any `json:"input"`
 	Expected any            `json:"expected"`
+}
+
+// TaskInput defines the input source for a task.
+type TaskInput struct {
+	Source string `json:"source"`           // "inline" | "file" | "api" | "synthetic"
+	Path   string `json:"path,omitempty"`   // file path or URL
+	Format string `json:"format,omitempty"` // "jsonl" | "json" | "parquet"
+}
+
+// GoldConfig defines how gold/expected output is defined.
+type GoldConfig struct {
+	Type string `json:"type"`           // "exact_match" | "contains" | "regex" | "llm_judge"
+	Data any    `json:"data,omitempty"` // file path or embedded data
+}
+
+// Threshold defines pass/regression thresholds for scoring.
+type Threshold struct {
+	Pass            float64 `json:"pass"`             // >= pass = 通过
+	RegressionAlert float64 `json:"regression_alert"` // < regression_alert = 回归告警
+}
+
+// ScoringConfig defines how a task is scored.
+type ScoringConfig struct {
+	PrimaryMetric    string    `json:"primary_metric"` // "exact_match" | "semantic_similarity" | "llm_judge"
+	SecondaryMetrics []string  `json:"secondary_metrics,omitempty"`
+	Threshold        Threshold `json:"threshold"`
+}
+
+// ExecutionConfig defines execution parameters for running this task.
+type ExecutionConfig struct {
+	Model       string  `json:"model"`          // e.g. "gpt-4o" | "claude-3.5" | "llama3"
+	Temperature float64 `json:"temperature"`    // 0.0 ~ 2.0
+	MaxTokens   int     `json:"max_tokens"`     // 1 ~ 128000
+	Seed        int64   `json:"seed,omitempty"` // for deterministic replay
 }
 
 // Metric represents a metric definition.

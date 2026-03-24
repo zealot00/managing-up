@@ -3,8 +3,11 @@ package evaluation
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/zealot/managing-up/apps/api/internal/llm"
+	"github.com/zealot/managing-up/apps/api/internal/runtime"
 	"github.com/zealot/managing-up/apps/api/internal/service"
 )
 
@@ -41,11 +44,12 @@ type EvaluationRepository interface {
 }
 
 type EvaluationRunner struct {
-	taskRepo   service.TaskRepository
-	metricRepo service.MetricRepository
-	execRepo   TaskExecutionRepository
-	evalRepo   EvaluationRepository
-	registry   *EvaluatorRegistry
+	taskRepo     service.TaskRepository
+	metricRepo   service.MetricRepository
+	execRepo     TaskExecutionRepository
+	evalRepo     EvaluationRepository
+	registry     *EvaluatorRegistry
+	traceEmitter runtime.TraceEmitter
 }
 
 func NewEvaluationRunner(
@@ -53,22 +57,38 @@ func NewEvaluationRunner(
 	metricRepo service.MetricRepository,
 	execRepo TaskExecutionRepository,
 	evalRepo EvaluationRepository,
+	traceEmitter runtime.TraceEmitter,
 ) *EvaluationRunner {
 	registry := NewEvaluatorRegistry()
 	registry.Register(&ExactMatchEvaluator{})
 	registry.Register(NewSemanticSimilarityEvaluator(0.8))
 
 	return &EvaluationRunner{
-		taskRepo:   taskRepo,
-		metricRepo: metricRepo,
-		execRepo:   execRepo,
-		evalRepo:   evalRepo,
-		registry:   registry,
+		taskRepo:     taskRepo,
+		metricRepo:   metricRepo,
+		execRepo:     execRepo,
+		evalRepo:     evalRepo,
+		registry:     registry,
+		traceEmitter: traceEmitter,
 	}
 }
 
 func (r *EvaluationRunner) RegisterJudgeModel(judgeFn PromptBasedJudge) {
 	r.registry.Register(NewJudgeModelEvaluator(judgeFn))
+}
+
+func (r *EvaluationRunner) emitEvent(ctx context.Context, eventType runtime.EventType, data any) {
+	if r.traceEmitter == nil {
+		return
+	}
+	event := runtime.TraceEvent{
+		ID:          runtime.GenerateTraceID(),
+		ExecutionID: "", // will be set by caller
+		EventType:   eventType,
+		EventData:   runtime.MustBuildEventData(data),
+		Timestamp:   time.Now(),
+	}
+	r.traceEmitter.Emit(ctx, event)
 }
 
 func (r *EvaluationRunner) RunTask(ctx context.Context, taskID, agentID string, input map[string]any) (TaskExecution, error) {
@@ -91,7 +111,36 @@ func (r *EvaluationRunner) RunTask(ctx context.Context, taskID, agentID string, 
 		return TaskExecution{}, fmt.Errorf("failed to create task execution: %w", err)
 	}
 
-	output := r.simulateAgentOutput(task, input)
+	r.emitEvent(ctx, runtime.EventExecutionStarted, runtime.ExecutionStartedData{
+		SkillID:   taskID,
+		SkillName: agentID,
+		Input:     input,
+	})
+
+	startTime := time.Now()
+	output, err := callLLM(ctx, task, input)
+	durationMs := time.Since(startTime).Milliseconds()
+	if err != nil {
+		exec.Status = "failed"
+		exec.Output = map[string]any{"error": err.Error()}
+		r.execRepo.UpdateTaskExecution(exec)
+		r.emitEvent(ctx, runtime.EventExecutionFailed, map[string]any{
+			"error": err.Error(),
+		})
+		return exec, fmt.Errorf("LLM call failed: %w", err)
+	}
+
+	var inputTokens int
+	if tokens, ok := output["tokens"].(int); ok {
+		inputTokens = tokens
+	}
+	r.emitEvent(ctx, runtime.EventLLMCall, runtime.LLMCallData{
+		Model:       task.Execution.Model,
+		Output:      fmt.Sprintf("%v", output["result"]),
+		InputTokens: inputTokens,
+		DurationMs:  durationMs,
+	})
+
 	exec.Output = output
 	exec.Status = "completed"
 
@@ -99,6 +148,11 @@ func (r *EvaluationRunner) RunTask(ctx context.Context, taskID, agentID string, 
 	exec.DurationMs = duration
 
 	r.execRepo.UpdateTaskExecution(exec)
+
+	r.emitEvent(ctx, runtime.EventExecutionSucceeded, map[string]any{
+		"output":      output,
+		"duration_ms": duration,
+	})
 
 	return exec, nil
 }
@@ -124,11 +178,32 @@ func (r *EvaluationRunner) EvaluateExecution(ctx context.Context, taskExecID, me
 		return EvaluationResult{}, fmt.Errorf("evaluator not found for type: %s", metric.Type)
 	}
 
-	expected := r.getExpectedForInput(task, exec.Input)
+	expected := ""
+	for _, tc := range task.TestCases {
+		match := true
+		for k, v := range tc.Input {
+			if fmt.Sprintf("%v", exec.Input[k]) != fmt.Sprintf("%v", v) {
+				match = false
+				break
+			}
+		}
+		if match {
+			expected = fmt.Sprintf("%v", tc.Expected)
+			break
+		}
+	}
+	if expected == "" {
+		expected = fmt.Sprintf("%v", task.Gold.Data)
+	}
 	score, err := evaluator.Evaluate(ctx, exec.Input, expected, exec.Output)
 	if err != nil {
 		return EvaluationResult{}, fmt.Errorf("evaluation failed: %w", err)
 	}
+
+	r.emitEvent(ctx, runtime.EventLLMCall, runtime.LLMCallData{
+		Model:  task.Execution.Model,
+		Output: fmt.Sprintf("score: %.4f", score.Value),
+	})
 
 	eval := EvaluationResult{
 		ID:              fmt.Sprintf("eval_%d", time.Now().UnixNano()),
@@ -146,33 +221,94 @@ func (r *EvaluationRunner) EvaluateExecution(ctx context.Context, taskExecID, me
 	return eval, nil
 }
 
-func (r *EvaluationRunner) simulateAgentOutput(task service.Task, input map[string]any) map[string]any {
-	output := make(map[string]any)
-	for _, tc := range task.TestCases {
-		for k, v := range tc.Input {
-			if input[k] == v {
-				output[k] = tc.Expected
-			}
-		}
+// getLLMClient returns an LLM client configured for the task.
+func getLLMClient(task service.Task) (llm.Client, error) {
+	provider, model, err := llm.ParseModelString(task.Execution.Model)
+	if err != nil {
+		return nil, fmt.Errorf("invalid model string %q: %w", task.Execution.Model, err)
 	}
-	if len(output) == 0 {
-		output["result"] = "simulated output"
+
+	apiKey := os.Getenv("LLM_API_KEY")
+	// For Ollama, no API key needed
+	if provider == llm.ProviderOllama {
+		apiKey = ""
 	}
-	return output
+
+	client, err := llm.NewClient(provider, model, apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create LLM client: %w", err)
+	}
+	return client, nil
 }
 
-func (r *EvaluationRunner) getExpectedForInput(task service.Task, input map[string]any) any {
-	for _, tc := range task.TestCases {
-		match := true
-		for k, v := range tc.Input {
-			if input[k] != v {
-				match = false
+// callLLM invokes the LLM and returns the output text.
+func callLLM(ctx context.Context, task service.Task, input map[string]any) (map[string]any, error) {
+	client, err := getLLMClient(task)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build the prompt from input
+	prompt := buildPrompt(task, input)
+
+	messages := []llm.Message{
+		{Role: "user", Content: prompt},
+	}
+
+	opts := []llm.Option{
+		llm.WithTemperature(float32(task.Execution.Temperature)),
+		llm.WithMaxTokens(task.Execution.MaxTokens),
+	}
+
+	resp, err := client.Generate(ctx, messages, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("LLM call failed: %w", err)
+	}
+
+	output := map[string]any{
+		"result": resp.Content,
+		"model":  task.Execution.Model,
+		"tokens": resp.Usage.TotalTokens,
+	}
+
+	return output, nil
+}
+
+// buildPrompt creates a prompt from task input and gold/expected data.
+func buildPrompt(task service.Task, input map[string]any) string {
+	// Format input as a readable string
+	var parts []string
+	for k, v := range input {
+		parts = append(parts, fmt.Sprintf("%s: %v", k, v))
+	}
+	inputStr := joinLines(parts)
+
+	prompt := fmt.Sprintf("Task: %s\nInput:\n%s\n", task.Description, inputStr)
+
+	// If we have gold/expected data, include it as reference
+	if len(task.TestCases) > 0 {
+		for i, tc := range task.TestCases {
+			if fmt.Sprintf("%v", tc.Input) == fmt.Sprintf("%v", input) {
+				prompt += fmt.Sprintf("\nExpected output format: %v", tc.Expected)
 				break
 			}
-		}
-		if match {
-			return tc.Expected
+			if i == 0 {
+				prompt += fmt.Sprintf("\nExample expected: %v", tc.Expected)
+			}
 		}
 	}
-	return nil
+
+	prompt += "\nProvide your output."
+	return prompt
+}
+
+func joinLines(parts []string) string {
+	if len(parts) == 0 {
+		return "(no input)"
+	}
+	result := parts[0]
+	for _, p := range parts[1:] {
+		result += "\n" + p
+	}
+	return result
 }

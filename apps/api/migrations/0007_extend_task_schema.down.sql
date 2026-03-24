@@ -1,0 +1,15 @@
+ALTER TABLE tasks DROP COLUMN IF EXISTS task_type;
+ALTER TABLE tasks DROP COLUMN IF EXISTS input_source;
+ALTER TABLE tasks DROP COLUMN IF EXISTS input_path;
+ALTER TABLE tasks DROP COLUMN IF EXISTS input_format;
+ALTER TABLE tasks DROP COLUMN IF EXISTS gold_type;
+ALTER TABLE tasks DROP COLUMN IF EXISTS gold_data;
+ALTER TABLE tasks DROP COLUMN IF EXISTS primary_metric;
+ALTER TABLE tasks DROP COLUMN IF EXISTS secondary_metrics;
+ALTER TABLE tasks DROP COLUMN IF EXISTS threshold_pass;
+ALTER TABLE tasks DROP COLUMN IF EXISTS threshold_regression_alert;
+ALTER TABLE tasks DROP COLUMN IF EXISTS execution_model;
+ALTER TABLE tasks DROP COLUMN IF EXISTS execution_temperature;
+ALTER TABLE tasks DROP COLUMN IF EXISTS execution_max_tokens;
+ALTER TABLE tasks DROP COLUMN IF EXISTS execution_seed;
+ALTER TABLE tasks ALTER COLUMN difficulty SET NOT NULL;

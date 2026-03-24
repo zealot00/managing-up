@@ -1,5 +1,7 @@
 package llm
 
+import "strings"
+
 // Provider 是 LLM 提供商类型
 type Provider string
 
@@ -88,4 +90,50 @@ type Usage struct {
 	InputTokens  int `json:"input_tokens"`
 	OutputTokens int `json:"output_tokens"`
 	TotalTokens  int `json:"total_tokens"`
+}
+
+// ParseModelString parses a model string and returns the provider and model.
+// The model string can be in format "provider:model" (e.g., "openai:gpt-4o")
+// or just the model name (e.g., "gpt-4o") in which case the provider is inferred.
+func ParseModelString(modelStr string) (Provider, Model, error) {
+	// Check if format is "provider:model"
+	if strings.Contains(modelStr, ":") {
+		parts := strings.SplitN(modelStr, ":", 2)
+		provider := Provider(parts[0])
+		model := Model(parts[1])
+		return provider, model, nil
+	}
+
+	// Infer provider from model name prefix
+	model := Model(modelStr)
+	provider := inferProvider(modelStr)
+	return provider, model, nil
+}
+
+// inferProvider guesses the provider based on model name prefixes.
+func inferProvider(modelStr string) Provider {
+	switch {
+	case strings.HasPrefix(modelStr, "gpt-4") || strings.HasPrefix(modelStr, "gpt-3.5"):
+		return ProviderOpenAI
+	case strings.HasPrefix(modelStr, "claude-"):
+		return ProviderAnthropic
+	case strings.HasPrefix(modelStr, "gemini-"):
+		return ProviderGoogle
+	case strings.HasPrefix(modelStr, "azure-"):
+		return ProviderAzure
+	case strings.HasPrefix(modelStr, "llama") || strings.HasPrefix(modelStr, "mistral") || strings.HasPrefix(modelStr, "qwen"):
+		return ProviderOllama
+	case strings.HasPrefix(modelStr, "abab") || strings.HasPrefix(modelStr, "MiniMax"):
+		return ProviderMinimax
+	case strings.HasPrefix(modelStr, "glm-"):
+		return ProviderZhipuAI
+	case strings.HasPrefix(modelStr, "deepseek-"):
+		return ProviderDeepSeek
+	case strings.HasPrefix(modelStr, "ernie-"):
+		return ProviderBaidu
+	case strings.HasPrefix(modelStr, "qwen-"):
+		return ProviderAlibaba
+	default:
+		return ProviderOpenAI // default to OpenAI
+	}
 }
