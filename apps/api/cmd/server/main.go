@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/config"
-	"github.com/zealot/managing-up/apps/api/internal/persistence/postgres"
-	"github.com/zealot/managing-up/apps/api/internal/runtime"
+	engine "github.com/zealot/managing-up/apps/api/internal/engine"
+	"github.com/zealot/managing-up/apps/api/internal/repository/postgres"
 	"github.com/zealot/managing-up/apps/api/internal/server"
 )
 
@@ -34,8 +34,8 @@ func main() {
 
 		srv = server.NewWithRepository(cfg, repo, repo.Close)
 
-		engine := runtime.NewExecutionEngine(repo, runtime.NewToolGateway())
-		worker := runtime.NewWorker(engine, repo, 2*time.Second)
+		execEngine := engine.NewExecutionEngine(repo, engine.NewToolGateway())
+		worker := engine.NewWorker(execEngine, repo, 2*time.Second)
 		go worker.Start(context.Background())
 	}
 

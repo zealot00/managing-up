@@ -1,4 +1,4 @@
-package evaluation
+package evaluator
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/zealot/managing-up/apps/api/internal/engine"
 	"github.com/zealot/managing-up/apps/api/internal/llm"
-	"github.com/zealot/managing-up/apps/api/internal/runtime"
 	"github.com/zealot/managing-up/apps/api/internal/service"
 )
 
@@ -50,7 +50,7 @@ type EvaluationRunner struct {
 	evalRepo     EvaluationRepository
 	registry     *EvaluatorRegistry
 	router       *JudgeRouter
-	traceEmitter runtime.TraceEmitter
+	traceEmitter engine.TraceEmitter
 }
 
 func NewEvaluationRunner(
@@ -59,7 +59,7 @@ func NewEvaluationRunner(
 	execRepo TaskExecutionRepository,
 	evalRepo EvaluationRepository,
 	router *JudgeRouter,
-	traceEmitter runtime.TraceEmitter,
+	traceEmitter engine.TraceEmitter,
 ) *EvaluationRunner {
 	registry := NewEvaluatorRegistry()
 	registry.Register(&ExactMatchEvaluator{})
@@ -83,15 +83,15 @@ func (r *EvaluationRunner) RegisterJudgeModel(judgeFn PromptBasedJudge) {
 	r.registry.Register(NewJudgeModelEvaluator(judgeFn))
 }
 
-func (r *EvaluationRunner) emitEvent(ctx context.Context, eventType runtime.EventType, data any) {
+func (r *EvaluationRunner) emitEvent(ctx context.Context, eventType engine.EventType, data any) {
 	if r.traceEmitter == nil {
 		return
 	}
-	event := runtime.TraceEvent{
-		ID:          runtime.GenerateTraceID(),
+	event := engine.TraceEvent{
+		ID:          engine.GenerateTraceID(),
 		ExecutionID: "", // will be set by caller
 		EventType:   eventType,
-		EventData:   runtime.MustBuildEventData(data),
+		EventData:   engine.MustBuildEventData(data),
 		Timestamp:   time.Now(),
 	}
 	r.traceEmitter.Emit(ctx, event)
@@ -117,7 +117,7 @@ func (r *EvaluationRunner) RunTask(ctx context.Context, taskID, agentID string, 
 		return TaskExecution{}, fmt.Errorf("failed to create task execution: %w", err)
 	}
 
-	r.emitEvent(ctx, runtime.EventExecutionStarted, runtime.ExecutionStartedData{
+	r.emitEvent(ctx, engine.EventExecutionStarted, engine.ExecutionStartedData{
 		SkillID:   taskID,
 		SkillName: agentID,
 		Input:     input,
@@ -130,7 +130,7 @@ func (r *EvaluationRunner) RunTask(ctx context.Context, taskID, agentID string, 
 		exec.Status = "failed"
 		exec.Output = map[string]any{"error": err.Error()}
 		r.execRepo.UpdateTaskExecution(exec)
-		r.emitEvent(ctx, runtime.EventExecutionFailed, map[string]any{
+		r.emitEvent(ctx, engine.EventExecutionFailed, map[string]any{
 			"error": err.Error(),
 		})
 		return exec, fmt.Errorf("LLM call failed: %w", err)
@@ -140,7 +140,7 @@ func (r *EvaluationRunner) RunTask(ctx context.Context, taskID, agentID string, 
 	if tokens, ok := output["tokens"].(int); ok {
 		inputTokens = tokens
 	}
-	r.emitEvent(ctx, runtime.EventLLMCall, runtime.LLMCallData{
+	r.emitEvent(ctx, engine.EventLLMCall, engine.LLMCallData{
 		Model:       task.Execution.Model,
 		Output:      fmt.Sprintf("%v", output["result"]),
 		InputTokens: inputTokens,
@@ -155,7 +155,7 @@ func (r *EvaluationRunner) RunTask(ctx context.Context, taskID, agentID string, 
 
 	r.execRepo.UpdateTaskExecution(exec)
 
-	r.emitEvent(ctx, runtime.EventExecutionSucceeded, map[string]any{
+	r.emitEvent(ctx, engine.EventExecutionSucceeded, map[string]any{
 		"output":      output,
 		"duration_ms": duration,
 	})
@@ -206,7 +206,7 @@ func (r *EvaluationRunner) EvaluateExecution(ctx context.Context, taskExecID, me
 		return EvaluationResult{}, fmt.Errorf("evaluation failed: %w", err)
 	}
 
-	r.emitEvent(ctx, runtime.EventLLMCall, runtime.LLMCallData{
+	r.emitEvent(ctx, engine.EventLLMCall, engine.LLMCallData{
 		Model:  task.Execution.Model,
 		Output: fmt.Sprintf("score: %.4f", score.Value),
 	})

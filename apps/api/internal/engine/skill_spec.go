@@ -1,4 +1,4 @@
-package runtime
+package engine
 
 type SkillSpec struct {
 	Name        string     `yaml:"name"`

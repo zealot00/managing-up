@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/zealot/managing-up/apps/api/internal/config"
-	"github.com/zealot/managing-up/apps/api/internal/persistence/postgres"
+	"github.com/zealot/managing-up/apps/api/internal/repository/postgres"
 )
 
 func main() {
