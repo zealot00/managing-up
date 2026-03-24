@@ -8,6 +8,7 @@ import (
 
 	"github.com/zealot/managing-up/apps/api/internal/engine"
 	"github.com/zealot/managing-up/apps/api/internal/llm"
+	"github.com/zealot/managing-up/apps/api/internal/server"
 	"github.com/zealot/managing-up/apps/api/internal/service"
 )
 
@@ -51,6 +52,8 @@ type EvaluationRunner struct {
 	registry     *EvaluatorRegistry
 	router       *JudgeRouter
 	traceEmitter engine.TraceEmitter
+	agent        engine.Agent
+	agentLLM     llm.Client
 }
 
 func NewEvaluationRunner(
@@ -60,6 +63,8 @@ func NewEvaluationRunner(
 	evalRepo EvaluationRepository,
 	router *JudgeRouter,
 	traceEmitter engine.TraceEmitter,
+	agent engine.Agent,
+	agentLLM llm.Client,
 ) *EvaluationRunner {
 	registry := NewEvaluatorRegistry()
 	registry.Register(&ExactMatchEvaluator{})
@@ -76,6 +81,8 @@ func NewEvaluationRunner(
 		registry:     registry,
 		router:       router,
 		traceEmitter: traceEmitter,
+		agent:        agent,
+		agentLLM:     agentLLM,
 	}
 }
 
@@ -123,41 +130,100 @@ func (r *EvaluationRunner) RunTask(ctx context.Context, taskID, agentID string, 
 		Input:     input,
 	})
 
-	startTime := time.Now()
-	output, err := callLLM(ctx, task, input)
-	durationMs := time.Since(startTime).Milliseconds()
+	serverTask := server.Task{
+		ID:          task.ID,
+		Name:        task.Name,
+		Description: task.Description,
+		Tags:        task.Tags,
+		CreatedAt:   task.CreatedAt,
+		UpdatedAt:   task.UpdatedAt,
+		TaskType:    task.TaskType,
+		Input: server.TaskInput{
+			Source: task.Input.Source,
+			Path:   task.Input.Path,
+			Format: task.Input.Format,
+		},
+		Gold: server.GoldConfig{
+			Type: task.Gold.Type,
+			Data: task.Gold.Data,
+		},
+		Scoring: server.ScoringConfig{
+			PrimaryMetric:    task.Scoring.PrimaryMetric,
+			SecondaryMetrics: task.Scoring.SecondaryMetrics,
+			Threshold: server.Threshold{
+				Pass:            task.Scoring.Threshold.Pass,
+				RegressionAlert: task.Scoring.Threshold.RegressionAlert,
+			},
+		},
+		Execution: server.ExecutionConfig{
+			Model:       task.Execution.Model,
+			Temperature: task.Execution.Temperature,
+			MaxTokens:   task.Execution.MaxTokens,
+			Seed:        task.Execution.Seed,
+		},
+		SkillID:    task.SkillID,
+		Difficulty: task.Difficulty,
+		TestCases: func() []server.TestCase {
+			result := make([]server.TestCase, len(task.TestCases))
+			for i, tc := range task.TestCases {
+				result[i] = server.TestCase{
+					Input:    tc.Input,
+					Expected: tc.Expected,
+				}
+			}
+			return result
+		}(),
+	}
+	result, err := r.agent.Run(ctx, serverTask, nil)
 	if err != nil {
 		exec.Status = "failed"
 		exec.Output = map[string]any{"error": err.Error()}
 		r.execRepo.UpdateTaskExecution(exec)
-		r.emitEvent(ctx, engine.EventExecutionFailed, map[string]any{
-			"error": err.Error(),
-		})
-		return exec, fmt.Errorf("LLM call failed: %w", err)
+		r.emitEvent(ctx, engine.EventExecutionFailed, map[string]any{"error": err.Error()})
+		return exec, fmt.Errorf("agent run failed: %w", err)
 	}
 
-	var inputTokens int
-	if tokens, ok := output["tokens"].(int); ok {
-		inputTokens = tokens
+	// Store agent result
+	exec.Output = map[string]any{
+		"result":      result.Output,
+		"status":      result.Status,
+		"total_steps": result.TotalSteps,
+		"cost":        result.Cost,
+		"duration_ms": result.Duration.Milliseconds(),
+		"trace":       result.Trace, // full agent trace
 	}
-	r.emitEvent(ctx, engine.EventLLMCall, engine.LLMCallData{
-		Model:       task.Execution.Model,
-		Output:      fmt.Sprintf("%v", output["result"]),
-		InputTokens: inputTokens,
-		DurationMs:  durationMs,
-	})
+	exec.DurationMs = result.Duration.Milliseconds()
 
-	exec.Output = output
-	exec.Status = "completed"
-
-	duration := time.Since(exec.CreatedAt).Milliseconds()
-	exec.DurationMs = duration
+	// Update status based on agent result
+	switch result.Status {
+	case engine.StatusSucceeded:
+		exec.Status = "completed"
+	case engine.StatusFailed:
+		exec.Status = "failed"
+	case engine.StatusTimeout:
+		exec.Status = "timeout"
+	case engine.StatusMaxStepsExceeded:
+		exec.Status = "max_steps_exceeded"
+	default:
+		exec.Status = result.Status
+	}
 
 	r.execRepo.UpdateTaskExecution(exec)
 
+	// Emit events for each agent step
+	for _, step := range result.Trace {
+		if step.Error != "" {
+			r.emitEvent(ctx, engine.EventLLMCall, engine.LLMCallData{
+				Model:      result.Cost.Model,
+				Output:     step.LLMResponse,
+				DurationMs: 0,
+			})
+		}
+	}
+
 	r.emitEvent(ctx, engine.EventExecutionSucceeded, map[string]any{
-		"output":      output,
-		"duration_ms": duration,
+		"output":      result.Output,
+		"duration_ms": result.Duration.Milliseconds(),
 	})
 
 	return exec, nil
