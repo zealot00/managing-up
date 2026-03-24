@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Skill Hub EE",
-  description: "Enterprise operating system for governed intelligence execution.",
+  title: "managing-up — 向上管理",
+  description: "Enterprise AI quality infrastructure — benchmark, regression, and harness testing for AI agents.",
 };
 
 const navLinks = [
@@ -27,9 +27,9 @@ export default function RootLayout({
         <nav className="nav-bar">
           <div className="nav-inner">
             <a href="/" className="nav-brand">
-              <img src="/logo.svg" alt="Skill Hub EE" className="nav-logo" />
-              <span>Skill Hub</span>
-              <span className="nav-edition">EE</span>
+              <img src="/logo.svg" alt="managing-up" className="nav-logo" />
+              <span>managing-up</span>
+              <span className="nav-edition">向上管理</span>
             </a>
             <div className="nav-links">
               {navLinks.map((link) => (
