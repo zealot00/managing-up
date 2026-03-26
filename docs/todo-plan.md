@@ -63,35 +63,43 @@ Beyond the original plan:
 - [x] **Tool Gateway** — Mock HTTP adapter for MVP
 - [x] **Background Worker** — 2s polling for pending executions
 
-## Agent Harness Phase 1 — 2026-03-25
+## Agent Harness Phase 1 — 2026-03-25 → 重构
 
-> 基于 gap-analysis-2026-03-25 + product-spec.md 合并更新  
-> 排期遵循 PDCA 滚动迭代：Plan → Do → Check → Act
+> 2026-03-26 优先级调整：砍掉 Task Builder + Skill Sandbox + Shadow Eval
+> 聚焦：Task Registry + Local CLI Runner + Trajectory Capture + Basic Dashboard
 
 ### 🔴 P0 — 立即开始（阻断验收）
 
 | Item | Domain | Notes | Status |
 |------|--------|-------|--------|
-| Task Builder (`POST /api/v1/tasks/from-trace`) | D1 | 从 trace 自动生成 task，数据底座 | ✅ 2026-03-25 + UI ✅ |
-| Judge Model Metric | D4 | LLM 作为评判者，exact_match 不足 | ✅ 2026-03-25 |
+| Task Registry | D1 | 管理已有数据集（砍掉自动生成） | ✅ Phase 1 已完成 |
+| Local CLI Runner | D2 | 单 Agent 评测工具 | ✅ Phase 1 已完成 |
+| Trajectory Capture | D3 | 录制 Agent 运行轨迹 | ✅ Phase 1 已完成 |
+| Basic Dashboard | D5 | 看评测结果 | ✅ Phase 1 已完成 |
 
-### 🟡 P1 — 下一个冲刺
+### 🟡 本周 Sprint
 
-| Item | Domain | Notes | Status |
-|------|--------|-------|--------|
-| Basic Sweep Engine | D2 | `POST /api/v1/experiments` 支持多-variant | ✅ 2026-03-25 |
-| Capability Diff API | D4 | 自动回答"变聪明/变笨" | ✅ 2026-03-25 |
-| Metric Framework 扩展 | D4 | 当前 2 种 → judge_model + statistical | ✅ judge_model + statistical ✅ 2026-03-25 |
-| Capability Graph | D4 | 分数 → capability → KPI 映射，Dashboard 数据基础 | ✅ 2026-03-25 |
+| Item | Notes | Status |
+|------|-------|--------|
+| 3 个内部 Agent 项目 pilot | 验证录制轨迹是否有用 + 开发者愿不愿意用 CLI | ⬜ 进行中 |
+| 确定 Metric 优先级 | 哪些 metric 是内部开发者真正关心的 | ⬜ 待确认 |
 
-### 🟢 P2 — 后续迭代（Phase 2-3）
+### 🟠 本月 — 数据模型确定（技术债源头）
 
-| Item | Domain | Notes |
-|------|--------|-------|
-| Distributed Runner | D2 | 单 worker → 多 worker，100+ 并行 |
-| Capability Graph | D4 | 分数 → capability → KPI 映射 |
-| Replay Bus | D3 | 完整 trajectory 回放 |
-| Radar Dashboard | D5 | 6 指标卡 → Radar view + trend line | ✅ 2026-03-25 |
+| Item | Notes | Status |
+|------|-------|--------|
+| Trajectory Schema 定义 | 轨迹数据结构怎么存 | ⬜ 待定 |
+| 存储选型 | Postgres？TimescaleDB？ClickHouse？ | ⬜ 待定 |
+
+### 🟢 砍掉（已移除）
+
+| Item | 原因 |
+|------|------|
+| Task Builder (from-trace) | 复杂度高，优先用现有数据集 |
+| Skill Sandbox | Phase 6，后续再定 |
+| Shadow Eval | Phase 6，后续再定 |
+| Distributed Runner | Phase 2 |
+| Replay Bus | Phase 3 |
 
 ---
 
@@ -99,11 +107,11 @@ Beyond the original plan:
 
 | Phase | Focus | Key Items |
 |-------|-------|-----------|
-| Phase 2 | Capability Modeling | Capability Graph, Trajectory Search, Failure Mining |
-| Phase 3 | Distributed Execution | Worker Pool, Budget Scheduler, Deterministic Mode |
-| Phase 4 | Governance & CI | CI Gate API, GitHub Integration, RBAC |
-| Phase 5 | Observability Deepening | Radar Dashboard, Entropy Budget, Cost Intelligence |
-| Phase 6 | Advanced Execution | Policy Variant Runner, Skill Sandbox, Shadow Eval |
+| Phase 2 | Pilot + Data Model | 3 Agent 项目验证 + Trajectory Schema + 存储选型 |
+| Phase 3 | Capability Modeling | Capability Graph, Trajectory Search, Failure Mining |
+| Phase 4 | Distributed Execution | Worker Pool, Budget Scheduler, Deterministic Mode |
+| Phase 5 | Governance & CI | CI Gate API, GitHub Integration, RBAC |
+| Phase 6 | Observability Deepening | Radar Dashboard, Entropy Budget, Cost Intelligence |
 
 ---
 
@@ -112,13 +120,13 @@ Beyond the original plan:
 当前 Sprint 以 **2 周**为周期滚动：
 
 ```
-Sprint 1 (W1-W2): P0 items → Task Builder + Judge Model
+Sprint 1 (已完): P0 items → Task Registry + CLI Runner + Trajectory Capture + Dashboard
     ↓
-Sprint 2 (W3-W4): P1 items → Sweep Engine + Metric Framework
+Sprint 2 (本周): 3 个内部 Agent 项目 pilot → 验证轨迹价值 + CLI 接受度 + Metric 优先级
     ↓
-Sprint 3 (W5-W6): P2 items → Distributed Runner + Capability Graph
+Sprint 3 (本月): Trajectory Schema 定义 + 存储选型（P0 技术债）
     ↓
-Check: 验收测试 + gap-analysis 复盘
+Check: pilot 结果 + 数据模型评审
     ↓
 Act: 调整优先级，下一轮 Sprint
 ```
