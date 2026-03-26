@@ -30,9 +30,20 @@ type Experiment struct {
 	Description string
 	TaskIDs     []string
 	AgentIDs    []string
+	Variants    []Variant
 	Status      string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+// Variant represents an LLM configuration variant for experiment sweeps.
+type Variant struct {
+	Name        string
+	Model       string
+	Temperature float64
+	MaxTokens   int
+	Seed        int64
+	SkillConfig map[string]string
 }
 
 // ExperimentRun represents an individual run within an experiment.
@@ -41,6 +52,7 @@ type ExperimentRun struct {
 	ExperimentID string
 	TaskID       string
 	AgentID      string
+	VariantID    string
 	MetricScores map[string]any
 	OverallScore float64
 	DurationMs   int64
@@ -54,6 +66,7 @@ type CreateExperimentRequest struct {
 	Description string
 	TaskIDs     []string
 	AgentIDs    []string
+	Variants    []Variant
 }
 
 // TaskRunner defines the interface for running tasks and evaluating results.
@@ -110,7 +123,7 @@ func NewExperimentService(
 }
 
 // RunExperiment triggers execution of an experiment.
-// It runs all task×agent combinations in parallel using a worker pool.
+// It runs all task×agent or task×variant combinations in parallel using a worker pool.
 func (s *ExperimentService) RunExperiment(ctx context.Context, experimentID string) error {
 	exp, ok := s.experimentRepo.GetExperiment(experimentID)
 	if !ok {
@@ -119,39 +132,50 @@ func (s *ExperimentService) RunExperiment(ctx context.Context, experimentID stri
 
 	s.experimentRepo.UpdateExperimentStatus(exp.ID, "running")
 
-	// Collect all (task, agent) pairs to run
 	type pair struct {
-		taskID  string
-		agentID string
+		taskID    string
+		agentID   string
+		variantID string
 	}
 	var pairs []pair
-	for _, taskID := range exp.TaskIDs {
-		for _, agentID := range exp.AgentIDs {
-			pairs = append(pairs, pair{taskID: taskID, agentID: agentID})
+
+	if len(exp.Variants) > 0 {
+		for _, taskID := range exp.TaskIDs {
+			for _, variant := range exp.Variants {
+				variantID := variant.Name
+				if variantID == "" {
+					variantID = variant.Model
+				}
+				pairs = append(pairs, pair{taskID: taskID, agentID: "", variantID: variantID})
+			}
+		}
+	} else {
+		for _, taskID := range exp.TaskIDs {
+			for _, agentID := range exp.AgentIDs {
+				pairs = append(pairs, pair{taskID: taskID, agentID: agentID, variantID: ""})
+			}
 		}
 	}
 
-	// Run in parallel (max 10 workers)
 	const maxWorkers = 10
 	sem := make(chan struct{}, maxWorkers)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	completed := 0
-	_ = completed // suppress unused warning
 
 	for _, p := range pairs {
 		wg.Add(1)
-		go func(taskID, agentID string) {
+		go func(taskID, agentID, variantID string) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			s.runSingleTask(ctx, exp.ID, taskID, agentID)
+			s.runSingleTask(ctx, exp.ID, taskID, agentID, variantID)
 
 			mu.Lock()
 			completed++
 			mu.Unlock()
-		}(p.taskID, p.agentID)
+		}(p.taskID, p.agentID, p.variantID)
 	}
 
 	wg.Wait()
@@ -160,14 +184,15 @@ func (s *ExperimentService) RunExperiment(ctx context.Context, experimentID stri
 	return nil
 }
 
-// runSingleTask executes one task for one agent and records an ExperimentRun.
-func (s *ExperimentService) runSingleTask(ctx context.Context, experimentID, taskID, agentID string) ExperimentRun {
+// runSingleTask executes one task for one agent or variant and records an ExperimentRun.
+func (s *ExperimentService) runSingleTask(ctx context.Context, experimentID, taskID, agentID, variantID string) ExperimentRun {
 	now := time.Now()
 	run := ExperimentRun{
 		ID:           fmt.Sprintf("run_%d", time.Now().UnixNano()),
 		ExperimentID: experimentID,
 		TaskID:       taskID,
 		AgentID:      agentID,
+		VariantID:    variantID,
 		Status:       "running",
 		CreatedAt:    now,
 	}
@@ -187,7 +212,14 @@ func (s *ExperimentService) runSingleTask(ctx context.Context, experimentID, tas
 	var totalScore float64
 	var scored int
 
-	for i, tc := range task.TestCases {
+	testCases := task.TestCases
+	if len(testCases) == 0 {
+		// No test cases defined — generate a default case with empty input
+		// EvaluateExecution will fall back to task.Gold.Data as expected output
+		testCases = []TestCase{{Input: map[string]any{}, Expected: nil}}
+	}
+
+	for i, tc := range testCases {
 		// Execute task
 		exec, err := s.runner.RunTask(ctx, taskID, agentID, tc.Input)
 		if err != nil {

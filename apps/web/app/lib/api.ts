@@ -152,7 +152,7 @@ type Envelope<T> = {
   meta: { request_id: string };
 };
 
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8080";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 async function readEnvelope<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -187,6 +187,10 @@ export async function getSkillVersionsBySkillId(skillId: string): Promise<{ item
   return readEnvelope<{ items: SkillVersion[] }>(`/api/v1/skills/${skillId}/versions`);
 }
 
+export async function getSkillSpec(skillId: string): Promise<{ spec_yaml: string }> {
+  return readEnvelope<{ spec_yaml: string }>(`/api/v1/skills/${skillId}/spec`);
+}
+
 export async function getExecutions(): Promise<{ items: Execution[] }> {
   return readEnvelope<{ items: Execution[] }>("/api/v1/executions");
 }
@@ -209,6 +213,14 @@ export type CreateSkillRequest = {
   name: string;
   owner_team: string;
   risk_level: string;
+};
+
+export type CreateSkillVersionRequest = {
+  skill_id: string;
+  version: string;
+  change_summary: string;
+  approval_required: boolean;
+  spec_yaml: string;
 };
 
 export type CreateExecutionRequest = {
@@ -244,6 +256,10 @@ async function postEnvelope<T, R>(path: string, body: T): Promise<R> {
 
 export async function createSkill(req: CreateSkillRequest): Promise<Skill> {
   return postEnvelope<CreateSkillRequest, Skill>("/api/v1/skills", req);
+}
+
+export async function createSkillVersion(req: CreateSkillVersionRequest): Promise<SkillVersion> {
+  return postEnvelope<CreateSkillVersionRequest, SkillVersion>("/api/v1/skill-versions", req);
 }
 
 export async function createExecution(req: CreateExecutionRequest): Promise<Execution> {
@@ -299,6 +315,19 @@ export async function deleteTask(id: string): Promise<void> {
   if (!response.ok) {
     throw new Error(`API DELETE failed for /api/v1/tasks/${id}`);
   }
+}
+
+export type BuildTaskFromTraceRequest = {
+  execution_id?: string;
+  trace_id?: string;
+  name?: string;
+  description?: string;
+  tags?: string[];
+  difficulty?: string;
+};
+
+export async function buildTaskFromTrace(req: BuildTaskFromTraceRequest): Promise<Task> {
+  return postEnvelope<BuildTaskFromTraceRequest, Task>("/api/v1/tasks/from-trace", req);
 }
 
 // Metric API
@@ -381,4 +410,28 @@ export async function getReplaySnapshots(executionId?: string): Promise<{ items:
 
 export async function getReplaySnapshot(id: string): Promise<ReplaySnapshot> {
   return readEnvelope<ReplaySnapshot>(`/api/v1/replay-snapshots/${id}`);
+}
+
+// Capabilities API
+export type CapabilityScore = {
+  experimentId: string;
+  experimentName: string;
+  score: number;
+  timestamp: string;
+};
+
+export type CapabilityGraphNode = {
+  name: string;
+  score: number;
+  sampleSize: number;
+  scores: CapabilityScore[];
+};
+
+export async function getCapabilities(): Promise<{ data: CapabilityGraphNode[] }> {
+  const response = await readEnvelope<{ capabilities: CapabilityGraphNode[] }>("/api/v1/capabilities");
+  return { data: response.capabilities };
+}
+
+export async function getCapability(name: string): Promise<CapabilityGraphNode> {
+  return readEnvelope<CapabilityGraphNode>(`/api/v1/capabilities/${name}`);
 }

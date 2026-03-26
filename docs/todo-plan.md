@@ -63,11 +63,73 @@ Beyond the original plan:
 - [x] **Tool Gateway** — Mock HTTP adapter for MVP
 - [x] **Background Worker** — 2s polling for pending executions
 
-## Remaining Items (Future)
+## Agent Harness Phase 1 — 2026-03-25
+
+> 基于 gap-analysis-2026-03-25 + product-spec.md 合并更新  
+> 排期遵循 PDCA 滚动迭代：Plan → Do → Check → Act
+
+### 🔴 P0 — 立即开始（阻断验收）
+
+| Item | Domain | Notes | Status |
+|------|--------|-------|--------|
+| Task Builder (`POST /api/v1/tasks/from-trace`) | D1 | 从 trace 自动生成 task，数据底座 | ✅ 2026-03-25 + UI ✅ |
+| Judge Model Metric | D4 | LLM 作为评判者，exact_match 不足 | ✅ 2026-03-25 |
+
+### 🟡 P1 — 下一个冲刺
+
+| Item | Domain | Notes | Status |
+|------|--------|-------|--------|
+| Basic Sweep Engine | D2 | `POST /api/v1/experiments` 支持多-variant | ✅ 2026-03-25 |
+| Capability Diff API | D4 | 自动回答"变聪明/变笨" | ✅ 2026-03-25 |
+| Metric Framework 扩展 | D4 | 当前 2 种 → judge_model + statistical | ✅ judge_model + statistical ✅ 2026-03-25 |
+| Capability Graph | D4 | 分数 → capability → KPI 映射，Dashboard 数据基础 | ✅ 2026-03-25 |
+
+### 🟢 P2 — 后续迭代（Phase 2-3）
+
+| Item | Domain | Notes |
+|------|--------|-------|
+| Distributed Runner | D2 | 单 worker → 多 worker，100+ 并行 |
+| Capability Graph | D4 | 分数 → capability → KPI 映射 |
+| Replay Bus | D3 | 完整 trajectory 回放 |
+| Radar Dashboard | D5 | 6 指标卡 → Radar view + trend line | ✅ 2026-03-25 |
+
+---
+
+## Phase 2-6 Roadmap
+
+| Phase | Focus | Key Items |
+|-------|-------|-----------|
+| Phase 2 | Capability Modeling | Capability Graph, Trajectory Search, Failure Mining |
+| Phase 3 | Distributed Execution | Worker Pool, Budget Scheduler, Deterministic Mode |
+| Phase 4 | Governance & CI | CI Gate API, GitHub Integration, RBAC |
+| Phase 5 | Observability Deepening | Radar Dashboard, Entropy Budget, Cost Intelligence |
+| Phase 6 | Advanced Execution | Policy Variant Runner, Skill Sandbox, Shadow Eval |
+
+---
+
+## PDCA 迭代模式
+
+当前 Sprint 以 **2 周**为周期滚动：
+
+```
+Sprint 1 (W1-W2): P0 items → Task Builder + Judge Model
+    ↓
+Sprint 2 (W3-W4): P1 items → Sweep Engine + Metric Framework
+    ↓
+Sprint 3 (W5-W6): P2 items → Distributed Runner + Capability Graph
+    ↓
+Check: 验收测试 + gap-analysis 复盘
+    ↓
+Act: 调整优先级，下一轮 Sprint
+```
+
+---
+
+## 原有 Remaining Items（保留）
 
 | Item | Priority | Notes |
 |------|----------|-------|
-| Real Tool Gateway implementation | High | Shell/SQL safety, key management |
+| Real Tool Gateway implementation | High | Phase 3 后再实现，当前 mock 够用 |
 | Frontend smoke tests | Medium | Playwright/Cypress |
 | PostgreSQL-backed CI | Medium | GitHub Actions workflow |
 | Idempotent seed data | Low | Environment-specific seeds |
@@ -77,7 +139,10 @@ Beyond the original plan:
 | Metric | Value |
 |--------|-------|
 | Go Tests | 83 passing |
-| Frontend Pages | 7 routes |
-| API Endpoints | 11 |
+| Frontend Pages | 9 routes (+2: /tasks/from-trace, /dashboard/capabilities) |
+| API Endpoints | 16 (+5: tasks/from-trace, capabilities, capabilities/{name}, capabilities/{name}/diff, experiments variants) |
+| Metric Types | 5 (exact_match, semantic_similarity, embedding_similarity, judge_model, statistical) |
+| Internal Packages | stats (shared statistical functions) |
 | LLM Providers | 10 |
 | SDK Languages | 2 (Python, TypeScript) |
+| Phase 1 完成 | 6/6 items ✅ |

@@ -32,6 +32,16 @@ func New(dsn string) (*Repository, error) {
 		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
+	// Ensure new columns exist ( idempotent ALTER TABLE )
+	if _, err := db.Exec(`ALTER TABLE experiment_runs ADD COLUMN IF NOT EXISTS variant_id TEXT NOT NULL DEFAULT ''`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrate experiment_runs variant_id: %w", err)
+	}
+	if _, err := db.Exec(`ALTER TABLE experiments ADD COLUMN IF NOT EXISTS variants JSONB DEFAULT '[]'::jsonb`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrate experiments variants: %w", err)
+	}
+
 	return &Repository{db: db}, nil
 }
 
@@ -549,14 +559,58 @@ func (r *Repository) CreateTask(task server.Task) (server.Task, error) {
 		id = fmt.Sprintf("task_%d", time.Now().UnixNano())
 	}
 
+	// Default values for new columns
+	taskType := task.TaskType
+	if taskType == "" {
+		taskType = "benchmark"
+	}
+	inputSource := task.Input.Source
+	if inputSource == "" {
+		inputSource = "inline"
+	}
+	goldType := task.Gold.Type
+	if goldType == "" {
+		goldType = "exact_match"
+	}
+	primaryMetric := task.Scoring.PrimaryMetric
+	if primaryMetric == "" {
+		primaryMetric = "exact_match"
+	}
+	executionModel := task.Execution.Model
+	if executionModel == "" {
+		executionModel = "gpt-4o"
+	}
+
 	tagsJSON, _ := json.Marshal(task.Tags)
 	testCasesJSON, _ := json.Marshal(task.TestCases)
+	goldDataJSON, _ := json.Marshal(task.Gold.Data)
+	secondaryMetricsJSON, _ := json.Marshal(task.Scoring.SecondaryMetrics)
 
 	query := `
-		INSERT INTO tasks (id, name, description, skill_id, tags, difficulty, test_cases, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO tasks (
+			id, name, description, skill_id, tags, difficulty, test_cases,
+			created_at, updated_at,
+			task_type, input_source, input_path, input_format,
+			gold_type, gold_data, primary_metric, secondary_metrics,
+			threshold_pass, threshold_regression_alert,
+			execution_model, execution_temperature, execution_max_tokens, execution_seed
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
 	`
-	_, err := r.db.Exec(query, id, task.Name, task.Description, task.SkillID, tagsJSON, task.Difficulty, testCasesJSON, task.CreatedAt, task.UpdatedAt)
+	// Use nil for empty skill_id to satisfy FK constraint
+	var skillIDArg any
+	if task.SkillID != "" {
+		skillIDArg = task.SkillID
+	}
+
+	_, err := r.db.Exec(query,
+		id, task.Name, task.Description, skillIDArg, tagsJSON, task.Difficulty, testCasesJSON,
+		task.CreatedAt, task.UpdatedAt,
+		taskType, inputSource, task.Input.Path, task.Input.Format,
+		goldType, goldDataJSON, primaryMetric, secondaryMetricsJSON,
+		task.Scoring.Threshold.Pass, task.Scoring.Threshold.RegressionAlert,
+		executionModel, task.Execution.Temperature, task.Execution.MaxTokens, task.Execution.Seed,
+	)
 	if err != nil {
 		return server.Task{}, err
 	}
@@ -567,33 +621,56 @@ func (r *Repository) CreateTask(task server.Task) (server.Task, error) {
 
 func (r *Repository) GetTask(id string) (server.Task, bool) {
 	query := `
-		SELECT id, name, description, skill_id, tags, difficulty, test_cases, created_at, updated_at
+		SELECT
+			id, name, description, skill_id, tags, difficulty, test_cases,
+			created_at, updated_at,
+			task_type, input_source, input_path, input_format,
+			gold_type, gold_data, primary_metric, secondary_metrics,
+			threshold_pass, threshold_regression_alert,
+			execution_model, execution_temperature, execution_max_tokens, execution_seed
 		FROM tasks
 		WHERE id = $1
 	`
 
 	var task server.Task
-	var tagsJSON, testCasesJSON []byte
-	var skillID string
+	var tagsJSON, testCasesJSON, goldDataJSON, secondaryMetricsJSON []byte
+	var skillID *string
 
 	err := r.db.QueryRow(query, id).Scan(
 		&task.ID, &task.Name, &task.Description, &skillID,
-		&tagsJSON, &task.Difficulty, &testCasesJSON, &task.CreatedAt, &task.UpdatedAt,
+		&tagsJSON, &task.Difficulty, &testCasesJSON,
+		&task.CreatedAt, &task.UpdatedAt,
+		&task.TaskType, &task.Input.Source, &task.Input.Path, &task.Input.Format,
+		&task.Gold.Type, &goldDataJSON, &task.Scoring.PrimaryMetric, &secondaryMetricsJSON,
+		&task.Scoring.Threshold.Pass, &task.Scoring.Threshold.RegressionAlert,
+		&task.Execution.Model, &task.Execution.Temperature, &task.Execution.MaxTokens, &task.Execution.Seed,
 	)
 	if err != nil {
 		return server.Task{}, false
 	}
 
-	task.SkillID = skillID
+	if skillID != nil {
+		task.SkillID = *skillID
+	} else {
+		task.SkillID = ""
+	}
 	json.Unmarshal(tagsJSON, &task.Tags)
 	json.Unmarshal(testCasesJSON, &task.TestCases)
+	json.Unmarshal(goldDataJSON, &task.Gold.Data)
+	json.Unmarshal(secondaryMetricsJSON, &task.Scoring.SecondaryMetrics)
 
 	return task, true
 }
 
 func (r *Repository) ListTasks(skillID string, difficulty string) []server.Task {
 	query := `
-		SELECT id, name, description, skill_id, tags, difficulty, test_cases, created_at, updated_at
+		SELECT
+			id, name, description, skill_id, tags, difficulty, test_cases,
+			created_at, updated_at,
+			task_type, input_source, input_path, input_format,
+			gold_type, gold_data, primary_metric, secondary_metrics,
+			threshold_pass, threshold_regression_alert,
+			execution_model, execution_temperature, execution_max_tokens, execution_seed
 		FROM tasks
 		WHERE ($1 = '' OR skill_id = $1) AND ($2 = '' OR difficulty = $2)
 		ORDER BY created_at DESC
@@ -608,16 +685,30 @@ func (r *Repository) ListTasks(skillID string, difficulty string) []server.Task 
 	items := make([]server.Task, 0)
 	for rows.Next() {
 		var task server.Task
-		var tagsJSON, testCasesJSON []byte
-		var sID string
+		var tagsJSON, testCasesJSON, goldDataJSON, secondaryMetricsJSON []byte
+		var sID *string
 
-		if err := rows.Scan(&task.ID, &task.Name, &task.Description, &sID, &tagsJSON, &task.Difficulty, &testCasesJSON, &task.CreatedAt, &task.UpdatedAt); err != nil {
+		if err := rows.Scan(
+			&task.ID, &task.Name, &task.Description, &sID,
+			&tagsJSON, &task.Difficulty, &testCasesJSON,
+			&task.CreatedAt, &task.UpdatedAt,
+			&task.TaskType, &task.Input.Source, &task.Input.Path, &task.Input.Format,
+			&task.Gold.Type, &goldDataJSON, &task.Scoring.PrimaryMetric, &secondaryMetricsJSON,
+			&task.Scoring.Threshold.Pass, &task.Scoring.Threshold.RegressionAlert,
+			&task.Execution.Model, &task.Execution.Temperature, &task.Execution.MaxTokens, &task.Execution.Seed,
+		); err != nil {
 			continue
 		}
 
-		task.SkillID = sID
+		if sID != nil {
+			task.SkillID = *sID
+		} else {
+			task.SkillID = ""
+		}
 		json.Unmarshal(tagsJSON, &task.Tags)
 		json.Unmarshal(testCasesJSON, &task.TestCases)
+		json.Unmarshal(goldDataJSON, &task.Gold.Data)
+		json.Unmarshal(secondaryMetricsJSON, &task.Scoring.SecondaryMetrics)
 		items = append(items, task)
 	}
 
@@ -719,12 +810,16 @@ func (r *Repository) CreateExperiment(exp server.Experiment) (server.Experiment,
 	}
 	taskIDsJSON, _ := json.Marshal(exp.TaskIDs)
 	agentIDsJSON, _ := json.Marshal(exp.AgentIDs)
+	variantsJSON, _ := json.Marshal(exp.Variants)
 
 	query := `
-		INSERT INTO experiments (id, name, description, task_ids, agent_ids, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO experiments (id, name, description, task_ids, agent_ids, variants, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (id) DO UPDATE SET
+			status = EXCLUDED.status,
+			updated_at = EXCLUDED.updated_at
 	`
-	_, err := r.db.Exec(query, id, exp.Name, exp.Description, taskIDsJSON, agentIDsJSON, exp.Status, exp.CreatedAt, exp.UpdatedAt)
+	_, err := r.db.Exec(query, id, exp.Name, exp.Description, taskIDsJSON, agentIDsJSON, variantsJSON, exp.Status, exp.CreatedAt, exp.UpdatedAt)
 	if err != nil {
 		return server.Experiment{}, err
 	}
@@ -734,22 +829,23 @@ func (r *Repository) CreateExperiment(exp server.Experiment) (server.Experiment,
 
 func (r *Repository) GetExperiment(id string) (server.Experiment, bool) {
 	query := `
-		SELECT id, name, description, task_ids, agent_ids, status, created_at, updated_at
+		SELECT id, name, description, task_ids, agent_ids, variants, status, created_at, updated_at
 		FROM experiments WHERE id = $1
 	`
 	var exp server.Experiment
-	var taskIDsJSON, agentIDsJSON []byte
-	err := r.db.QueryRow(query, id).Scan(&exp.ID, &exp.Name, &exp.Description, &taskIDsJSON, &agentIDsJSON, &exp.Status, &exp.CreatedAt, &exp.UpdatedAt)
+	var taskIDsJSON, agentIDsJSON, variantsJSON []byte
+	err := r.db.QueryRow(query, id).Scan(&exp.ID, &exp.Name, &exp.Description, &taskIDsJSON, &agentIDsJSON, &variantsJSON, &exp.Status, &exp.CreatedAt, &exp.UpdatedAt)
 	if err != nil {
 		return server.Experiment{}, false
 	}
 	json.Unmarshal(taskIDsJSON, &exp.TaskIDs)
 	json.Unmarshal(agentIDsJSON, &exp.AgentIDs)
+	json.Unmarshal(variantsJSON, &exp.Variants)
 	return exp, true
 }
 
 func (r *Repository) ListExperiments() []server.Experiment {
-	query := `SELECT id, name, description, task_ids, agent_ids, status, created_at, updated_at FROM experiments ORDER BY created_at DESC`
+	query := `SELECT id, name, description, task_ids, agent_ids, variants, status, created_at, updated_at FROM experiments ORDER BY created_at DESC`
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return []server.Experiment{}
@@ -759,20 +855,40 @@ func (r *Repository) ListExperiments() []server.Experiment {
 	items := make([]server.Experiment, 0)
 	for rows.Next() {
 		var exp server.Experiment
-		var taskIDsJSON, agentIDsJSON []byte
-		if err := rows.Scan(&exp.ID, &exp.Name, &exp.Description, &taskIDsJSON, &agentIDsJSON, &exp.Status, &exp.CreatedAt, &exp.UpdatedAt); err != nil {
+		var taskIDsJSON, agentIDsJSON, variantsJSON []byte
+		if err := rows.Scan(&exp.ID, &exp.Name, &exp.Description, &taskIDsJSON, &agentIDsJSON, &variantsJSON, &exp.Status, &exp.CreatedAt, &exp.UpdatedAt); err != nil {
 			continue
 		}
 		json.Unmarshal(taskIDsJSON, &exp.TaskIDs)
 		json.Unmarshal(agentIDsJSON, &exp.AgentIDs)
+		json.Unmarshal(variantsJSON, &exp.Variants)
 		items = append(items, exp)
 	}
 	return items
 }
 
+func (r *Repository) CreateExperimentRun(run server.ExperimentRun) (server.ExperimentRun, error) {
+	id := run.ID
+	if id == "" {
+		id = fmt.Sprintf("run_%d", time.Now().UnixNano())
+	}
+	metricScoresJSON, _ := json.Marshal(run.MetricScores)
+
+	query := `
+		INSERT INTO experiment_runs (id, experiment_id, task_id, agent_id, variant_id, metric_scores, overall_score, duration_ms, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+	_, err := r.db.Exec(query, id, run.ExperimentID, run.TaskID, run.AgentID, run.VariantID, metricScoresJSON, run.OverallScore, run.DurationMs, run.Status, run.CreatedAt)
+	if err != nil {
+		return server.ExperimentRun{}, err
+	}
+	run.ID = id
+	return run, nil
+}
+
 func (r *Repository) ListExperimentRuns(experimentID string) []server.ExperimentRun {
 	query := `
-		SELECT id, experiment_id, task_id, agent_id, metric_scores, overall_score, duration_ms, status, created_at
+		SELECT id, experiment_id, task_id, agent_id, variant_id, metric_scores, overall_score, duration_ms, status, created_at
 		FROM experiment_runs
 		WHERE ($1 = '' OR experiment_id = $1)
 		ORDER BY created_at DESC
@@ -787,13 +903,24 @@ func (r *Repository) ListExperimentRuns(experimentID string) []server.Experiment
 	for rows.Next() {
 		var run server.ExperimentRun
 		var metricScoresJSON []byte
-		if err := rows.Scan(&run.ID, &run.ExperimentID, &run.TaskID, &run.AgentID, &metricScoresJSON, &run.OverallScore, &run.DurationMs, &run.Status, &run.CreatedAt); err != nil {
+		if err := rows.Scan(&run.ID, &run.ExperimentID, &run.TaskID, &run.AgentID, &run.VariantID, &metricScoresJSON, &run.OverallScore, &run.DurationMs, &run.Status, &run.CreatedAt); err != nil {
 			continue
 		}
 		json.Unmarshal(metricScoresJSON, &run.MetricScores)
 		items = append(items, run)
 	}
 	return items
+}
+
+func (r *Repository) UpdateExperimentRun(run server.ExperimentRun) error {
+	metricScoresJSON, _ := json.Marshal(run.MetricScores)
+	query := `
+		UPDATE experiment_runs
+		SET variant_id = $2, metric_scores = $3, overall_score = $4, duration_ms = $5, status = $6
+		WHERE id = $1
+	`
+	_, err := r.db.Exec(query, run.ID, run.VariantID, metricScoresJSON, run.OverallScore, run.DurationMs, run.Status)
+	return err
 }
 
 func (r *Repository) CreateReplaySnapshot(snap server.ReplaySnapshot) (server.ReplaySnapshot, error) {

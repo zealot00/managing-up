@@ -271,3 +271,92 @@ func isValidDifficulty(d string) bool {
 	}
 	return false
 }
+
+type BuildTaskFromTraceRequest struct {
+	ExecutionID string
+	TraceID     string
+	Input       map[string]any
+	Output      map[string]any
+	Steps       []TraceStep
+}
+
+type TraceStep struct {
+	StepID     string
+	ToolRef    string
+	Input      map[string]any
+	Output     map[string]any
+	DurationMs int64
+}
+
+func (s *TaskService) BuildTaskFromTrace(req BuildTaskFromTraceRequest) (Task, error) {
+	if req.ExecutionID == "" && req.TraceID == "" {
+		return Task{}, fmt.Errorf("execution_id or trace_id is required")
+	}
+
+	executionID := req.ExecutionID
+	if executionID == "" {
+		executionID = req.TraceID
+	}
+
+	var taskInput TaskInput
+	if req.Input != nil {
+		taskInput = TaskInput{
+			Source: "synthetic",
+			Path:   fmt.Sprintf("execution://%s", executionID),
+			Format: "json",
+		}
+	}
+
+	var gold GoldConfig
+	if req.Output != nil {
+		gold = GoldConfig{
+			Type: "exact_match",
+			Data: req.Output,
+		}
+	}
+
+	var testCases []TestCase
+	if len(req.Steps) > 0 {
+		for _, step := range req.Steps {
+			if step.Input != nil {
+				testCases = append(testCases, TestCase{
+					Input:    step.Input,
+					Expected: step.Output,
+				})
+			}
+		}
+	}
+
+	now := time.Now()
+	task := Task{
+		ID:          fmt.Sprintf("task_%d", time.Now().UnixNano()),
+		Name:        fmt.Sprintf("Task from execution %s", executionID),
+		Description: fmt.Sprintf("Auto-generated task from trace %s", executionID),
+		Tags:        []string{"auto-generated", "from-trace"},
+		CreatedAt:   now,
+		UpdatedAt:   now,
+		TaskType:    "regression",
+		Input:       taskInput,
+		Gold:        gold,
+		Scoring: ScoringConfig{
+			PrimaryMetric: "exact_match",
+			Threshold: Threshold{
+				Pass:            0.85,
+				RegressionAlert: 0.90,
+			},
+		},
+		Execution: ExecutionConfig{
+			Model:       "gpt-4o",
+			Temperature: 0.0,
+			MaxTokens:   2048,
+		},
+		Difficulty: "medium",
+		TestCases:  testCases,
+	}
+
+	if len(testCases) > 0 {
+		task.Input.Source = "inline"
+	}
+
+	return task, nil
+}

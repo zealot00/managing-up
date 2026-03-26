@@ -6,7 +6,7 @@ import { SkeletonPanel } from "../components/SkeletonPanel";
 function SkeletonExecutionsPage() {
   return (
     <main className="shell">
-      <section className="hero hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Execution Timeline</p>
         <h1>Operational runs across governed skills.</h1>
         <p className="lede">
@@ -34,7 +34,7 @@ async function ExecutionsContent() {
 
   return (
     <main className="shell">
-      <section className="hero hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Execution Timeline</p>
         <h1>Operational runs across governed skills.</h1>
         <p className="lede">
@@ -59,7 +59,7 @@ async function ExecutionsContent() {
                 </p>
                 <a
                   href={`/executions/${execution.id}/traces`}
-                  style={{ fontSize: "0.78rem", color: "var(--primary)", marginTop: 4, display: "inline-block" }}
+                  className="trace-link"
                 >
                   View trace →
                 </a>

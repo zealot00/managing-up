@@ -9,7 +9,7 @@ function SkeletonTasks() {
       <section className="toprail" aria-label="Tasks navigation">
         <div className="loading-pulse" style={{ width: 180, height: 44, borderRadius: 999 }} />
       </section>
-      <section className="hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Task Registry</p>
         <h1>Evaluation Tasks</h1>
       </section>
@@ -72,7 +72,7 @@ async function TasksContent() {
         </a>
       </section>
 
-      <section className="hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Task Registry</p>
         <h1>Evaluation Tasks</h1>
         <p className="lede">

@@ -74,7 +74,7 @@ async function ExperimentsContent() {
         </a>
       </section>
 
-      <section className="hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Experiment DB</p>
         <h1>Experiments</h1>
         <p className="lede">

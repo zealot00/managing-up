@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getSkill, getSkillVersions } from "../../lib/api";
+import { getSkill, getSkillVersions, getSkillSpec } from "../../lib/api";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -19,6 +19,8 @@ export default async function SkillDetailPage({ params }: Props) {
   const versionsData = await getSkillVersions();
   const versions = versionsData.items.filter((v) => v.skill_id === id);
 
+  const specData = await getSkillSpec(id);
+
   return (
     <main className="shell">
       <section className="toprail">
@@ -27,7 +29,7 @@ export default async function SkillDetailPage({ params }: Props) {
         </Link>
       </section>
 
-      <section className="hero hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Registry</p>
         <h1>{skill.name}</h1>
         <p className="lede">
@@ -96,6 +98,14 @@ export default async function SkillDetailPage({ params }: Props) {
               ))
             )}
           </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-header">
+            <p className="section-kicker">Specification</p>
+            <h2>Skill Spec YAML</h2>
+          </div>
+          <pre className="json-block">{specData.spec_yaml}</pre>
         </article>
       </section>
     </main>

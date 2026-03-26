@@ -7,7 +7,7 @@ import { SkeletonPanel } from "../components/SkeletonPanel";
 function SkeletonApprovalsPage() {
   return (
     <main className="shell">
-      <section className="hero hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Human Control</p>
         <h1>Approvals and procedure validation workload.</h1>
         <p className="lede">
@@ -43,7 +43,7 @@ async function ApprovalsContent() {
 
   return (
     <main className="shell">
-      <section className="hero hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Human Control</p>
         <h1>Approvals and procedure validation workload.</h1>
         <p className="lede">

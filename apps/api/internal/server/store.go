@@ -523,6 +523,14 @@ func (s *store) CreateExperiment(exp Experiment) (Experiment, error) {
 	return Experiment{}, nil
 }
 
+func (s *store) CreateExperimentRun(run ExperimentRun) (ExperimentRun, error) {
+	return ExperimentRun{}, nil
+}
+
+func (s *store) UpdateExperimentRun(run ExperimentRun) error {
+	return nil
+}
+
 func (s *store) ListExperimentRuns(experimentID string) []ExperimentRun {
 	return []ExperimentRun{}
 }

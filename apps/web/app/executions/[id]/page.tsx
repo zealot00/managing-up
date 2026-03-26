@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getExecution } from "../../lib/api";
+import { getExecution, getTraces } from "../../lib/api";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -9,8 +9,9 @@ export default async function ExecutionDetailPage({ params }: Props) {
   const { id } = await params;
 
   let execution;
+  let traces;
   try {
-    execution = await getExecution(id);
+    [execution, traces] = await Promise.all([getExecution(id), getTraces(id)]);
   } catch {
     notFound();
   }
@@ -19,13 +20,17 @@ export default async function ExecutionDetailPage({ params }: Props) {
     notFound();
   }
 
+  const formatTimestamp = (ts: string) => {
+    return new Date(ts).toLocaleString();
+  };
+
   return (
     <main className="shell">
       <section className="toprail">
         <a href="/executions">← Back to executions</a>
       </section>
 
-      <section className="hero hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Execution Timeline</p>
         <h1>{execution.skill_name}</h1>
         <p className="lede">
@@ -84,6 +89,37 @@ export default async function ExecutionDetailPage({ params }: Props) {
               ? JSON.stringify(execution.input, null, 2)
               : "{ }"}
           </pre>
+        </article>
+
+        <article className="panel">
+          <div className="panel-header">
+            <p className="section-kicker">Execution</p>
+            <h2>Trace timeline</h2>
+          </div>
+          {traces.length === 0 ? (
+            <p className="text-muted">No trace events recorded.</p>
+          ) : (
+            <div className="list">
+              {traces.map((event) => (
+                <article className="list-card" key={event.id}>
+                  <div>
+                    <h3>{event.step_id}</h3>
+                    <p>
+                      <span className={`badge badge-${event.event_type}`}>{event.event_type}</span>
+                      {" · "}
+                      {formatTimestamp(event.timestamp)}
+                    </p>
+                    <details>
+                      <summary>Event data</summary>
+                      <pre className="json-block json-small">
+                        {JSON.stringify(event.event_data, null, 2)}
+                      </pre>
+                    </details>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </article>
       </section>
     </main>

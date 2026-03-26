@@ -91,7 +91,7 @@ async function EvaluationsContent() {
         </a>
       </section>
 
-      <section className="hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Evaluation Engine</p>
         <h1>Task Executions</h1>
         <p className="lede">

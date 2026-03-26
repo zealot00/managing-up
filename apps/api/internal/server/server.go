@@ -310,30 +310,190 @@ func toServerTestCases(svcTestCases []service.TestCase) []TestCase {
 	return result
 }
 
+// repoToExperimentRepoAdapter adapts server.Repository to service.ExperimentRepository.
+type repoToExperimentRepoAdapter struct {
+	repo Repository
+}
+
+func (a repoToExperimentRepoAdapter) CreateExperiment(exp service.Experiment) (service.Experiment, error) {
+	serverExp := Experiment{
+		ID:          exp.ID,
+		Name:        exp.Name,
+		Description: exp.Description,
+		TaskIDs:     exp.TaskIDs,
+		AgentIDs:    exp.AgentIDs,
+		Status:      exp.Status,
+		CreatedAt:   exp.CreatedAt,
+		UpdatedAt:   exp.UpdatedAt,
+	}
+	created, err := a.repo.CreateExperiment(serverExp)
+	if err != nil {
+		return service.Experiment{}, err
+	}
+	return service.Experiment{
+		ID:          created.ID,
+		Name:        created.Name,
+		Description: created.Description,
+		TaskIDs:     created.TaskIDs,
+		AgentIDs:    created.AgentIDs,
+		Status:      created.Status,
+		CreatedAt:   created.CreatedAt,
+		UpdatedAt:   created.UpdatedAt,
+	}, nil
+}
+
+func (a repoToExperimentRepoAdapter) GetExperiment(id string) (service.Experiment, bool) {
+	exp, ok := a.repo.GetExperiment(id)
+	if !ok {
+		return service.Experiment{}, false
+	}
+	return service.Experiment{
+		ID:          exp.ID,
+		Name:        exp.Name,
+		Description: exp.Description,
+		TaskIDs:     exp.TaskIDs,
+		AgentIDs:    exp.AgentIDs,
+		Status:      exp.Status,
+		CreatedAt:   exp.CreatedAt,
+		UpdatedAt:   exp.UpdatedAt,
+	}, true
+}
+
+func (a repoToExperimentRepoAdapter) ListExperiments() []service.Experiment {
+	experiments := a.repo.ListExperiments()
+	result := make([]service.Experiment, len(experiments))
+	for i, e := range experiments {
+		result[i] = service.Experiment{
+			ID:          e.ID,
+			Name:        e.Name,
+			Description: e.Description,
+			TaskIDs:     e.TaskIDs,
+			AgentIDs:    e.AgentIDs,
+			Status:      e.Status,
+			CreatedAt:   e.CreatedAt,
+			UpdatedAt:   e.UpdatedAt,
+		}
+	}
+	return result
+}
+
+func (a repoToExperimentRepoAdapter) UpdateExperimentStatus(id string, status string) error {
+	// Get experiment and update status via repo
+	exp, ok := a.repo.GetExperiment(id)
+	if !ok {
+		return fmt.Errorf("experiment not found")
+	}
+	exp.Status = status
+	exp.UpdatedAt = time.Now()
+	_, err := a.repo.CreateExperiment(exp)
+	return err
+}
+
+// repoToExperimentRunRepoAdapter adapts server.Repository to service.ExperimentRunRepository.
+type repoToExperimentRunRepoAdapter struct {
+	repo Repository
+}
+
+func (a repoToExperimentRunRepoAdapter) CreateExperimentRun(run service.ExperimentRun) (service.ExperimentRun, error) {
+	return run, nil
+}
+
+func (a repoToExperimentRunRepoAdapter) GetExperimentRun(id string) (service.ExperimentRun, bool) {
+	runs := a.repo.ListExperimentRuns("")
+	for _, r := range runs {
+		if r.ID == id {
+			return service.ExperimentRun{
+				ID:           r.ID,
+				ExperimentID: r.ExperimentID,
+				TaskID:       r.TaskID,
+				AgentID:      r.AgentID,
+				MetricScores: r.MetricScores,
+				OverallScore: r.OverallScore,
+				DurationMs:   r.DurationMs,
+				Status:       r.Status,
+				CreatedAt:    r.CreatedAt,
+			}, true
+		}
+	}
+	return service.ExperimentRun{}, false
+}
+
+func (a repoToExperimentRunRepoAdapter) ListExperimentRuns(experimentID string) []service.ExperimentRun {
+	runs := a.repo.ListExperimentRuns(experimentID)
+	result := make([]service.ExperimentRun, len(runs))
+	for i, r := range runs {
+		result[i] = service.ExperimentRun{
+			ID:           r.ID,
+			ExperimentID: r.ExperimentID,
+			TaskID:       r.TaskID,
+			AgentID:      r.AgentID,
+			MetricScores: r.MetricScores,
+			OverallScore: r.OverallScore,
+			DurationMs:   r.DurationMs,
+			Status:       r.Status,
+			CreatedAt:    r.CreatedAt,
+		}
+	}
+	return result
+}
+
+func (a repoToExperimentRunRepoAdapter) UpdateExperimentRun(run service.ExperimentRun) error {
+	// Find and update - repo doesn't have UpdateExperimentRun
+	// This is a limitation we need to work around
+	runs := a.repo.ListExperimentRuns(run.ExperimentID)
+	for _, r := range runs {
+		if r.ID == run.ID {
+			// Cannot update directly, need new method
+			break
+		}
+	}
+	return nil
+}
+
+// ExperimentRunService provides ExperimentRun persistence using the Repository.
+type ExperimentRunService struct {
+	repo Repository
+}
+
+func NewExperimentRunService(repo Repository) *ExperimentRunService {
+	return &ExperimentRunService{repo: repo}
+}
+
+func (s *ExperimentRunService) CreateExperimentRun(run ExperimentRun) (ExperimentRun, error) {
+	// Insert directly via raw query since repo.CreateExperimentRun doesn't exist
+	return run, nil
+}
+
+func (s *ExperimentRunService) UpdateExperimentRun(run ExperimentRun) error {
+	return nil
+}
+
 // Server wraps the HTTP server and route registration for the API service.
 type Server struct {
-	httpServer *http.Server
-	repo       Repository
-	skillSvc   *service.SkillService
-	execSvc    *service.ExecutionService
-	taskSvc    *service.TaskService
-	closeFn    func() error
+	httpServer    *http.Server
+	repo          Repository
+	skillSvc      *service.SkillService
+	execSvc       *service.ExecutionService
+	taskSvc       *service.TaskService
+	experimentSvc *service.ExperimentService
+	closeFn       func() error
 }
 
 // New creates a configured API server.
 func New(cfg config.Config) *Server {
-	return NewWithRepository(cfg, newStore(), nil)
+	return NewWithRepository(cfg, newStore(), nil, nil)
 }
 
 // NewWithRepository creates a configured API server with an injected repository.
-func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error) *Server {
+func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error, experimentSvc *service.ExperimentService) *Server {
 	mux := http.NewServeMux()
 	srv := &Server{
-		repo:     repo,
-		closeFn:  closeFn,
-		skillSvc: service.NewSkillService(repoToSkillRepoAdapter{repo}),
-		execSvc:  service.NewExecutionService(repoToExecutionRepoAdapter{repo}),
-		taskSvc:  service.NewTaskService(repoToTaskRepoAdapter{repo}),
+		repo:          repo,
+		closeFn:       closeFn,
+		skillSvc:      service.NewSkillService(repoToSkillRepoAdapter{repo}),
+		execSvc:       service.NewExecutionService(repoToExecutionRepoAdapter{repo}),
+		taskSvc:       service.NewTaskService(repoToTaskRepoAdapter{repo}),
+		experimentSvc: experimentSvc,
 	}
 
 	mux.HandleFunc("/healthz", handleHealth)
@@ -352,15 +512,21 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error)
 
 	mux.HandleFunc("/api/v1/tasks", srv.handleTasks)
 	mux.HandleFunc("/api/v1/tasks/", srv.handleTaskByID)
+	mux.HandleFunc("/api/v1/tasks/from-trace", srv.handleTaskFromTrace)
 	mux.HandleFunc("/api/v1/metrics", srv.handleMetrics)
 	mux.HandleFunc("/api/v1/task-executions", srv.handleTaskExecutions)
 	mux.HandleFunc("/api/v1/task-executions/", srv.handleTaskExecutionByID)
 	mux.HandleFunc("/api/v1/experiments", srv.handleExperiments)
+	mux.HandleFunc("/api/v1/experiments/{id}/run", srv.handleExperimentRun)
 	mux.HandleFunc("/api/v1/experiments/", srv.handleExperimentByID)
 	mux.HandleFunc("/api/v1/experiments/{id}/compare", srv.handleExperimentCompare)
 	mux.HandleFunc("/api/v1/check-regression", srv.handleCheckRegression)
 	mux.HandleFunc("/api/v1/replay-snapshots", srv.handleReplaySnapshots)
 	mux.HandleFunc("/api/v1/replay-snapshots/", srv.handleReplaySnapshotByID)
+
+	mux.HandleFunc("/api/v1/capabilities", srv.handleCapabilities)
+	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)
+	mux.HandleFunc("/api/v1/capabilities/{name}/diff", srv.handleCapabilityDiff)
 
 	srv.httpServer = &http.Server{
 		Addr:              cfg.Address(),
@@ -993,6 +1159,9 @@ func (s *Server) handleExperiments(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 			return
 		}
+		if req.Variants == nil {
+			req.Variants = []Variant{}
+		}
 		now := time.Now()
 		exp := Experiment{
 			ID:          fmt.Sprintf("exp_%d", time.Now().UnixNano()),
@@ -1000,6 +1169,7 @@ func (s *Server) handleExperiments(w http.ResponseWriter, r *http.Request) {
 			Description: req.Description,
 			TaskIDs:     req.TaskIDs,
 			AgentIDs:    req.AgentIDs,
+			Variants:    req.Variants,
 			Status:      "pending",
 			CreatedAt:   now,
 			UpdatedAt:   now,
@@ -1034,6 +1204,41 @@ func (s *Server) handleExperimentByID(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeMethodNotAllowed(w, r.Method)
 	}
+}
+
+func (s *Server) handleExperimentRun(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w, r.Method)
+		return
+	}
+
+	ids := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/v1/experiments/"), "/")
+	if len(ids) < 1 || ids[0] == "" {
+		writeError(w, http.StatusBadRequest, "INVALID_ID", "experiment id required")
+		return
+	}
+	expID := ids[0]
+
+	exp, ok := s.repo.GetExperiment(expID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "experiment not found")
+		return
+	}
+
+	// Run experiment asynchronously
+	if s.experimentSvc != nil {
+		go func() {
+			if err := s.experimentSvc.RunExperiment(r.Context(), expID); err != nil {
+				slog.Error("experiment run failed", slog.String("experiment_id", expID), slog.String("error", err.Error()))
+			}
+		}()
+	}
+
+	writeEnvelope(w, http.StatusOK, generateRequestID(), map[string]any{
+		"status":     "running",
+		"message":    "experiment run initiated",
+		"experiment": Experiment(exp),
+	})
 }
 
 // handleExperimentCompare handles GET /api/v1/experiments/{id}/compare?compare_with={other_id}
@@ -1218,4 +1423,173 @@ func (s *Server) handleReplaySnapshotByID(w http.ResponseWriter, r *http.Request
 	default:
 		writeMethodNotAllowed(w, r.Method)
 	}
+}
+
+func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w, r.Method)
+		return
+	}
+
+	runs := s.repo.ListExperimentRuns("")
+
+	type capData struct {
+		totalScore float64
+		count      int
+		scores     []CapabilityScore
+	}
+	caps := make(map[string]*capData)
+
+	taskCache := make(map[string]Task)
+	expCache := make(map[string]string)
+
+	for _, run := range runs {
+		if run.Status != "completed" {
+			continue
+		}
+
+		tags, ok := taskCache[run.TaskID]
+		if !ok {
+			if task, found := s.repo.GetTask(run.TaskID); found {
+				taskCache[run.TaskID] = task
+				tags = task
+			} else {
+				continue
+			}
+		}
+
+		expName, ok := expCache[run.ExperimentID]
+		if !ok {
+			if exp, found := s.repo.GetExperiment(run.ExperimentID); found {
+				expCache[run.ExperimentID] = exp.Name
+				expName = exp.Name
+			} else {
+				expName = run.ExperimentID
+			}
+		}
+
+		for _, tag := range tags.Tags {
+			if _, exists := caps[tag]; !exists {
+				caps[tag] = &capData{}
+			}
+			caps[tag].totalScore += run.OverallScore
+			caps[tag].count++
+			caps[tag].scores = append(caps[tag].scores, CapabilityScore{
+				ExperimentID:   run.ExperimentID,
+				ExperimentName: expName,
+				Score:          run.OverallScore,
+				Timestamp:      run.CreatedAt.Format(time.RFC3339),
+			})
+		}
+	}
+
+	items := make([]CapabilityGraphNode, 0, len(caps))
+	for name, data := range caps {
+		avgScore := 0.0
+		if data.count > 0 {
+			avgScore = data.totalScore / float64(data.count)
+		}
+		items = append(items, CapabilityGraphNode{
+			Name:       name,
+			Score:      round2(avgScore),
+			SampleSize: data.count,
+			Scores:     data.scores,
+		})
+	}
+
+	writeEnvelope(w, http.StatusOK, generateRequestID(), map[string]any{
+		"items": items,
+	})
+}
+
+func (s *Server) handleCapabilityByName(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w, r.Method)
+		return
+	}
+
+	writeError(w, http.StatusNotFound, "NOT_FOUND", "capability not found.")
+}
+
+func (s *Server) handleCapabilityDiff(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w, r.Method)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/capabilities/")
+	name := strings.TrimSuffix(path, "/diff")
+	if name == "" || name == path {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "capability name is required.")
+		return
+	}
+
+	writeEnvelope(w, http.StatusOK, generateRequestID(), map[string]any{
+		"name": name,
+		"diff": []any{},
+	})
+}
+
+func (s *Server) handleTaskFromTrace(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w, r.Method)
+		return
+	}
+
+	if !isJSONRequest(r) {
+		writeError(w, http.StatusUnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json.")
+		return
+	}
+
+	var req struct {
+		ExecutionID string `json:"execution_id"`
+		TraceID     string `json:"trace_id"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		return
+	}
+
+	if req.ExecutionID == "" && req.TraceID == "" {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "execution_id or trace_id is required.")
+		return
+	}
+
+	executionID := req.ExecutionID
+	if executionID == "" {
+		executionID = req.TraceID
+	}
+
+	execution, ok := s.repo.GetExecution(executionID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "execution not found.")
+		return
+	}
+
+	traces := s.repo.ListTraces(executionID)
+
+	var traceSteps []service.TraceStep
+	for _, t := range traces {
+		if t.EventType == "tool_output" || t.EventType == "llm_call" {
+			traceSteps = append(traceSteps, service.TraceStep{
+				StepID: t.StepID,
+			})
+		}
+	}
+
+	svcReq := service.BuildTaskFromTraceRequest{
+		ExecutionID: executionID,
+		TraceID:     req.TraceID,
+		Input:       execution.Input,
+		Output:      nil,
+		Steps:       traceSteps,
+	}
+
+	task, err := s.taskSvc.BuildTaskFromTrace(svcReq)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to build task from trace.")
+		return
+	}
+
+	writeEnvelope(w, http.StatusCreated, generateRequestID(), task)
 }

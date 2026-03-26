@@ -1,201 +1,83 @@
-import { Suspense } from "react";
-import { getDashboard, getSkills } from "./lib/api";
-import type { DashboardData, Skill } from "./lib/api";
-import { SkeletonPanel } from "./components/SkeletonPanel";
+"use client";
 
-const platformModules = [
-  { title: "Skill Registry", desc: "Version-controlled SOPs as executable skills with approval workflows." },
-  { title: "Execution Engine", desc: "Stateful runtime with step tracking and approval checkpoints." },
-  { title: "Task Evaluation", desc: "Reusable tasks with pluggable metrics for agent benchmarking." },
-  { title: "Trace & Replay", desc: "Full execution traces and deterministic replay for debugging." },
-];
+import { useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import { useRouter } from "next/navigation";
 
-const fallbackMetrics = [
-  { label: "Active skills", value: "3" },
-  { label: "Published versions", value: "3" },
-  { label: "Running executions", value: "1" },
-  { label: "Waiting approvals", value: "1" },
-];
+export default function HomePage() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
 
-function SkeletonDashboard() {
-  return (
-    <main className="shell">
-      <section className="toprail" aria-label="Platform posture">
-        <div className="loading-pulse" style={{ width: 180, height: 44, borderRadius: 999 }} />
-        <div className="loading-pulse" style={{ width: 200, height: 44, borderRadius: 999 }} />
-        <div className="loading-pulse" style={{ width: 190, height: 44, borderRadius: 999 }} />
-      </section>
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace("/dashboard");
+    }
+  }, [isAuthenticated, isLoading, router]);
 
-      <section className="hero">
-        <p className="eyebrow">Enterprise AI Quality Infrastructure</p>
-        <div className="loading-pulse" style={{ width: 560, height: 48, marginBottom: 16 }} />
-        <div className="loading-pulse loading-pulse-long" style={{ marginBottom: 8 }} />
-        <div className="loading-pulse loading-pulse-medium" />
-      </section>
-
-      <section className="stats" aria-label="Platform overview">
-        {[1, 2, 3, 4].map((i) => (
-          <article className="metric" key={i}>
-            <div className="loading-pulse loading-pulse-short" style={{ marginBottom: 12 }} />
-            <div className="loading-pulse" style={{ width: 60, height: 32 }} />
-          </article>
-        ))}
-      </section>
-
-      <section className="panel-grid">
-        <SkeletonPanel height={320} />
-        <SkeletonPanel height={320} />
-      </section>
-
-      <section className="grid" aria-label="Platform modules">
-        {[1, 2, 3, 4].map((i) => (
-          <article className="card" key={i}>
-            <div className="loading-pulse loading-pulse-short" style={{ marginBottom: 12 }} />
-            <div className="loading-pulse loading-pulse-medium" />
-          </article>
-        ))}
-      </section>
-    </main>
-  );
-}
-
-async function DashboardContent() {
-  let dashboard: DashboardData | null = null;
-  let skills: { items: Skill[] } | null = null;
-
-  try {
-    [dashboard, skills] = await Promise.all([getDashboard(), getSkills()]);
-  } catch {
-    dashboard = null;
-    skills = null;
+  if (isLoading) {
+    return (
+      <main className="shell">
+        <section className="hero-landing">
+          <div className="loading-pulse" style={{ width: 200, height: 20, marginBottom: 16 }} />
+          <div className="loading-pulse" style={{ width: 400, height: 40, marginBottom: 16 }} />
+          <div className="loading-pulse" style={{ width: 600, height: 20 }} />
+        </section>
+      </main>
+    );
   }
 
-  const metrics = dashboard
-    ? [
-        { label: "Active skills", value: String(dashboard.summary.active_skills) },
-        { label: "Published versions", value: String(dashboard.summary.published_versions) },
-        { label: "Running executions", value: String(dashboard.summary.running_executions) },
-        { label: "Waiting approvals", value: String(dashboard.summary.waiting_approvals) },
-      ]
-    : fallbackMetrics;
+  if (isAuthenticated) {
+    return null;
+  }
 
   return (
     <main className="shell">
-      <section className="toprail" aria-label="Platform posture">
-        <div className="toprail-chip">Governed execution runtime</div>
-        <div className="toprail-chip">Audit-ready operations</div>
-        <div className="toprail-chip">Human approvals in loop</div>
-        <a className="toprail-link" href="/skills">
-          Registry
-        </a>
-        <a className="toprail-link" href="/executions">
-          Executions
-        </a>
-        <a className="toprail-link" href="/approvals">
-          Approvals
-        </a>
-        <a className="toprail-link" href="/tasks">
-          Tasks
-        </a>
-        <a className="toprail-link" href="/evaluations">
-          Evaluations
-        </a>
-      </section>
-
-      <section className="hero">
+      <section className="hero-landing">
         <p className="eyebrow">Enterprise AI Quality Infrastructure</p>
         <h1>Convert SOPs into executable skills.</h1>
         <p className="lede">
-          Registry, execute, and observe AI agent skills with enterprise-grade controls.
-          Full audit trails, human approvals, and task evaluation built in.
+          Managing-up provides benchmark testing, regression detection, and harness evaluation
+          for AI agents. Full audit trails, human approvals, and quantitative reporting.
         </p>
       </section>
 
-      <section className="stats" aria-label="Platform overview">
-        {metrics.map((metric) => (
-          <article className="metric" key={metric.label}>
-            <p>{metric.label}</p>
-            <strong>{metric.value}</strong>
-          </article>
-        ))}
-      </section>
-
-      <section className="panel-grid">
-        <article className="panel">
-          <div className="panel-header">
-            <p className="section-kicker">Skill Registry</p>
-            <h2>Published skills</h2>
-          </div>
-          <div className="list">
-            {(skills?.items ?? []).length > 0 ? (
-              skills?.items.map((skill) => (
-                <article className="list-card" key={skill.id}>
-                  <div>
-                    <h3>{skill.name}</h3>
-                    <p>
-                      {skill.owner_team} · {skill.risk_level} risk
-                    </p>
-                  </div>
-                  <span className={`badge badge-${skill.status}`}>{skill.status}</span>
-                </article>
-              ))
-            ) : (
-              <article className="list-card">
-                <div>
-                  <h3>Registry data unavailable</h3>
-                  <p>Start the Go API on port 8080 to populate live skill data.</p>
-                </div>
-                <span className="badge badge-muted">offline</span>
-              </article>
-            )}
-          </div>
+      <section className="grid" style={{ marginTop: "24px" }}>
+        <article className="card" style={{ cursor: "pointer" }} onClick={() => window.open("https://github.com/your-org/managing-up", "_blank")}>
+          <h2>Get Started</h2>
+          <p>Clone the repository and start building your AI quality infrastructure today.</p>
+          <span style={{ color: "var(--primary)", fontWeight: 600 }}>GitHub →</span>
         </article>
-
-        <article className="panel">
-          <div className="panel-header">
-            <p className="section-kicker">Execution Timeline</p>
-            <h2>Recent runs</h2>
-          </div>
-          <div className="list">
-            {(dashboard?.recent_executions ?? []).length > 0 ? (
-              dashboard?.recent_executions.map((execution) => (
-                <article className="list-card" key={execution.id}>
-                  <div>
-                    <h3>{execution.skill_name}</h3>
-                    <p>{execution.current_step_id}</p>
-                  </div>
-                  <span className={`badge badge-${execution.status}`}>{execution.status}</span>
-                </article>
-              ))
-            ) : (
-              <article className="list-card">
-                <div>
-                  <h3>No live execution feed</h3>
-                  <p>Dashboard data appears when the backend dashboard endpoint is reachable.</p>
-                </div>
-                <span className="badge badge-muted">standby</span>
-              </article>
-            )}
-          </div>
+        
+        <article className="card" style={{ cursor: "pointer" }} onClick={() => window.open("https://docs.example.com", "_blank")}>
+          <h2>Documentation</h2>
+          <p>Comprehensive guides, API references, and integration examples.</p>
+          <span style={{ color: "var(--primary)", fontWeight: 600 }}>Read Docs →</span>
         </article>
       </section>
 
-      <section className="grid" aria-label="Platform modules">
-        {platformModules.map((mod) => (
-          <article className="card" key={mod.title}>
-            <h2>{mod.title}</h2>
-            <p>{mod.desc}</p>
+      <section style={{ marginTop: "32px" }}>
+        <div className="panel-header" style={{ marginBottom: "16px" }}>
+          <h2>Ecosystem</h2>
+        </div>
+        <div className="grid">
+          <article className="card">
+            <h3>SEH - Skill Eval Harness</h3>
+            <p>Standardized evaluation framework for testing AI agent skills against defined test cases.</p>
           </article>
-        ))}
+          <article className="card">
+            <h3>Skill Registry</h3>
+            <p>Version-controlled SOPs as executable skills with approval workflows.</p>
+          </article>
+          <article className="card">
+            <h3>Trace & Replay</h3>
+            <p>Full execution traces and deterministic replay for debugging AI behaviors.</p>
+          </article>
+          <article className="card">
+            <h3>Benchmark Engine</h3>
+            <p>Quantitative performance metrics across different models and configurations.</p>
+          </article>
+        </div>
       </section>
     </main>
-  );
-}
-
-export default function HomePage() {
-  return (
-    <Suspense fallback={<SkeletonDashboard />}>
-      <DashboardContent />
-    </Suspense>
   );
 }

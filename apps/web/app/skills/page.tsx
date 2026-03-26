@@ -1,12 +1,14 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { getSkills, getSkillVersions } from "../lib/api";
 import CreateSkillForm from "../components/CreateSkillForm";
+import CreateSkillVersionForm from "../components/CreateSkillVersionForm";
 import { SkeletonPanel } from "../components/SkeletonPanel";
 
 function SkeletonSkillsPage() {
   return (
     <main className="shell">
-      <section className="hero hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Registry</p>
         <h1>Skill inventory and version posture.</h1>
         <p className="lede">
@@ -38,7 +40,7 @@ async function SkillsContent() {
 
   return (
     <main className="shell">
-      <section className="hero hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Registry</p>
         <h1>Skill inventory and version posture.</h1>
         <p className="lede">
@@ -49,6 +51,8 @@ async function SkillsContent() {
 
       <CreateSkillForm />
 
+      <CreateSkillVersionForm skills={skills.items} />
+
       <section className="panel-grid panel-grid-wide">
         <article className="panel">
           <div className="panel-header">
@@ -57,7 +61,7 @@ async function SkillsContent() {
           </div>
           <div className="list">
             {skills.items.map((skill) => (
-              <article className="list-card" key={skill.id}>
+              <Link href={`/skills/${skill.id}`} key={skill.id} className="list-card" style={{ textDecoration: "none", cursor: "pointer" }}>
                 <div>
                   <h3>{skill.name}</h3>
                   <p>
@@ -65,7 +69,7 @@ async function SkillsContent() {
                   </p>
                 </div>
                 <span className={`badge badge-${skill.status}`}>{skill.status}</span>
-              </article>
+              </Link>
             ))}
           </div>
         </article>

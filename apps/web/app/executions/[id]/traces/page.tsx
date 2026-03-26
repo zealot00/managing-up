@@ -115,7 +115,7 @@ async function TraceContent({ id }: { id: string }) {
 
       {execution ? (
         <>
-          <section className="hero-compact" style={{ marginBottom: 24 }}>
+          <section className="hero-page hero-compact" style={{ marginBottom: 24 }}>
             <p className="eyebrow">Execution Trace</p>
             <h1>{execution.skill_name}</h1>
             <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center" }}>

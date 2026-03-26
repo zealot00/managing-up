@@ -1,10 +1,10 @@
 module github.com/zealot/managing-up/apps/api
 
-go 1.23.0
-
-toolchain go1.24.0
+go 1.25.0
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/lib/pq v1.12.0
+	golang.org/x/crypto v0.49.0
 	gopkg.in/yaml.v3 v3.0.1
 )

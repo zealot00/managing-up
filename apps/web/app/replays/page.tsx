@@ -84,7 +84,7 @@ async function ReplaysContent() {
         </a>
       </section>
 
-      <section className="hero-compact">
+      <section className="hero-page hero-compact">
         <p className="eyebrow">Replay Layer</p>
         <h1>Replay Snapshots</h1>
         <p className="lede">

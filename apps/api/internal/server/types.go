@@ -247,6 +247,16 @@ type TaskExecution struct {
 	CreatedAt  time.Time      `json:"created_at"`
 }
 
+// Variant represents an LLM configuration variant for experiment sweeps.
+type Variant struct {
+	Name        string            `json:"name"`        // variant identifier
+	Model       string            `json:"model"`       // e.g. "gpt-4o", "claude-3.5"
+	Temperature float64           `json:"temperature"` // 0.0 ~ 2.0
+	MaxTokens   int               `json:"max_tokens"`  // output max tokens
+	Seed        int64             `json:"seed,omitempty"`
+	SkillConfig map[string]string `json:"skill_config,omitempty"` // skill param overrides
+}
+
 // Experiment represents an experiment for comparing agent/skill performance.
 type Experiment struct {
 	ID          string    `json:"id"`
@@ -254,6 +264,7 @@ type Experiment struct {
 	Description string    `json:"description"`
 	TaskIDs     []string  `json:"task_ids"`
 	AgentIDs    []string  `json:"agent_ids"`
+	Variants    []Variant `json:"variants,omitempty"`
 	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at,omitempty"`
@@ -265,6 +276,7 @@ type ExperimentRun struct {
 	ExperimentID string         `json:"experiment_id"`
 	TaskID       string         `json:"task_id"`
 	AgentID      string         `json:"agent_id"`
+	VariantID    string         `json:"variant_id,omitempty"`
 	MetricScores map[string]any `json:"metric_scores"`
 	OverallScore float64        `json:"overall_score"`
 	DurationMs   int64          `json:"duration_ms,omitempty"`
@@ -316,8 +328,25 @@ type EvaluateRequest struct {
 
 // CreateExperimentRequest is the payload for creating an experiment.
 type CreateExperimentRequest struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	TaskIDs     []string `json:"task_ids"`
-	AgentIDs    []string `json:"agent_ids"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	TaskIDs     []string  `json:"task_ids"`
+	AgentIDs    []string  `json:"agent_ids"`
+	Variants    []Variant `json:"variants,omitempty"`
+}
+
+// CapabilityGraphNode represents aggregated capability scores.
+type CapabilityGraphNode struct {
+	Name       string            `json:"name"`
+	Score      float64           `json:"score"`
+	SampleSize int               `json:"sampleSize"`
+	Scores     []CapabilityScore `json:"scores"`
+}
+
+// CapabilityScore represents an individual score contributing to a capability.
+type CapabilityScore struct {
+	ExperimentID   string  `json:"experimentId"`
+	ExperimentName string  `json:"experimentName"`
+	Score          float64 `json:"score"`
+	Timestamp      string  `json:"timestamp"`
 }
