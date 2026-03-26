@@ -299,12 +299,14 @@ type ReplaySnapshot struct {
 
 // CreateTaskRequest is the payload for creating a task.
 type CreateTaskRequest struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
-	SkillID     string     `json:"skill_id"`
-	Tags        []string   `json:"tags"`
-	Difficulty  string     `json:"difficulty"`
-	TestCases   []TestCase `json:"test_cases"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	SkillID     string        `json:"skill_id"`
+	Tags        []string      `json:"tags"`
+	Difficulty  string        `json:"difficulty"`
+	TestCases   []TestCase    `json:"test_cases"`
+	Gold        GoldConfig    `json:"gold,omitempty"`
+	Scoring     ScoringConfig `json:"scoring,omitempty"`
 }
 
 // CreateMetricRequest is the payload for creating a metric.

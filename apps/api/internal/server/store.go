@@ -14,11 +14,15 @@ type store struct {
 	procedureDrafts []ProcedureDraft
 	executions      []Execution
 	approvals       []Approval
+	tasks           map[string]Task
+	experiments     map[string]Experiment
+	experimentRuns  map[string]ExperimentRun
 }
 
 var _ Repository = (*store)(nil)
 
-func newStore() *store {
+// NewStore creates a new in-memory store.
+func NewStore() *store {
 	now := time.Date(2026, 3, 19, 10, 0, 0, 0, time.UTC)
 
 	return &store{
@@ -137,6 +141,9 @@ func newStore() *store {
 				RequestedAt:   now.Add(-30 * time.Minute),
 			},
 		},
+		tasks:          make(map[string]Task),
+		experiments:    make(map[string]Experiment),
+		experimentRuns: make(map[string]ExperimentRun),
 	}
 }
 
@@ -456,15 +463,44 @@ func (s *store) CreateTrace(event TraceEvent) error {
 }
 
 func (s *store) ListTasks(skillID string, difficulty string) []Task {
-	return []Task{}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	items := make([]Task, 0, len(s.tasks))
+	for _, task := range s.tasks {
+		if skillID != "" && task.SkillID != skillID {
+			continue
+		}
+		if difficulty != "" && task.Difficulty != difficulty {
+			continue
+		}
+		items = append(items, task)
+	}
+
+	return items
 }
 
 func (s *store) GetTask(id string) (Task, bool) {
-	return Task{}, false
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	task, found := s.tasks[id]
+	return task, found
 }
 
 func (s *store) CreateTask(task Task) (Task, error) {
-	return Task{}, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	if task.ID == "" {
+		task.ID = fmt.Sprintf("task_%03d", len(s.tasks)+1)
+	}
+	task.CreatedAt = now
+	task.UpdatedAt = now
+
+	s.tasks[task.ID] = task
+	return task, nil
 }
 
 func (s *store) UpdateTask(task Task) error {
@@ -512,27 +548,73 @@ func (s *store) CreateEvaluationResult(eval Evaluation) (Evaluation, error) {
 }
 
 func (s *store) ListExperiments() []Experiment {
-	return []Experiment{}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	items := make([]Experiment, 0, len(s.experiments))
+	for _, exp := range s.experiments {
+		items = append(items, exp)
+	}
+	return items
 }
 
 func (s *store) GetExperiment(id string) (Experiment, bool) {
-	return Experiment{}, false
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	exp, found := s.experiments[id]
+	return exp, found
 }
 
 func (s *store) CreateExperiment(exp Experiment) (Experiment, error) {
-	return Experiment{}, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	if exp.ID == "" {
+		exp.ID = fmt.Sprintf("exp_%d", time.Now().UnixNano())
+	}
+	exp.CreatedAt = now
+	exp.UpdatedAt = now
+	s.experiments[exp.ID] = exp
+	return exp, nil
 }
 
 func (s *store) CreateExperimentRun(run ExperimentRun) (ExperimentRun, error) {
-	return ExperimentRun{}, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	if run.ID == "" {
+		run.ID = fmt.Sprintf("run_%d", time.Now().UnixNano())
+	}
+	run.CreatedAt = now
+	s.experimentRuns[run.ID] = run
+	return run, nil
 }
 
 func (s *store) UpdateExperimentRun(run ExperimentRun) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, found := s.experimentRuns[run.ID]; !found {
+		return fmt.Errorf("experiment run not found: %s", run.ID)
+	}
+	s.experimentRuns[run.ID] = run
 	return nil
 }
 
 func (s *store) ListExperimentRuns(experimentID string) []ExperimentRun {
-	return []ExperimentRun{}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	items := make([]ExperimentRun, 0)
+	for _, run := range s.experimentRuns {
+		if experimentID == "" || run.ExperimentID == experimentID {
+			items = append(items, run)
+		}
+	}
+	return items
 }
 
 func (s *store) ListReplaySnapshots(executionID string) []ReplaySnapshot {

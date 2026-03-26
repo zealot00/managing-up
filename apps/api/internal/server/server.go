@@ -285,6 +285,18 @@ func toServiceCreateTaskRequest(req CreateTaskRequest) service.CreateTaskRequest
 		Tags:        req.Tags,
 		Difficulty:  req.Difficulty,
 		TestCases:   toServiceTestCases(req.TestCases),
+		Gold: service.GoldConfig{
+			Type: req.Gold.Type,
+			Data: req.Gold.Data,
+		},
+		Scoring: service.ScoringConfig{
+			PrimaryMetric:    req.Scoring.PrimaryMetric,
+			SecondaryMetrics: req.Scoring.SecondaryMetrics,
+			Threshold: service.Threshold{
+				Pass:            req.Scoring.Threshold.Pass,
+				RegressionAlert: req.Scoring.Threshold.RegressionAlert,
+			},
+		},
 	}
 }
 
@@ -481,7 +493,7 @@ type Server struct {
 
 // New creates a configured API server.
 func New(cfg config.Config) *Server {
-	return NewWithRepository(cfg, newStore(), nil, nil)
+	return NewWithRepository(cfg, NewStore(), nil, nil)
 }
 
 // NewWithRepository creates a configured API server with an injected repository.
@@ -1228,7 +1240,9 @@ func (s *Server) handleExperimentRun(w http.ResponseWriter, r *http.Request) {
 	// Run experiment asynchronously
 	if s.experimentSvc != nil {
 		go func() {
-			if err := s.experimentSvc.RunExperiment(r.Context(), expID); err != nil {
+			// Use background context so experiment continues even after HTTP response returns
+			bgCtx := context.Background()
+			if err := s.experimentSvc.RunExperiment(bgCtx, expID); err != nil {
 				slog.Error("experiment run failed", slog.String("experiment_id", expID), slog.String("error", err.Error()))
 			}
 		}()

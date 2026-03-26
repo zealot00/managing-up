@@ -33,7 +33,16 @@ func main() {
 	if cfg.Database.Enabled() {
 		repo, err := postgres.New(cfg.Database.DSN)
 		if err != nil {
-			log.Fatalf("postgres initialization failed: %v", err)
+			slog.Warn("postgres initialization failed, falling back to in-memory store", slog.String("error", err.Error()))
+			store := server.NewStore()
+			llmClient := createLLMClient()
+			agent := createLLMAgent(llmClient)
+			evalRunner := createEvaluationRunner(store, agent, llmClient)
+			taskRunnerAdapter := newTaskRunnerAdapter(evalRunner)
+			experimentSvc := createExperimentService(store, taskRunnerAdapter)
+			srv := server.NewWithRepository(cfg, store, nil, experimentSvc)
+			startServer(srv)
+			return
 		}
 
 		llmClient := createLLMClient()
