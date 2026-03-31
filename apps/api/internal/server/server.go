@@ -18,6 +18,23 @@ import (
 
 var logger *slog.Logger
 
+// corsMiddleware wraps an http.Handler and adds CORS headers.
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func SetLogger(l *slog.Logger) {
 	logger = l
 }
@@ -542,7 +559,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 
 	srv.httpServer = &http.Server{
 		Addr:              cfg.Address(),
-		Handler:           mux,
+		Handler:           corsMiddleware(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

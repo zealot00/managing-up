@@ -196,6 +196,66 @@ make serve-pg DATABASE_URL="postgres://localhost:5432/skillhub?sslmode=disable"
 | Baidu | ernie-4.0-8k, ernie-3.5-8k |
 | Alibaba | qwen-max, qwen-plus, qwen-turbo |
 
+---
+
+## LLM Gateway
+
+OpenAI 和 Anthropic 兼容的 LLM 代理接口，支持 API Key 认证。
+
+### 端点
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/models` | List available models |
+| POST | `/v1/chat/completions` | OpenAI-compatible chat completions |
+| POST | `/v1/messages` | Anthropic-compatible messages |
+
+### 使用示例
+
+```bash
+# List models
+curl http://localhost:8080/v1/models
+
+# OpenAI chat completion
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"Hi"}]}'
+
+# Anthropic messages
+curl -X POST http://localhost:8080/v1/messages \
+  -H "x-api-key: $ANTHROPIC_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{"model":"claude-haiku-3","messages":[{"role":"user","content":"Hi"}]}'
+```
+
+---
+
+## sop-to-skill Orchestrator API
+
+CLI 编排 API，用于远程增强提取、Skill 版本管理、测试编排和门禁评估。
+
+### 端点
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/healthz` | Health check |
+| POST | `/v1/runs` | Create orchestration run |
+| GET | `/v1/runs/{runId}` | Get run status |
+| GET | `/v1/runs/{runId}/artifacts` | List artifacts |
+| POST | `/v1/extraction/enhance` | Enhanced extraction |
+| POST | `/v1/extraction/compare` | Compare extractions |
+| POST | `/v1/skills` | Create skill |
+| GET | `/v1/skills/{id}/versions` | List versions |
+| POST | `/v1/skills/{id}/promote` | Promote version |
+| POST | `/v1/tests/runs` | Create test run |
+| POST | `/v1/gates/evaluate` | Evaluate gate |
+| GET | `/v1/policies/{id}` | Get policy |
+
+详细文档见 [docs/api-reference.md](docs/api-reference.md)
+
+---
+
 配置方式：
 
 ```bash

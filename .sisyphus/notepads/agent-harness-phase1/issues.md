@@ -18,3 +18,31 @@
 
 **Additional note:** The server does NOT gracefully fall back to in-memory mode when postgres is unavailable - it calls `log.Fatalf` in main.go:36. If postgres is not running, the server will exit. To use in-memory mode, ensure `DB_DRIVER` or `DATABASE_URL` is empty in `.env`.
 
+### 2026-03-26: In-memory store stubs for experiments
+
+**Problem:** Multiple methods in `store.go` returned stub/empty values:
+- `CreateTask` returned `Task{}, nil` (all-zero Task)
+- `CreateExperiment` returned `Experiment{}, nil`
+- `GetExperiment` returned `Experiment{}, false`
+- `ListExperiments` returned `[]Experiment{}`
+- `CreateExperimentRun` returned `ExperimentRun{}, nil`
+- `UpdateExperimentRun` returned `nil`
+- `ListExperimentRuns` returned `[]ExperimentRun{}`
+
+**Resolution:** 
+- Added `experiments map[string]Experiment` and `experimentRuns map[string]ExperimentRun` to store struct
+- Initialized maps in `NewStore()`
+- Implemented all methods properly with mutex locks
+
+### 2026-03-26: newStore() not accessible from main.go
+
+**Problem:** main.go (package main) tried to call `newStore()` from the server package, but `newStore` was unexported (lowercase).
+
+**Resolution:** Renamed `newStore()` to `NewStore()` in store.go (exported), updated internal caller in `server.New()`, and updated main.go to use `server.NewStore()`.
+
+### 2026-03-26: Postgres fallback didn't set up experimentSvc
+
+**Problem:** When postgres failed and server fell back to `server.New(cfg)`, `experimentSvc` was set to `nil` in the server, making experiment runs non-functional.
+
+**Resolution:** Updated fallback path in main.go to create full stack with in-memory store: `server.NewStore()` + LLM client + agent + evaluationRunner + taskRunnerAdapter + experimentSvc.
+
