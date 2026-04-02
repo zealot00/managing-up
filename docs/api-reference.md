@@ -2,12 +2,7 @@
 
 ## Overview
 
-This document defines the MVP HTTP contract for the Go backend and Next.js frontend.
-
-Base URL:
-
-- local: `http://localhost:8080`
-- prefix: `/api/v1`
+Base URL: `http://localhost:8080`
 
 Response envelope:
 
@@ -21,116 +16,177 @@ Response envelope:
 }
 ```
 
-## Resource Summary
-
-### Core Endpoints
-- `GET /healthz`
-- `GET /health`
-- `GET /api/v1/meta`
-
-### LLM Gateway (OpenAI/Anthropic Compatible)
-- `GET /v1/models`
-- `POST /v1/chat/completions`
-- `POST /v1/messages`
-
-### SOP-to-Skill Orchestrator API
-- `GET /v1/healthz`
-- `POST /v1/runs`
-- `GET /v1/runs/{runId}`
-- `GET /v1/runs/{runId}/artifacts`
-- `POST /v1/extraction/enhance`
-- `POST /v1/extraction/compare`
-- `POST /v1/skills`
-- `GET /v1/skills/{skillId}/versions`
-- `GET /v1/skills/{skillId}/versions/{version}`
-- `GET /v1/skills/{skillId}/diff`
-- `POST /v1/skills/{skillId}/rollback`
-- `POST /v1/skills/{skillId}/promote`
-- `POST /v1/tests/runs`
-- `GET /v1/tests/runs/{testRunId}`
-- `GET /v1/tests/runs/{testRunId}/report`
-- `POST /v1/gates/evaluate`
-- `GET /v1/policies/{policyId}`
-
-### Skill Registry API
-- `GET /api/v1/dashboard`
-- `GET /api/v1/procedure-drafts`
-- `GET /api/v1/skills`
-- `POST /api/v1/skills`
-- `GET /api/v1/skills/{skillId}`
-- `GET /api/v1/skill-versions`
-- `GET /api/v1/executions`
-- `POST /api/v1/executions`
-- `GET /api/v1/executions/{executionId}`
-- `POST /api/v1/executions/{executionId}/approve`
-- `GET /api/v1/approvals`
-
-## 1. Health and Meta
-
-### `GET /healthz`
-
-- liveness endpoint
-
-### `GET /api/v1/meta`
-
-- service identity and scope metadata
-
-## 2. Dashboard
-
-### `GET /api/v1/dashboard`
-
-- homepage summary payload
-
-Fields:
-
-- `summary.active_skills`
-- `summary.published_versions`
-- `summary.running_executions`
-- `summary.waiting_approvals`
-- `summary.success_rate`
-- `summary.avg_duration_seconds`
-- `recent_executions`
-
-## 3. Procedure Drafts
-
-### `GET /api/v1/procedure-drafts`
-
-- list parsed SOP drafts
-
-Query params:
-
-- `status` optional
-
-Response item shape:
+Error envelope:
 
 ```json
 {
-  "id": "draft_001",
-  "procedure_key": "runbook_restart_service",
-  "title": "Restart Service Runbook",
-  "validation_status": "validated",
-  "required_tools": ["monitor_api", "orchestrator_api"],
-  "source_type": "markdown",
-  "created_at": "2026-03-19T10:00:00Z"
+  "data": null,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Resource not found"
+  },
+  "meta": {
+    "request_id": "req_123"
+  }
 }
 ```
 
-## 4. Skills
+---
+
+## 1. 认证 Authentication
+
+### `POST /api/v1/auth/login`
+
+用户登录。
+
+Request:
+```json
+{
+  "username": "admin",
+  "password": "admin"
+}
+```
+
+Response (200):
+```json
+{
+  "data": {
+    "user": {
+      "id": "user_admin",
+      "username": "admin",
+      "role": "admin"
+    }
+  }
+}
+```
+
+Sets authentication cookie on success.
+
+### `POST /api/v1/auth/logout`
+
+用户登出。清除认证 cookie。
+
+### `GET /api/v1/auth/me`
+
+获取当前用户信息。需要认证。
+
+Response (200):
+```json
+{
+  "data": {
+    "user": {
+      "id": "user_admin",
+      "username": "admin",
+      "role": "admin"
+    }
+  }
+}
+```
+
+---
+
+## 2. 健康检查 Health
+
+### `GET /healthz`
+
+Liveness probe.
+
+Response:
+```json
+{
+  "status": "ok"
+}
+```
+
+### `GET /api/v1/meta`
+
+Service metadata.
+
+Response:
+```json
+{
+  "data": {
+    "service": "managing-up-api",
+    "runtime": "go",
+    "scope": ["registry", "execution", "approval"]
+  }
+}
+```
+
+---
+
+## 3. Tips (登录页名言)
+
+### `GET /api/v1/tip`
+
+获取随机名言。无需认证。每次随机返回一条 active 的 tip。
+
+Response (200):
+```json
+{
+  "data": {
+    "id": "tip_001",
+    "content": "Talk is cheap. Show me the code.",
+    "author": "Linus Torvalds",
+    "category": "quote",
+    "is_active": true,
+    "created_at": "2026-03-19T10:00:00Z",
+    "updated_at": "2026-03-19T10:00:00Z"
+  }
+}
+```
+
+Tip 数据存储在 `tips` 表中，可通过 SQL 直接管理：
+
+```sql
+-- 添加新 tip
+INSERT INTO tips (id, content, author, category)
+VALUES ('tip_new', 'Your quote here', 'Author', 'quote');
+
+-- 禁用某条 tip
+UPDATE tips SET is_active = false WHERE id = 'tip_005';
+```
+
+---
+
+## 4. Dashboard
+
+### `GET /api/v1/dashboard`
+
+首页统计摘要。
+
+Response (200):
+```json
+{
+  "data": {
+    "summary": {
+      "active_skills": 3,
+      "published_versions": 2,
+      "running_executions": 1,
+      "waiting_approvals": 1,
+      "success_rate": 0.75,
+      "avg_duration_seconds": 120
+    },
+    "recent_executions": [...]
+  }
+}
+```
+
+---
+
+## 5. Skills
 
 ### `GET /api/v1/skills`
 
-- list registry entries
+列出技能。
 
-Query params:
-
-- `status` optional
+Query params: `status` (可选)
 
 ### `POST /api/v1/skills`
 
-- create a draft skill metadata record
+创建技能。
 
 Request:
-
 ```json
 {
   "name": "rollback_deployment_skill",
@@ -139,56 +195,35 @@ Request:
 }
 ```
 
-Validation:
+### `GET /api/v1/skills/{id}`
 
-- `name` required
-- `owner_team` required
-- `risk_level` in `low | medium | high`
+技能详情。
 
-### `GET /api/v1/skills/{skillId}`
+### `GET /api/v1/skills/{id}/spec`
 
-- fetch a single skill
-
-## 5. Skill Versions
+下载 YAML spec 文件。
 
 ### `GET /api/v1/skill-versions`
 
-- list immutable skill versions
+列出技能版本。
 
-Query params:
+Query params: `skill_id` (可选)
 
-- `skill_id` optional
-
-Response item shape:
-
-```json
-{
-  "id": "version_001",
-  "skill_id": "skill_001",
-  "version": "v1",
-  "status": "published",
-  "change_summary": "Initial restart automation flow.",
-  "approval_required": true,
-  "created_at": "2026-03-19T10:00:00Z"
-}
-```
+---
 
 ## 6. Executions
 
 ### `GET /api/v1/executions`
 
-- list execution runs
+列出执行记录。
 
-Query params:
-
-- `status` optional
+Query params: `status` (可选)
 
 ### `POST /api/v1/executions`
 
-- create a new execution
+触发执行。
 
 Request:
-
 ```json
 {
   "skill_id": "skill_001",
@@ -199,16 +234,15 @@ Request:
 }
 ```
 
-### `GET /api/v1/executions/{executionId}`
+### `GET /api/v1/executions/{id}`
 
-- fetch one execution
+执行详情。
 
-### `POST /api/v1/executions/{executionId}/approve`
+### `POST /api/v1/executions/{id}/approve`
 
-- resolve an approval checkpoint bound to the execution
+审批/拒绝。
 
 Request:
-
 ```json
 {
   "approver": "ops_manager",
@@ -217,23 +251,17 @@ Request:
 }
 ```
 
-Validation:
-
-- `approver` required
-- `decision` in `approved | rejected`
+---
 
 ## 7. Approvals
 
 ### `GET /api/v1/approvals`
 
-- list approval checkpoints
+列出审批。
 
-Query params:
+Query params: `status` (可选)
 
-- `status` optional
-
-Response item shape:
-
+Response item:
 ```json
 {
   "id": "approval_001",
@@ -246,13 +274,91 @@ Response item shape:
 }
 ```
 
-## 8. Error Codes
+---
 
-- `BAD_REQUEST`
-- `NOT_FOUND`
-- `METHOD_NOT_ALLOWED`
-- `UNSUPPORTED_MEDIA_TYPE`
-- `INTERNAL_ERROR`
+## 8. Tasks
+
+### `GET /api/v1/tasks`
+
+列出任务。
+
+Query params: `skill_id`, `difficulty` (可选)
+
+### `POST /api/v1/tasks`
+
+创建任务。
+
+### `GET /api/v1/tasks/{id}`
+
+任务详情。
+
+### `PUT /api/v1/tasks/{id}`
+
+更新任务。
+
+### `DELETE /api/v1/tasks/{id}`
+
+删除任务。
+
+### `GET /api/v1/metrics`
+
+列出指标定义。
+
+### `GET /api/v1/task-executions`
+
+任务执行列表。
+
+### `GET /api/v1/task-executions/{id}`
+
+任务执行详情。
+
+---
+
+## 9. Experiments
+
+### `GET /api/v1/experiments`
+
+列出实验。
+
+### `POST /api/v1/experiments`
+
+创建实验。
+
+### `GET /api/v1/experiments/{id}`
+
+实验结果。
+
+### `GET /api/v1/experiments/{id}/compare?compare_with={other_id}`
+
+对比两个实验。
+
+### `POST /api/v1/check-regression`
+
+回归检测。
+
+Request:
+```json
+{
+  "baseline_experiment_id": "exp_001",
+  "candidate_experiment_id": "exp_002"
+}
+```
+
+---
+
+## 10. Replay
+
+### `GET /api/v1/replay-snapshots`
+
+回放快照列表。
+
+Query params: `execution_id` (可选)
+
+### `GET /api/v1/replay-snapshots/{id}`
+
+快照详情。
+
+---
 
 ## 11. LLM Gateway
 
@@ -260,17 +366,17 @@ Multi-provider LLM proxy with OpenAI and Anthropic API compatibility.
 
 ### Authentication
 
-All endpoints require API key authentication via:
-- `Authorization: Bearer <key>` header (OpenAI style)
-- `x-api-key: <key>` header (Anthropic style)
+所有端点需要 API Key 认证：
+- `Authorization: Bearer <key>` (OpenAI 风格)
+- `x-api-key: <key>` (Anthropic 风格)
 
-Public endpoints (no auth required):
+公开端点（无需认证）：
 - `GET /health`
 - `GET /v1/models`
 
 ### `GET /v1/models`
 
-List available models across all providers.
+列出可用模型。
 
 Response:
 ```json
@@ -290,7 +396,7 @@ Response:
 
 ### `POST /v1/chat/completions`
 
-OpenAI-compatible chat completions endpoint.
+OpenAI 兼容接口。支持流式响应。
 
 Headers:
 - `Authorization: Bearer <key>` required
@@ -304,11 +410,12 @@ Request:
     {"role": "user", "content": "Hello"}
   ],
   "temperature": 0.7,
-  "max_tokens": 1024
+  "max_tokens": 1024,
+  "stream": false
 }
 ```
 
-Response:
+Response (non-streaming):
 ```json
 {
   "id": "chatcmpl-xxx",
@@ -330,15 +437,24 @@ Response:
 }
 ```
 
+Response (streaming, `stream: true`):
+```
+data: {"id":"chatcmpl-xxx","object":"chat.completion.chunk","created":1774954597,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-xxx","object":"chat.completion.chunk","created":1774954597,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+```
+
 Model prefix routing:
-- `openai:gpt-4o` or just `gpt-4o` → OpenAI
-- `anthropic:claude-sonnet-4` or `claude-sonnet-4` → Anthropic
+- `openai:gpt-4o` 或 `gpt-4o` → OpenAI
+- `anthropic:claude-sonnet-4` 或 `claude-sonnet-4` → Anthropic
 - `gemini:gemini-2.0-flash` → Google
 - `deepseek:deepseek-chat` → DeepSeek
 
 ### `POST /v1/messages`
 
-Anthropic-compatible messages endpoint.
+Anthropic 兼容接口。
 
 Headers:
 - `x-api-key: <key>` required
@@ -356,6 +472,124 @@ Request:
 }
 ```
 
+### `POST /v1/embeddings`
+
+Embeddings 接口。
+
+Request:
+```json
+{
+  "model": "text-embedding-3-small",
+  "input": ["Hello world"]
+}
+```
+
+### Gateway 管理 API
+
+#### `GET /api/v1/gateway/keys`
+
+列出当前用户的 Gateway API Keys。
+
+Response:
+```json
+{
+  "data": {
+    "items": [
+      {
+        "id": "key_xxx",
+        "user_id": "user_admin",
+        "name": "default",
+        "key_prefix": "sk_live",
+        "created_at": "2026-04-01T10:00:00Z",
+        "last_used_at": "2026-04-02T10:00:00Z",
+        "revoked_at": null
+      }
+    ]
+  }
+}
+```
+
+#### `POST /api/v1/gateway/keys`
+
+创建 Gateway API Key。
+
+Request:
+```json
+{
+  "name": "my-key"
+}
+```
+
+Response:
+```json
+{
+  "data": {
+    "key": "sk_live_xxx",
+    "key_meta": {
+      "id": "key_xxx",
+      "name": "my-key",
+      "key_prefix": "sk_live"
+    }
+  }
+}
+```
+
+#### `DELETE /api/v1/gateway/keys/{id}`
+
+撤销 API Key。
+
+#### `GET /api/v1/gateway/usage`
+
+使用统计（按 Provider/Model 聚合）。
+
+Query params:
+- `from` - 起始日期 (ISO 8601)
+- `to` - 截止日期 (ISO 8601)
+- `user_id` - 指定用户 (admin)
+
+Response item:
+```json
+{
+  "user_id": "user_admin",
+  "username": "admin",
+  "provider": "openai",
+  "model": "gpt-4o",
+  "request_count": 100,
+  "prompt_tokens": 50000,
+  "completion_tokens": 100000,
+  "total_tokens": 150000,
+  "total_cost": 2.25
+}
+```
+
+#### `GET /api/v1/gateway/usage/users`
+
+用户级别使用统计（admin）。
+
+Response item:
+```json
+{
+  "user_id": "user_admin",
+  "username": "admin",
+  "request_count": 200,
+  "prompt_tokens": 100000,
+  "completion_tokens": 200000,
+  "total_tokens": 300000,
+  "total_cost": 4.50
+}
+```
+
+### Gateway 功能
+
+| 功能 | 说明 |
+|------|------|
+| **多提供商路由** | 根据模型名自动路由到对应提供商 |
+| **流式响应** | SSE 格式实时返回生成内容 |
+| **使用统计** | 按 Provider/Model/User 聚合 token 和费用 |
+| **费用追踪** | 基于模型定价自动计算成本 |
+| **限流** | 每 Key 每分钟请求限制 (默认 60) |
+| **重试机制** | 指数退避自动重试 (最多 3 次) |
+
 ### Error Responses
 
 ```json
@@ -368,10 +602,14 @@ Request:
 ```
 
 Error codes:
-- `unauthorized` - Missing or invalid API key
-- `invalid_request` - Malformed request body
-- `invalid_model` - Unknown model identifier
-- `generation_failed` - LLM provider error
+- `unauthorized` - 缺少或无效 API Key
+- `invalid_request` - 请求格式错误
+- `invalid_model` - 未知模型标识
+- `generation_failed` - LLM 提供商错误
+- `stream_failed` - 流式响应失败
+- `rate_limit_exceeded` - 超过请求限制
+
+---
 
 ## 12. SOP-to-Skill Orchestrator API
 
@@ -382,11 +620,6 @@ Base path: `/v1`
 ### Authentication
 
 Uses Bearer JWT token authentication.
-
-### Common Headers
-
-- `Idempotency-Key` - Optional, for write operations
-- `Content-Type: application/json`
 
 ### `GET /v1/healthz`
 
@@ -460,9 +693,6 @@ Response:
 }
 ```
 
-Run statuses: `queued`, `running`, `succeeded`, `failed`, `canceled`
-Run stages: `extraction`, `generation`, `validation`, `versioning`, `testing`, `completed`
-
 ### `GET /v1/runs/{runId}/artifacts`
 
 List run artifacts.
@@ -478,8 +708,6 @@ Response:
   ]
 }
 ```
-
-Artifact kinds: `skill_md`, `full_skill_md`, `schema_json`, `manifest_yaml`, `constraints_dir`, `framework_bundle`
 
 ### `POST /v1/extraction/enhance`
 
@@ -548,115 +776,7 @@ Response:
 }
 ```
 
-### Skill Version Management
-
-#### `POST /v1/skills`
-
-Create skill metadata.
-
-Request:
-```json
-{
-  "skillId": "skill_xxx",
-  "name": "My Skill",
-  "owner": "team-x",
-  "tags": ["production", "critical"]
-}
-```
-
-Response (201 Created):
-```json
-{
-  "skillId": "skill_xxx",
-  "name": "My Skill",
-  "owner": "team-x",
-  "tags": ["production", "critical"],
-  "createdAt": "2026-03-31T10:00:00Z"
-}
-```
-
-#### `POST /v1/skills/{skillId}/versions`
-
-Create new skill version.
-
-Request:
-```json
-{
-  "version": "1.1.0",
-  "sourceHash": "sha256:abc123",
-  "schemaHash": "sha256:def456",
-  "artifacts": [
-    {"kind": "skill_md", "uri": "s3://bucket/v1.1.0/skill.md"}
-  ],
-  "runId": "run_xxx"
-}
-```
-
-#### `GET /v1/skills/{skillId}/versions`
-
-List all versions.
-
-Response:
-```json
-{
-  "skillId": "skill_xxx",
-  "versions": [...]
-}
-```
-
-#### `GET /v1/skills/{skillId}/diff?from=v1.0.0&to=v1.1.0`
-
-Compare two versions.
-
-### Async Operations
-
-#### `POST /v1/skills/{skillId}/rollback`
-
-Rollback to previous version.
-
-Request:
-```json
-{
-  "targetVersion": "1.0.0",
-  "reason": "Critical bug in v1.1.0"
-}
-```
-
-Response (202 Accepted):
-```json
-{
-  "actionId": "action_xxx",
-  "status": "accepted",
-  "acceptedAt": "2026-03-31T10:00:00Z"
-}
-```
-
-#### `POST /v1/skills/{skillId}/promote`
-
-Promote version to environment.
-
-Request:
-```json
-{
-  "version": "1.1.0",
-  "channel": "staging"
-}
-```
-
-Response (202 Accepted):
-```json
-{
-  "actionId": "action_xxx",
-  "status": "accepted",
-  "acceptedAt": "2026-03-31T10:00:00Z"
-}
-```
-
-Channels: `dev`, `staging`, `prod`
-
-### Test Orchestration
-
-#### `POST /v1/tests/runs`
+### `POST /v1/tests/runs`
 
 Create test run.
 
@@ -682,7 +802,7 @@ Response (202 Accepted):
 }
 ```
 
-#### `GET /v1/tests/runs/{testRunId}`
+### `GET /v1/tests/runs/{testRunId}`
 
 Get test run status.
 
@@ -697,7 +817,7 @@ Response:
 }
 ```
 
-#### `GET /v1/tests/runs/{testRunId}/report`
+### `GET /v1/tests/runs/{testRunId}/report`
 
 Get test report.
 
@@ -715,9 +835,7 @@ Response:
 }
 ```
 
-### Gate Evaluation
-
-#### `POST /v1/gates/evaluate`
+### `POST /v1/gates/evaluate`
 
 Evaluate promotion gate.
 
@@ -741,9 +859,7 @@ Response:
 }
 ```
 
-### Policies
-
-#### `GET /v1/policies/{policyId}`
+### `GET /v1/policies/{policyId}`
 
 Get policy definition.
 
@@ -759,33 +875,16 @@ Response:
 }
 ```
 
-### Error Response Format
+---
 
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Skill not found",
-    "details": {},
-    "requestId": "req_xxx"
-  }
-}
-```
+## Error Codes
 
-## 9. Frontend Integration Notes
-
-Frontend pages should map to these endpoints:
-
-- `/` -> `dashboard`
-- `/skills` -> `skills` + `skill-versions`
-- `/executions` -> `executions`
-- `/approvals` -> `approvals`
-
-## 10. Persistence Note
-
-These HTTP contracts are designed to remain stable when the backend switches from the in-memory repository to PostgreSQL.
-
-Migration files live in:
-
-- `apps/api/migrations/0001_init.up.sql`
-- `apps/api/migrations/0001_init.down.sql`
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `BAD_REQUEST` | 400 | 请求格式错误 |
+| `NOT_FOUND` | 404 | 资源不存在 |
+| `METHOD_NOT_ALLOWED` | 405 | 请求方法不支持 |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | Content-Type 不支持 |
+| `UNAUTHORIZED` | 401 | 未认证或认证失败 |
+| `INVALID_CREDENTIALS` | 401 | 用户名或密码错误 |
+| `INTERNAL_ERROR` | 500 | 服务器内部错误 |

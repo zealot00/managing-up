@@ -114,7 +114,29 @@ managing-up 是一个 AI 系统的**质检部门 + 照妖镜**。
 
 ## 快速开始 Quick Start
 
-### 1. 启动后端（内存模式）
+### 1. 配置数据库
+
+```bash
+cd apps/api
+# 编辑 .env 文件
+cat > .env << EOF
+PORT=8080
+DB_DRIVER=postgres
+DATABASE_URL=postgresql://postgres:pass@localhost:5432/managing-up
+EOF
+```
+
+### 2. 运行迁移和种子数据
+
+```bash
+cd apps/api
+go run cmd/migrate/main.go   # 创建表结构
+go run cmd/seed/main.go       # 插入测试数据 + 默认用户
+```
+
+默认账号：`admin` / `admin`
+
+### 3. 启动后端
 
 ```bash
 cd apps/api
@@ -122,7 +144,7 @@ go run cmd/server/main.go
 # Server running at http://localhost:8080
 ```
 
-### 2. 启动前端
+### 4. 启动前端
 
 ```bash
 cd apps/web
@@ -131,51 +153,104 @@ npm run dev
 # Frontend at http://localhost:3000
 ```
 
-### 3. 使用 PostgreSQL
+### 环境变量
 
-```bash
-cd apps/api
-make migrate
-make seed
-make serve-pg DATABASE_URL="postgres://localhost:5432/skillhub?sslmode=disable"
-```
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `PORT` | API 监听端口 | `8080` |
+| `DB_DRIVER` | 数据库驱动 (必须 postgres) | - |
+| `DATABASE_URL` | PostgreSQL 连接字符串 | - |
+| `LLM_PROVIDER` | 默认 LLM 提供商 | `ollama` |
+| `LLM_MODEL` | 默认 LLM 模型 | `deepseek-r1-tool-calling:7b` |
+| `LLM_BASE_URL` | LLM API 地址 | `http://localhost:11434` |
+| `LLM_API_KEY` | LLM API Key | - |
+| `NEXT_PUBLIC_API_BASE_URL` | 前端 API 地址 | `http://localhost:8080` |
 
 ---
 
 ## API 端点 API Endpoints
 
+### 认证 Auth
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/v1/skills` | List published skills |
-| POST | `/api/v1/skills` | Create skill |
-| GET | `/api/v1/skills/{id}` | Get skill details |
-| GET | `/api/v1/skills/{id}/spec` | Download skill YAML spec |
-| GET | `/api/v1/skill-versions` | List skill versions |
-| POST | `/api/v1/executions` | Trigger execution |
-| GET | `/api/v1/executions/{id}` | Get execution status |
-| POST | `/api/v1/executions/{id}/approve` | Approve/reject |
-| POST | `/api/v1/generate-skill` | Generate skill from SOP |
-| POST | `/api/v1/agents` | Register agent |
-| GET | `/api/v1/approvals` | List approvals |
-| GET | `/api/v1/dashboard` | Dashboard metrics |
-| GET | `/api/v1/meta` | API metadata |
-| GET | `/api/v1/procedure-drafts` | List procedure drafts |
-| GET | `/api/v1/tasks` | List evaluation tasks |
-| POST | `/api/v1/tasks` | Create task |
-| GET | `/api/v1/tasks/{id}` | Get task |
-| PUT | `/api/v1/tasks/{id}` | Update task |
-| DELETE | `/api/v1/tasks/{id}` | Delete task |
-| GET | `/api/v1/metrics` | List metric definitions |
-| POST | `/api/v1/evaluations` | Run evaluation |
-| GET | `/api/v1/task-executions` | List task executions |
-| GET | `/api/v1/task-executions/{id}` | Get task execution |
-| GET | `/api/v1/experiments` | List experiments |
-| POST | `/api/v1/experiments` | Create experiment |
-| GET | `/api/v1/experiments/{id}` | Get experiment results |
-| GET | `/api/v1/experiments/{id}/compare?compare_with={other_id}` | Compare two experiments |
-| POST | `/api/v1/check-regression` | Check score regression |
-| GET | `/api/v1/replay-snapshots` | List replay snapshots |
-| GET | `/api/v1/replay-snapshots/{id}` | Get replay snapshot |
+| POST | `/api/v1/auth/login` | 用户登录 |
+| POST | `/api/v1/auth/logout` | 用户登出 |
+| GET | `/api/v1/auth/me` | 获取当前用户信息 |
+
+### 核心 Core
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/healthz` | 健康检查 |
+| GET | `/api/v1/meta` | API 元数据 |
+| GET | `/api/v1/dashboard` | Dashboard 统计 |
+| GET | `/api/v1/tip` | 获取登录页名言 (随机) |
+
+### 技能 Skills
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/skills` | 列出技能 |
+| POST | `/api/v1/skills` | 创建技能 |
+| GET | `/api/v1/skills/{id}` | 技能详情 |
+| GET | `/api/v1/skills/{id}/spec` | 下载 YAML spec |
+| GET | `/api/v1/skill-versions` | 列出技能版本 |
+| POST | `/api/v1/generate-skill` | 从 SOP 生成技能 |
+
+### 执行 Executions
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/executions` | 列出执行记录 |
+| POST | `/api/v1/executions` | 触发执行 |
+| GET | `/api/v1/executions/{id}` | 执行详情 |
+| POST | `/api/v1/executions/{id}/approve` | 审批/拒绝 |
+| GET | `/api/v1/approvals` | 列出审批 |
+
+### 任务 Tasks
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/tasks` | 列出任务 |
+| POST | `/api/v1/tasks` | 创建任务 |
+| GET | `/api/v1/tasks/{id}` | 任务详情 |
+| PUT | `/api/v1/tasks/{id}` | 更新任务 |
+| DELETE | `/api/v1/tasks/{id}` | 删除任务 |
+| GET | `/api/v1/metrics` | 列出指标定义 |
+| GET | `/api/v1/task-executions` | 任务执行列表 |
+| GET | `/api/v1/task-executions/{id}` | 任务执行详情 |
+
+### 实验 Experiments
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/experiments` | 列出实验 |
+| POST | `/api/v1/experiments` | 创建实验 |
+| GET | `/api/v1/experiments/{id}` | 实验结果 |
+| GET | `/api/v1/experiments/{id}/compare` | 对比实验 |
+| POST | `/api/v1/check-regression` | 回归检测 |
+
+### 回放 Replay
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/replay-snapshots` | 回放快照列表 |
+| GET | `/api/v1/replay-snapshots/{id}` | 快照详情 |
+
+### LLM Gateway (OpenAI/Anthropic 兼容)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/models` | 可用模型列表 |
+| POST | `/v1/chat/completions` | OpenAI 兼容接口 |
+| POST | `/v1/messages` | Anthropic 兼容接口 |
+| POST | `/v1/embeddings` | Embeddings 接口 |
+| GET | `/api/v1/gateway/keys` | 列出 Gateway API Key |
+| POST | `/api/v1/gateway/keys` | 创建 Gateway API Key |
+| DELETE | `/api/v1/gateway/keys/{id}` | 撤销 API Key |
+| GET | `/api/v1/gateway/usage` | 使用统计 (按 Provider/Model) |
+| GET | `/api/v1/gateway/usage/users` | 使用统计 (按用户) |
 
 ---
 
@@ -200,7 +275,7 @@ make serve-pg DATABASE_URL="postgres://localhost:5432/skillhub?sslmode=disable"
 
 ## LLM Gateway
 
-OpenAI 和 Anthropic 兼容的 LLM 代理接口，支持 API Key 认证。
+OpenAI 和 Anthropic 兼容的 LLM 代理接口，支持多提供商、API Key 认证、使用统计和费用追踪。
 
 ### 端点
 
@@ -209,6 +284,7 @@ OpenAI 和 Anthropic 兼容的 LLM 代理接口，支持 API Key 认证。
 | GET | `/v1/models` | List available models |
 | POST | `/v1/chat/completions` | OpenAI-compatible chat completions |
 | POST | `/v1/messages` | Anthropic-compatible messages |
+| POST | `/v1/embeddings` | Embeddings |
 
 ### 使用示例
 
@@ -228,6 +304,33 @@ curl -X POST http://localhost:8080/v1/messages \
   -H "anthropic-version: 2023-06-01" \
   -d '{"model":"claude-haiku-3","messages":[{"role":"user","content":"Hi"}]}'
 ```
+
+### Gateway 管理
+
+```bash
+# 创建 API Key
+curl -X POST http://localhost:8080/api/v1/gateway/keys \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-key"}'
+
+# 列出 Keys
+curl http://localhost:8080/api/v1/gateway/keys
+
+# 查看使用统计
+curl http://localhost:8080/api/v1/gateway/usage?from=2026-04-01&to=2026-04-30
+
+# 查看用户级别使用统计 (admin)
+curl http://localhost:8080/api/v1/gateway/usage/users
+```
+
+### Gateway 功能
+
+- **多提供商路由**: 自动根据模型名路由到对应提供商
+- **API Key 认证**: Bearer Token / x-api-key
+- **使用统计**: 按 Provider/Model/User 聚合
+- **费用追踪**: 基于模型定价自动计算成本
+- **限流**: 每 Key 每分钟请求限制
+- **重试机制**: 指数退避自动重试
 
 ---
 
@@ -322,29 +425,39 @@ managing-up/
 │   │   ├── cmd/
 │   │   │   ├── server/          # HTTP server
 │   │   │   ├── migrate/         # Database migrations
-│   │   │   └── seed/            # Test data seeding
+│   │   │   ├── seed/            # Test data seeding
+│   │   │   ├── hashpw/          # Password hashing utility
+│   │   │   └── updatepw/        # Password reset utility
 │   │   ├── internal/
 │   │   │   ├── server/          # HTTP handlers + routing
-│   │   │   ├── service/         # Domain logic (execution, task, metric, skill)
-│   │   │   ├── engine/         # Execution engine + trace + replay
+│   │   │   │   └── handlers/    # Auth handler
+│   │   │   ├── service/         # Domain logic
+│   │   │   ├── engine/          # Execution engine + trace + replay
 │   │   │   ├── evaluator/       # Evaluators + evaluation runner
-│   │   │   ├── generator/        # LLM skill generator (SOP → YAML)
+│   │   │   ├── generator/       # LLM skill generator (SOP → YAML)
+│   │   │   ├── gateway/         # LLM Gateway (OpenAI/Anthropic compatible)
 │   │   │   ├── llm/             # LLM provider clients (10 providers)
+│   │   │   ├── orchestrator/    # SOP-to-Skill orchestrator
+│   │   │   ├── seh/             # SEH module
 │   │   │   └── repository/      # PostgreSQL repository
-│   │   ├── migrations/          # SQL migrations (0001-0007)
-│   │   └── openapi/            # OpenAPI spec
+│   │   └── migrations/          # SQL migrations (0001-0012)
 │   └── web/
 │       └── app/                 # Next.js frontend
+│           ├── components/      # Reusable UI components
+│           ├── context/         # Auth context
+│           ├── dashboard/       # Dashboard pages
+│           ├── gateway/         # Gateway management + usage stats
+│           ├── login/           # Login page (Soviet post-punk style)
 │           ├── skills/          # Skill registry UI
 │           ├── executions/      # Execution + trace timeline
-│           ├── tasks/          # Task definitions
+│           ├── tasks/           # Task definitions
 │           ├── evaluations/     # Evaluation results
 │           ├── experiments/     # Experiment comparison
 │           └── replays/         # Replay snapshots
 ├── sdk/
-│   ├── python/                 # Python SDK
-│   └── typescript/            # TypeScript SDK
-└── docs/                      # Architecture docs
+│   ├── python/                  # Python SDK
+│   └── typescript/              # TypeScript SDK
+└── docs/                        # Architecture docs
 ```
 
 ---
@@ -358,15 +471,19 @@ managing-up/
 | Approval Gate | ✅ | Human-in-the-loop for high-risk ops |
 | Skill Generator | ✅ | SOP document → YAML spec |
 | LLM Integration | ✅ | 10 providers |
+| LLM Gateway | ✅ | OpenAI/Anthropic compatible, streaming, cost tracking |
 | Task Definitions | ✅ | Structured test cases |
 | Experiment Tracking | ✅ | A/B comparison runs |
 | Evaluation Pipeline | ✅ | Multiple evaluator types |
 | Trace Replay | ✅ | Deterministic reproduction |
 | Python SDK | ✅ | PyPI package |
 | TypeScript SDK | ✅ | npm package |
-| PostgreSQL Persistence | ✅ | With migrations |
+| PostgreSQL Persistence | ✅ | With migrations (required) |
 | Agent SDKs | ✅ | Python + TypeScript |
 | Unit Tests | ✅ | All packages passing |
+| Admin Panel UI | ✅ | Sidebar layout, dark theme |
+| Usage Statistics | ✅ | Token ranking, cost tracking, charts |
+| Login Tips | ✅ | Database-driven quotes/tips |
 
 ---
 
