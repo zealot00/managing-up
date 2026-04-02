@@ -1,21 +1,20 @@
 import { Suspense } from "react";
 import { getTasks } from "../lib/api";
 import type { Task } from "../lib/api";
-import { SkeletonPanel } from "../components/SkeletonPanel";
 
 function SkeletonTasks() {
   return (
     <main className="shell">
-      <section className="toprail" aria-label="Tasks navigation">
-        <div className="loading-pulse" style={{ width: 180, height: 44, borderRadius: 999 }} />
-      </section>
-      <section className="hero-page hero-compact">
+      <header className="hero-page hero-compact">
         <p className="eyebrow">Task Registry</p>
         <h1>Evaluation Tasks</h1>
-      </section>
+        <p className="lede">
+          Reusable tasks for measuring agent performance. Each task defines inputs, expected outputs, and difficulty ratings.
+        </p>
+      </header>
       <div className="skeleton-grid">
         {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div className="skeleton-card" key={i} />
+          <div key={i} className="skeleton-card" />
         ))}
       </div>
     </main>
@@ -24,24 +23,22 @@ function SkeletonTasks() {
 
 function TaskCard({ task }: { task: Task }) {
   return (
-    <article className="card">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+    <article className="eval-card">
+      <div className="eval-card-header">
         <div>
-          <h2 style={{ margin: "0 0 8px", fontSize: "1.2rem" }}>{task.name}</h2>
-          <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.9rem" }}>{task.description || "No description"}</p>
+          <h3 className="eval-card-title">{task.name}</h3>
+          <p className="eval-card-meta">{task.description || "No description"}</p>
         </div>
         <span className={`badge badge-${task.difficulty === "easy" ? "succeeded" : task.difficulty === "medium" ? "running" : "failed"}`}>
           {task.difficulty}
         </span>
       </div>
-      <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className="tags">
         {task.tags.map((tag) => (
-          <span key={tag} style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(36, 49, 64, 0.06)", fontSize: "0.78rem", color: "var(--ink)" }}>
-            {tag}
-          </span>
+          <span key={tag} className="tag">{tag}</span>
         ))}
       </div>
-      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)", display: "flex", gap: 16, fontSize: "0.82rem", color: "var(--muted)" }}>
+      <div className="eval-card-footer">
         <span>{task.test_cases.length} test cases</span>
         {task.skill_id && <span>Linked to skill</span>}
       </div>
@@ -60,26 +57,13 @@ async function TasksContent() {
 
   return (
     <main className="shell">
-      <section className="toprail" aria-label="Tasks navigation">
-        <a className="toprail-link" href="/">
-          Dashboard
-        </a>
-        <a className="toprail-link" href="/tasks">
-          Tasks
-        </a>
-        <a className="toprail-link" href="/evaluations">
-          Evaluations
-        </a>
-      </section>
-
-      <section className="hero-page hero-compact">
+      <header className="hero-page hero-compact">
         <p className="eyebrow">Task Registry</p>
         <h1>Evaluation Tasks</h1>
         <p className="lede">
-          Reusable tasks for measuring agent performance. Each task defines inputs,
-          expected outputs, and difficulty ratings.
+          Reusable tasks for measuring agent performance. Each task defines inputs, expected outputs, and difficulty ratings.
         </p>
-      </section>
+      </header>
 
       <section aria-label="Task list">
         {(tasks?.items ?? []).length > 0 ? (
@@ -89,14 +73,13 @@ async function TasksContent() {
             ))}
           </div>
         ) : (
-          <article className="panel" style={{ marginTop: 24 }}>
-            <div className="panel-header">
-              <h2>No tasks yet</h2>
-            </div>
-            <p style={{ color: "var(--muted)", marginTop: 12 }}>
+          <div className="empty-state">
+            <div className="empty-state-icon">◎</div>
+            <h3 className="empty-state-title">No tasks yet</h3>
+            <p className="empty-state-description">
               Tasks will appear here once created via the API. Use POST /api/v1/tasks to create evaluation tasks.
             </p>
-          </article>
+          </div>
         )}
       </section>
     </main>

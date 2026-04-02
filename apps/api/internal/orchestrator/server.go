@@ -25,9 +25,20 @@ func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+func getIdempotencyKey(r *http.Request) string {
+	return r.Header.Get("Idempotency-Key")
+}
+
 func (s *Server) HandleOrchestratorRuns(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
+		idempKey := getIdempotencyKey(r)
+		if idempKey != "" && s.svc.idempStore != nil {
+			if cached, statusCode, found := s.svc.idempStore.Get(idempKey); found {
+				writeJSON(w, statusCode, cached)
+				return
+			}
+		}
 		var req CreateRunRequest
 		if err := decodeJSON(r, &req); err != nil {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
@@ -35,6 +46,9 @@ func (s *Server) HandleOrchestratorRuns(w http.ResponseWriter, r *http.Request) 
 		}
 		resp := s.svc.CreateRun(req)
 		w.Header().Set("Location", resp.Links.Self)
+		if idempKey != "" && s.svc.idempStore != nil {
+			s.svc.idempStore.Set(idempKey, resp, http.StatusAccepted)
+		}
 		writeJSON(w, http.StatusAccepted, resp)
 	default:
 		writeMethodNotAllowed(w, r.Method)
@@ -95,12 +109,22 @@ func (s *Server) HandleEnhanceExtraction(w http.ResponseWriter, r *http.Request)
 		writeMethodNotAllowed(w, r.Method)
 		return
 	}
+	idempKey := getIdempotencyKey(r)
+	if idempKey != "" && s.svc.idempStore != nil {
+		if cached, statusCode, found := s.svc.idempStore.Get(idempKey); found {
+			writeJSON(w, statusCode, cached)
+			return
+		}
+	}
 	var req EnhanceExtractionRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return
 	}
 	resp := s.svc.EnhanceExtraction(req)
+	if idempKey != "" && s.svc.idempStore != nil {
+		s.svc.idempStore.Set(idempKey, resp, http.StatusOK)
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -109,24 +133,44 @@ func (s *Server) HandleCompareExtraction(w http.ResponseWriter, r *http.Request)
 		writeMethodNotAllowed(w, r.Method)
 		return
 	}
+	idempKey := getIdempotencyKey(r)
+	if idempKey != "" && s.svc.idempStore != nil {
+		if cached, statusCode, found := s.svc.idempStore.Get(idempKey); found {
+			writeJSON(w, statusCode, cached)
+			return
+		}
+	}
 	var req CompareExtractionRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return
 	}
 	resp := s.svc.CompareExtraction(req)
+	if idempKey != "" && s.svc.idempStore != nil {
+		s.svc.idempStore.Set(idempKey, resp, http.StatusOK)
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) HandleOrchestratorSkills(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
+		idempKey := getIdempotencyKey(r)
+		if idempKey != "" && s.svc.idempStore != nil {
+			if cached, statusCode, found := s.svc.idempStore.Get(idempKey); found {
+				writeJSON(w, statusCode, cached)
+				return
+			}
+		}
 		var req CreateSkillRequest
 		if err := decodeJSON(r, &req); err != nil {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 			return
 		}
 		resp := s.svc.CreateSkill(req)
+		if idempKey != "" && s.svc.idempStore != nil {
+			s.svc.idempStore.Set(idempKey, resp, http.StatusCreated)
+		}
 		writeJSON(w, http.StatusCreated, resp)
 	default:
 		writeMethodNotAllowed(w, r.Method)
@@ -164,12 +208,22 @@ func (s *Server) HandleSkillVersions(w http.ResponseWriter, r *http.Request) {
 		resp := s.svc.ListSkillVersions(skillID)
 		writeJSON(w, http.StatusOK, resp)
 	case http.MethodPost:
+		idempKey := getIdempotencyKey(r)
+		if idempKey != "" && s.svc.idempStore != nil {
+			if cached, statusCode, found := s.svc.idempStore.Get(idempKey); found {
+				writeJSON(w, statusCode, cached)
+				return
+			}
+		}
 		var req CreateSkillVersionRequest
 		if err := decodeJSON(r, &req); err != nil {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 			return
 		}
 		resp := s.svc.CreateSkillVersion(skillID, req)
+		if idempKey != "" && s.svc.idempStore != nil {
+			s.svc.idempStore.Set(idempKey, resp, http.StatusCreated)
+		}
 		writeJSON(w, http.StatusCreated, resp)
 	default:
 		writeMethodNotAllowed(w, r.Method)
@@ -229,6 +283,13 @@ func (s *Server) HandlePromoteSkill(w http.ResponseWriter, r *http.Request) {
 		writeMethodNotAllowed(w, r.Method)
 		return
 	}
+	idempKey := getIdempotencyKey(r)
+	if idempKey != "" && s.svc.idempStore != nil {
+		if cached, statusCode, found := s.svc.idempStore.Get(idempKey); found {
+			writeJSON(w, statusCode, cached)
+			return
+		}
+	}
 	skillID := extractSkillIDFromPath(r.URL.Path)
 	var req PromoteRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -236,6 +297,9 @@ func (s *Server) HandlePromoteSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := s.svc.Promote(skillID, req)
+	if idempKey != "" && s.svc.idempStore != nil {
+		s.svc.idempStore.Set(idempKey, resp, http.StatusAccepted)
+	}
 	writeJSON(w, http.StatusAccepted, resp)
 }
 
@@ -263,12 +327,22 @@ func (s *Server) HandleCreateTestRun(w http.ResponseWriter, r *http.Request) {
 		writeMethodNotAllowed(w, r.Method)
 		return
 	}
+	idempKey := getIdempotencyKey(r)
+	if idempKey != "" && s.svc.idempStore != nil {
+		if cached, statusCode, found := s.svc.idempStore.Get(idempKey); found {
+			writeJSON(w, statusCode, cached)
+			return
+		}
+	}
 	var req CreateTestRunRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return
 	}
 	resp := s.svc.CreateTestRun(req)
+	if idempKey != "" && s.svc.idempStore != nil {
+		s.svc.idempStore.Set(idempKey, resp, http.StatusAccepted)
+	}
 	writeJSON(w, http.StatusAccepted, resp)
 }
 
@@ -315,12 +389,22 @@ func (s *Server) HandleEvaluateGate(w http.ResponseWriter, r *http.Request) {
 		writeMethodNotAllowed(w, r.Method)
 		return
 	}
+	idempKey := getIdempotencyKey(r)
+	if idempKey != "" && s.svc.idempStore != nil {
+		if cached, statusCode, found := s.svc.idempStore.Get(idempKey); found {
+			writeJSON(w, statusCode, cached)
+			return
+		}
+	}
 	var req GateEvaluateRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return
 	}
 	resp := s.svc.EvaluateGate(req)
+	if idempKey != "" && s.svc.idempStore != nil {
+		s.svc.idempStore.Set(idempKey, resp, http.StatusOK)
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 

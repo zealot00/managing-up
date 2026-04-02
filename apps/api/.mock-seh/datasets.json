@@ -1,0 +1,82 @@
+[
+  {
+    "dataset_id": "ds_abc12345",
+    "name": "Code Generation Benchmark",
+    "version": "v1.0",
+    "owner": "engineering",
+    "description": "High-quality code generation test cases",
+    "manifest": {
+      "dataset_name": "Code Generation Benchmark",
+      "version": "v1.0",
+      "owner": "engineering",
+      "description": "High-quality code generation test cases"
+    },
+    "case_count": 5,
+    "checksum": "sha256:a1b2c3d4e5f6",
+    "created_at": "2026-03-15T10:00:00Z"
+  },
+  {
+    "dataset_id": "ds_def67890",
+    "name": "Text Summarization Test",
+    "version": "v1.0",
+    "owner": "ml-team",
+    "description": "Text summarization evaluation cases",
+    "manifest": {
+      "dataset_name": "Text Summarization Test",
+      "version": "v1.0",
+      "owner": "ml-team",
+      "description": "Text summarization evaluation cases"
+    },
+    "case_count": 5,
+    "checksum": "sha256:f6e5d4c3b2a1",
+    "created_at": "2026-03-20T14:30:00Z"
+  },
+  {
+    "dataset_id": "ds_177510007541",
+    "name": "Test Dataset",
+    "version": "v1.0",
+    "owner": "test",
+    "description": "Test",
+    "manifest": {
+      "dataset_name": "",
+      "version": "",
+      "owner": "",
+      "description": ""
+    },
+    "case_count": 0,
+    "checksum": "",
+    "created_at": "2026-04-02T03:21:15Z"
+  },
+  {
+    "dataset_id": "ds_177510040869",
+    "name": "Final Test DS",
+    "version": "v1.0",
+    "owner": "test",
+    "description": "",
+    "manifest": {
+      "dataset_name": "",
+      "version": "",
+      "owner": "",
+      "description": ""
+    },
+    "case_count": 0,
+    "checksum": "",
+    "created_at": "2026-04-02T03:26:48Z"
+  },
+  {
+    "dataset_id": "ds_177511088839",
+    "name": "DB Test Dataset",
+    "version": "v1.0",
+    "owner": "test",
+    "description": "",
+    "manifest": {
+      "dataset_name": "",
+      "version": "",
+      "owner": "",
+      "description": ""
+    },
+    "case_count": 0,
+    "checksum": "",
+    "created_at": "2026-04-02T06:21:28Z"
+  }
+]

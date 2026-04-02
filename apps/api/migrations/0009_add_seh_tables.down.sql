@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS seh_releases;
+DROP TABLE IF EXISTS seh_policies;
+DROP TABLE IF EXISTS seh_runs;
+DROP TABLE IF EXISTS seh_cases;
+DROP TABLE IF EXISTS seh_datasets;

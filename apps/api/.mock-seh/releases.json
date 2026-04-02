@@ -1,0 +1,28 @@
+[
+  {
+    "approved_at": "2026-04-02T03:24:14Z",
+    "approved_by": "admin",
+    "release_id": "rel_177510024611",
+    "status": "approved"
+  },
+  {
+    "approved_at": "2026-04-02T03:24:24Z",
+    "approved_by": "admin",
+    "release_id": "rel_177510026484",
+    "status": "rolled_back"
+  },
+  {
+    "rejected_reason": "Not ready",
+    "release_id": "rel_177510027493",
+    "status": "rejected"
+  },
+  {
+    "approved_at": "2026-04-02T03:26:48Z",
+    "approved_by": "admin",
+    "release_id": "rel_177510040871",
+    "status": "approved"
+  },
+  {
+    "release_id": "rel_177511088841"
+  }
+]

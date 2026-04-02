@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/seh", label: "SEH" },
   { href: "/skills", label: "Skills" },
   { href: "/executions", label: "Executions" },
   { href: "/approvals", label: "Approvals" },
@@ -16,6 +18,7 @@ const navLinks = [
 ];
 
 export default function NavBar() {
+  const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const router = useRouter();
 
@@ -38,7 +41,6 @@ export default function NavBar() {
   }
 
   if (!isAuthenticated) {
-    // Minimal nav for logged-out users
     return (
       <nav className="nav-bar">
         <div className="nav-inner">
@@ -56,25 +58,28 @@ export default function NavBar() {
     );
   }
 
-  // Full nav for logged-in users
   return (
     <nav className="nav-bar">
       <div className="nav-inner">
         <a href="/" className="nav-brand">
           <img src="/logo.svg" alt="managing-up logo" className="nav-logo" />
           <span>managing-up</span>
-          <span className="nav-edition">向上管理</span>
+          <span className="nav-edition">EE</span>
         </a>
         <div className="nav-links">
           {navLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="nav-link">
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`nav-link${pathname === link.href ? " active" : ""}`}
+            >
               {link.label}
             </Link>
           ))}
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
-          <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>{user?.username}</span>
-          <button onClick={handleLogout} className="nav-link" style={{ background: "none", border: "none", cursor: "pointer" }}>
+        <div className="nav-user">
+          <span className="nav-username">{user?.username}</span>
+          <button onClick={handleLogout} className="nav-logout">
             Logout
           </button>
         </div>

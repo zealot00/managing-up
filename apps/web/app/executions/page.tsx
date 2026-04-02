@@ -1,30 +1,33 @@
 import { Suspense } from "react";
 import { getExecutions, getSkills } from "../lib/api";
 import TriggerExecutionForm from "../components/TriggerExecutionForm";
-import { SkeletonPanel } from "../components/SkeletonPanel";
 
 function SkeletonExecutionsPage() {
   return (
     <main className="shell">
-      <section className="hero-page hero-compact">
+      <header className="hero-page hero-compact">
         <p className="eyebrow">Execution Timeline</p>
         <h1>Operational runs across governed skills.</h1>
         <p className="lede">
           Monitor live and completed runs, current step progression, and operator-triggered events.
         </p>
-      </section>
+      </header>
 
       <div className="form-panel">
-        <div className="loading-pulse loading-pulse-short" style={{ marginBottom: 12 }} />
+        <div className="loading-pulse loading-pulse-short" style={{ marginBottom: 16 }} />
         <div className="form-fields">
           <div className="loading-pulse loading-pulse-medium" />
           <div className="loading-pulse loading-pulse-medium" />
           <div className="loading-pulse loading-pulse-long" />
         </div>
-        <div className="loading-pulse" style={{ width: 160, height: 44, borderRadius: 999 }} />
       </div>
 
-      <SkeletonPanel height={320} />
+      <div className="panel">
+        <div className="loading-pulse loading-pulse-medium" style={{ marginBottom: 16 }} />
+        <div className="skeleton-grid">
+          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="skeleton-card" />)}
+        </div>
+      </div>
     </main>
   );
 }
@@ -34,39 +37,42 @@ async function ExecutionsContent() {
 
   return (
     <main className="shell">
-      <section className="hero-page hero-compact">
+      <header className="hero-page hero-compact">
         <p className="eyebrow">Execution Timeline</p>
         <h1>Operational runs across governed skills.</h1>
         <p className="lede">
           Monitor live and completed runs, current step progression, and operator-triggered events.
         </p>
-      </section>
+      </header>
 
       <TriggerExecutionForm skills={skills.items} />
 
       <section className="panel">
         <div className="panel-header">
           <p className="section-kicker">Runs</p>
-          <h2>Execution queue</h2>
+          <h2 className="panel-title">Execution queue</h2>
         </div>
         <div className="list">
-          {executions.items.map((execution) => (
-            <article className="list-card" key={execution.id}>
-              <div>
-                <h3>{execution.skill_name}</h3>
-                <p>
-                  {execution.current_step_id} · triggered by {execution.triggered_by}
-                </p>
-                <a
-                  href={`/executions/${execution.id}/traces`}
-                  className="trace-link"
-                >
-                  View trace →
-                </a>
-              </div>
-              <span className={`badge badge-${execution.status}`}>{execution.status}</span>
-            </article>
-          ))}
+          {executions.items.length === 0 ? (
+            <p className="empty-note">No executions in queue</p>
+          ) : (
+            executions.items.map((execution) => (
+              <article className="list-card" key={execution.id}>
+                <div className="list-card-main">
+                  <h3 className="list-card-title">{execution.skill_name}</h3>
+                  <p className="list-card-meta">
+                    {execution.current_step_id} · triggered by {execution.triggered_by}
+                  </p>
+                </div>
+                <div className="list-card-actions">
+                  <a href={`/executions/${execution.id}/traces`} className="trace-link">
+                    View trace →
+                  </a>
+                  <span className={`badge badge-${execution.status}`}>{execution.status}</span>
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </section>
     </main>

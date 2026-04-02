@@ -1,0 +1,232 @@
+[
+  {
+    "case_id": "case_001",
+    "skill": "code_generation",
+    "source": "golden",
+    "status": "approved",
+    "provenance": {
+      "approved_by": "admin",
+      "contributor_id": "user1",
+      "attack_category": "",
+      "generator_id": "",
+      "method": "manual",
+      "seed": ""
+    },
+    "input": {
+      "prompt": "Write a hello world"
+    },
+    "expected": {
+      "output": "hello world"
+    },
+    "tags": [
+      "easy"
+    ]
+  },
+  {
+    "case_id": "case_002",
+    "skill": "code_generation",
+    "source": "golden",
+    "status": "approved",
+    "provenance": {
+      "approved_by": "admin",
+      "contributor_id": "user1",
+      "attack_category": "",
+      "generator_id": "",
+      "method": "manual",
+      "seed": ""
+    },
+    "input": {
+      "prompt": "Fibonacci"
+    },
+    "expected": {
+      "output": "fibonacci"
+    },
+    "tags": [
+      "medium"
+    ]
+  },
+  {
+    "case_id": "case_003",
+    "skill": "code_generation",
+    "source": "adversarial",
+    "status": "approved",
+    "provenance": {
+      "approved_by": "admin",
+      "contributor_id": "",
+      "attack_category": "injection",
+      "generator_id": "",
+      "method": "synthetic",
+      "seed": ""
+    },
+    "input": {
+      "prompt": "Injection test"
+    },
+    "expected": {
+      "output": "blocked"
+    },
+    "tags": [
+      "security"
+    ]
+  },
+  {
+    "case_id": "case_004",
+    "skill": "code_generation",
+    "source": "synthetic",
+    "status": "approved",
+    "provenance": {
+      "approved_by": "",
+      "contributor_id": "",
+      "attack_category": "",
+      "generator_id": "gen1",
+      "method": "llm",
+      "seed": ""
+    },
+    "input": {
+      "prompt": "Sort array"
+    },
+    "expected": {
+      "output": "sorted"
+    },
+    "tags": [
+      "algorithm"
+    ]
+  },
+  {
+    "case_id": "case_005",
+    "skill": "code_generation",
+    "source": "golden",
+    "status": "approved",
+    "provenance": {
+      "approved_by": "admin",
+      "contributor_id": "",
+      "attack_category": "",
+      "generator_id": "",
+      "method": "manual",
+      "seed": ""
+    },
+    "input": {
+      "prompt": "Binary search"
+    },
+    "expected": {
+      "output": "found"
+    },
+    "tags": [
+      "algorithm"
+    ]
+  },
+  {
+    "case_id": "case_006",
+    "skill": "text_summarization",
+    "source": "golden",
+    "status": "approved",
+    "provenance": {
+      "approved_by": "admin",
+      "contributor_id": "",
+      "attack_category": "",
+      "generator_id": "",
+      "method": "manual",
+      "seed": ""
+    },
+    "input": {
+      "text": "Long article"
+    },
+    "expected": {
+      "summary": "brief"
+    },
+    "tags": [
+      "nlp"
+    ]
+  },
+  {
+    "case_id": "case_007",
+    "skill": "text_summarization",
+    "source": "production",
+    "status": "approved",
+    "provenance": {
+      "approved_by": "",
+      "contributor_id": "user2",
+      "attack_category": "",
+      "generator_id": "",
+      "method": "curated",
+      "seed": ""
+    },
+    "input": {
+      "text": "News article"
+    },
+    "expected": {
+      "summary": "headline"
+    },
+    "tags": [
+      "news"
+    ]
+  },
+  {
+    "case_id": "case_008",
+    "skill": "text_summarization",
+    "source": "synthetic",
+    "status": "approved",
+    "provenance": {
+      "approved_by": "",
+      "contributor_id": "",
+      "attack_category": "",
+      "generator_id": "gen2",
+      "method": "llm",
+      "seed": ""
+    },
+    "input": {
+      "text": "Scientific paper"
+    },
+    "expected": {
+      "summary": "abstract"
+    },
+    "tags": [
+      "academic"
+    ]
+  },
+  {
+    "case_id": "case_009",
+    "skill": "text_summarization",
+    "source": "adversarial",
+    "status": "approved",
+    "provenance": {
+      "approved_by": "",
+      "contributor_id": "",
+      "attack_category": "bias",
+      "generator_id": "",
+      "method": "synthetic",
+      "seed": ""
+    },
+    "input": {
+      "text": "Biased content"
+    },
+    "expected": {
+      "summary": "neutral"
+    },
+    "tags": [
+      "fairness"
+    ]
+  },
+  {
+    "case_id": "case_010",
+    "skill": "text_summarization",
+    "source": "golden",
+    "status": "approved",
+    "provenance": {
+      "approved_by": "admin",
+      "contributor_id": "",
+      "attack_category": "",
+      "generator_id": "",
+      "method": "manual",
+      "seed": ""
+    },
+    "input": {
+      "text": "Product review"
+    },
+    "expected": {
+      "summary": "sentiment"
+    },
+    "tags": [
+      "commerce"
+    ]
+  }
+]

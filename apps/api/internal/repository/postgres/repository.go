@@ -8,6 +8,7 @@ import (
 
 	_ "github.com/lib/pq"
 
+	"github.com/zealot/managing-up/apps/api/internal/models"
 	"github.com/zealot/managing-up/apps/api/internal/server"
 )
 
@@ -1094,4 +1095,41 @@ func (r *Repository) ListEvaluations(taskExecutionID string) []server.Evaluation
 		items = append(items, eval)
 	}
 	return items
+}
+
+func (r *Repository) GetUserByUsername(username string) (models.User, bool) {
+	query := `
+		SELECT id, username, password_hash, role, created_at, updated_at
+		FROM users
+		WHERE username = $1
+	`
+	var user models.User
+	err := r.db.QueryRow(query, username).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return models.User{}, false
+	}
+	return user, true
+}
+
+func (r *Repository) GetUserByID(id string) (models.User, bool) {
+	query := `
+		SELECT id, username, password_hash, role, created_at, updated_at
+		FROM users
+		WHERE id = $1
+	`
+	var user models.User
+	err := r.db.QueryRow(query, id).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return models.User{}, false
+	}
+	return user, true
+}
+
+func (r *Repository) CreateUser(user models.User) error {
+	query := `
+		INSERT INTO users (id, username, password_hash, role, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	_, err := r.db.Exec(query, user.ID, user.Username, user.PasswordHash, user.Role, user.CreatedAt, user.UpdatedAt)
+	return err
 }

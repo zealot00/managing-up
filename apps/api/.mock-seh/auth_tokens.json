@@ -1,0 +1,20 @@
+[
+  {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzUxMjM3MTYsImlhdCI6MTc3NTAzNzMxNiwic3ViIjoibW9ja190b2tlbl9hZG1pbiIsImF1ZCI6WyJzZWgiXSwiaXNzIjoibWFuYWdpbmctdXAiLCJyb2xlIjoiYWRtaW4ifQ.E8o37YmIXD7EX7AJ4S3aBWDAyOCOHNCtoOCiUewgv4Y",
+    "role": "admin",
+    "api_key_hash": "3bcb08dbbc4d6da38ca9c60cf8088f2ceed852d29a1e9ec6cf49016d93853e7c",
+    "issued_at": "2026-04-01T09:55:16.233162Z"
+  },
+  {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzUxMjM3MjcsImlhdCI6MTc3NTAzNzMyNywic3ViIjoibW9ja190b2tlbl9hZG1pbiIsImF1ZCI6WyJzZWgiXSwiaXNzIjoibWFuYWdpbmctdXAiLCJyb2xlIjoiYWRtaW4ifQ.wfQJAqzSUE_fFyZMV9Mqqzb0_zwiJ0lNqhNpBFfF-pc",
+    "role": "admin",
+    "api_key_hash": "3bcb08dbbc4d6da38ca9c60cf8088f2ceed852d29a1e9ec6cf49016d93853e7c",
+    "issued_at": "2026-04-01T09:55:27.679681Z"
+  },
+  {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzUxMjU3NzQsImlhdCI6MTc3NTAzOTM3NCwic3ViIjoibW9ja190b2tlbl9hZG1pbiIsImF1ZCI6WyJzZWgiXSwiaXNzIjoibWFuYWdpbmctdXAiLCJyb2xlIjoiYWRtaW4ifQ.AsSdkDCMFod8SI1z5qMociDhm3CDfXvpMwoVPpjKw7s",
+    "role": "admin",
+    "api_key_hash": "3bcb08dbbc4d6da38ca9c60cf8088f2ceed852d29a1e9ec6cf49016d93853e7c",
+    "issued_at": "2026-04-01T10:29:34.793184Z"
+  }
+]

@@ -5,6 +5,8 @@ import (
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/zealot/managing-up/apps/api/internal/models"
 )
 
 type store struct {
@@ -627,4 +629,16 @@ func (s *store) GetReplaySnapshot(id string) (ReplaySnapshot, bool) {
 
 func (s *store) CreateReplaySnapshot(snap ReplaySnapshot) (ReplaySnapshot, error) {
 	return ReplaySnapshot{}, nil
+}
+
+func (s *store) GetUserByUsername(username string) (models.User, bool) {
+	return models.User{}, false
+}
+
+func (s *store) GetUserByID(id string) (models.User, bool) {
+	return models.User{}, false
+}
+
+func (s *store) CreateUser(user models.User) error {
+	return nil
 }

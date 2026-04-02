@@ -8,11 +8,17 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/config"
+	"github.com/zealot/managing-up/apps/api/internal/gateway"
+	"github.com/zealot/managing-up/apps/api/internal/orchestrator"
+	"github.com/zealot/managing-up/apps/api/internal/seh"
+	"github.com/zealot/managing-up/apps/api/internal/server/handlers"
+	"github.com/zealot/managing-up/apps/api/internal/server/middleware"
 	"github.com/zealot/managing-up/apps/api/internal/service"
 )
 
@@ -505,6 +511,10 @@ type Server struct {
 	execSvc       *service.ExecutionService
 	taskSvc       *service.TaskService
 	experimentSvc *service.ExperimentService
+	gatewayServer *gateway.Server
+	orchestrator  *orchestrator.Server
+	sehServer     *seh.Server
+	authHandler   *handlers.AuthHandler
 	closeFn       func() error
 }
 
@@ -516,6 +526,17 @@ func New(cfg config.Config) *Server {
 // NewWithRepository creates a configured API server with an injected repository.
 func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error, experimentSvc *service.ExperimentService) *Server {
 	mux := http.NewServeMux()
+	orchestratorSvc := orchestrator.NewOrchestrationService()
+	orchestratorServer := orchestrator.NewServer(orchestratorSvc)
+	sehAuthConfig := seh.AuthConfig{
+		Secret:         os.Getenv("SEH_JWT_SECRET"),
+		Issuer:         "managing-up",
+		Audience:       "seh",
+		SkipValidation: os.Getenv("SEH_SKIP_AUTH") == "true",
+	}
+	sehServer := seh.NewServer(sehAuthConfig)
+	authMW := middleware.NewAuthMiddleware()
+	authHandler := handlers.NewAuthHandler(service.NewAuthService(repo), authMW)
 	srv := &Server{
 		repo:          repo,
 		closeFn:       closeFn,
@@ -523,9 +544,16 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		execSvc:       service.NewExecutionService(repoToExecutionRepoAdapter{repo}),
 		taskSvc:       service.NewTaskService(repoToTaskRepoAdapter{repo}),
 		experimentSvc: experimentSvc,
+		gatewayServer: gateway.New(""),
+		orchestrator:  orchestratorServer,
+		sehServer:     sehServer,
+		authHandler:   authHandler,
 	}
 
 	mux.HandleFunc("/healthz", handleHealth)
+	mux.HandleFunc("/api/v1/auth/login", srv.authHandler.Login)
+	mux.HandleFunc("/api/v1/auth/logout", srv.authHandler.Logout)
+	mux.Handle("/api/v1/auth/me", authMW.RequireAuth(http.HandlerFunc(srv.authHandler.Me)))
 	mux.HandleFunc("/api/v1/meta", handleMeta)
 	mux.HandleFunc("/api/v1/dashboard", srv.handleDashboard)
 	mux.HandleFunc("/api/v1/procedure-drafts", srv.handleProcedureDrafts)
@@ -538,6 +566,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/executions/", srv.handleExecutionByID)
 	mux.HandleFunc("/api/v1/agents", srv.handleAgents)
 	mux.HandleFunc("/api/v1/generate-skill", srv.handleGenerateSkill)
+	mux.HandleFunc("/api/v1/skills/generate-from-extracted", srv.handleGenerateFromExtracted)
 
 	mux.HandleFunc("/api/v1/tasks", srv.handleTasks)
 	mux.HandleFunc("/api/v1/tasks/", srv.handleTaskByID)
@@ -556,6 +585,30 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/capabilities", srv.handleCapabilities)
 	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)
 	mux.HandleFunc("/api/v1/capabilities/{name}/diff", srv.handleCapabilityDiff)
+
+	mux.Handle("/v1/chat/completions", gateway.AuthMiddleware(http.HandlerFunc(srv.gatewayServer.HandleOpenAIChat)))
+	mux.Handle("/v1/messages", gateway.AuthMiddleware(http.HandlerFunc(srv.gatewayServer.HandleAnthropicMessages)))
+	mux.Handle("/v1/models", gateway.AuthMiddleware(http.HandlerFunc(srv.gatewayServer.HandleModels)))
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK); fmt.Fprintln(w, "ok") })
+
+	orchestratorAuth := orchestrator.AuthMiddleware(orchestrator.AuthConfig{
+		Secret:         os.Getenv("ORCHESTRATOR_JWT_SECRET"),
+		Issuer:         os.Getenv("ORCHESTRATOR_JWT_ISSUER"),
+		SkipValidation: os.Getenv("ORCHESTRATOR_SKIP_AUTH") == "true",
+	})
+
+	mux.Handle("/v1/healthz", orchestratorAuth(http.HandlerFunc(srv.orchestrator.HandleHealth)))
+	mux.Handle("/v1/runs", orchestratorAuth(http.HandlerFunc(srv.orchestrator.HandleOrchestratorRuns)))
+	mux.Handle("/v1/runs/", orchestratorAuth(http.HandlerFunc(srv.orchestrator.HandleOrchestratorRunByID)))
+	mux.Handle("/v1/extraction/", orchestratorAuth(http.HandlerFunc(srv.orchestrator.HandleExtraction)))
+	mux.Handle("/v1/skills", orchestratorAuth(http.HandlerFunc(srv.orchestrator.HandleOrchestratorSkills)))
+	mux.Handle("/v1/skills/", orchestratorAuth(http.HandlerFunc(srv.orchestrator.HandleOrchestratorSkillByID)))
+	mux.Handle("/v1/tests/", orchestratorAuth(http.HandlerFunc(srv.orchestrator.HandleTests)))
+	mux.Handle("/v1/gates/", orchestratorAuth(http.HandlerFunc(srv.orchestrator.HandleGates)))
+	mux.Handle("/v1/policies/", orchestratorAuth(http.HandlerFunc(srv.orchestrator.HandlePolicies)))
+
+	sehAuth := seh.AuthMiddleware(sehAuthConfig)
+	mux.Handle("/v1/seh/", sehAuth(http.StripPrefix("/v1/seh", srv.sehServer)))
 
 	srv.httpServer = &http.Server{
 		Addr:              cfg.Address(),

@@ -1,6 +1,10 @@
 package server
 
-import "time"
+import (
+	"time"
+
+	"github.com/zealot/managing-up/apps/api/internal/models"
+)
 
 // Repository defines the persistence contract used by HTTP handlers.
 type Repository interface {
@@ -41,6 +45,9 @@ type Repository interface {
 	ListReplaySnapshots(executionID string) []ReplaySnapshot
 	GetReplaySnapshot(id string) (ReplaySnapshot, bool)
 	CreateReplaySnapshot(snap ReplaySnapshot) (ReplaySnapshot, error)
+	GetUserByUsername(username string) (models.User, bool)
+	GetUserByID(id string) (models.User, bool)
+	CreateUser(user models.User) error
 }
 
 // ExecutionRepository extends Repository with methods needed by the runtime engine.

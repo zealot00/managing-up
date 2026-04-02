@@ -301,11 +301,15 @@ type TestRunAccepted struct {
 
 // TestRun represents a test run.
 type TestRun struct {
-	TestRunID string    `json:"testRunId"`
-	Status    string    `json:"status"` // queued, running, succeeded, failed
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt,omitempty"`
-	ExitCode  int       `json:"exitCode,omitempty"`
+	TestRunID  string     `json:"testRunId"`
+	Status     string     `json:"status"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	UpdatedAt  time.Time  `json:"updatedAt,omitempty"`
+	ExitCode   int        `json:"exitCode,omitempty"`
+	SkillID    string     `json:"-"`
+	Version    string     `json:"-"`
+	Runner     TestRunner `json:"-"`
+	DatasetRef string     `json:"-"`
 }
 
 // TestFailure represents a single test failure.

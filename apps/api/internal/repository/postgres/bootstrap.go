@@ -71,6 +71,9 @@ func Seed(dsn string) error {
 	if err := seedApprovals(tx, now); err != nil {
 		return err
 	}
+	if err := seedUsers(tx, now); err != nil {
+		return err
+	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit seed transaction: %w", err)
@@ -228,6 +231,33 @@ func seedApprovals(tx *sql.Tx, now time.Time) error {
 	record := []any{"approval_001", "exec_002", "collect_logs_skill", "approval_before_export", "waiting", "ops_manager", now.Add(-30 * time.Minute)}
 	if _, err := tx.Exec(query, record...); err != nil {
 		return fmt.Errorf("seed approvals: %w", err)
+	}
+
+	return nil
+}
+
+func seedUsers(tx *sql.Tx, now time.Time) error {
+	query := `
+		INSERT INTO users (id, username, password_hash, role, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (id) DO UPDATE SET
+			username = EXCLUDED.username,
+			password_hash = EXCLUDED.password_hash,
+			role = EXCLUDED.role,
+			updated_at = EXCLUDED.updated_at
+	`
+
+	// password is "admin" - bcrypt hash
+	hash := "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.rsAOGe8W3p3cKo.OC"
+	records := [][]any{
+		{"user_admin", "admin", hash, "admin", now, now},
+		{"user_operator", "operator", hash, "user", now, now},
+	}
+
+	for _, record := range records {
+		if _, err := tx.Exec(query, record...); err != nil {
+			return fmt.Errorf("seed users: %w", err)
+		}
 	}
 
 	return nil

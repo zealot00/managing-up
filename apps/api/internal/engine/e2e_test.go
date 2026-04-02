@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zealot/managing-up/apps/api/internal/engine/tool/builtin"
 	"github.com/zealot/managing-up/apps/api/internal/server"
 )
 
@@ -32,11 +31,8 @@ steps:
 		},
 	}
 
-	// Create tool gateway with calculator registered
+	// Create tool gateway (HTTP-based, no local registration)
 	gw := NewToolGateway()
-	if err := gw.Register(builtin.NewCalculator(), nil); err != nil {
-		t.Fatalf("failed to register calculator: %v", err)
-	}
 
 	// Create execution engine
 	engine := NewExecutionEngine(repo, gw)

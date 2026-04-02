@@ -18,9 +18,9 @@ export default function HomePage() {
     return (
       <main className="shell">
         <section className="hero-landing">
-          <div className="loading-pulse" style={{ width: 200, height: 20, marginBottom: 16 }} />
-          <div className="loading-pulse" style={{ width: 400, height: 40, marginBottom: 16 }} />
-          <div className="loading-pulse" style={{ width: 600, height: 20 }} />
+          <div className="loading-pulse loading-pulse-short" style={{ width: 200, marginBottom: 16 }} />
+          <div className="loading-pulse loading-pulse-medium" style={{ width: 400, marginBottom: 16 }} />
+          <div className="loading-pulse loading-pulse-long" style={{ width: 600 }} />
         </section>
       </main>
     );
@@ -41,40 +41,61 @@ export default function HomePage() {
         </p>
       </section>
 
-      <section className="grid" style={{ marginTop: "24px" }}>
-        <article className="card" style={{ cursor: "pointer" }} onClick={() => window.open("https://github.com/your-org/managing-up", "_blank")}>
-          <h2>Get Started</h2>
-          <p>Clone the repository and start building your AI quality infrastructure today.</p>
-          <span style={{ color: "var(--primary)", fontWeight: 600 }}>GitHub →</span>
+      <div className="grid" style={{ marginTop: "var(--space-6)" }}>
+        <article className="card card-interactive" onClick={() => window.open("https://github.com/your-org/managing-up", "_blank")}>
+          <h2 style={{ fontSize: "var(--text-xl)", marginBottom: "var(--space-3)" }}>Get Started</h2>
+          <p style={{ color: "var(--muted)" }}>Clone the repository and start building your AI quality infrastructure today.</p>
+          <span style={{ color: "var(--primary)", fontWeight: 600, marginTop: "var(--space-4)", display: "inline-block" }}>GitHub →</span>
         </article>
         
-        <article className="card" style={{ cursor: "pointer" }} onClick={() => window.open("https://docs.example.com", "_blank")}>
-          <h2>Documentation</h2>
-          <p>Comprehensive guides, API references, and integration examples.</p>
-          <span style={{ color: "var(--primary)", fontWeight: 600 }}>Read Docs →</span>
+        <article className="card card-interactive" onClick={() => window.open("https://docs.example.com", "_blank")}>
+          <h2 style={{ fontSize: "var(--text-xl)", marginBottom: "var(--space-3)" }}>Documentation</h2>
+          <p style={{ color: "var(--muted)" }}>Comprehensive guides, API references, and integration examples.</p>
+          <span style={{ color: "var(--primary)", fontWeight: 600, marginTop: "var(--space-4)", display: "inline-block" }}>Read Docs →</span>
         </article>
-      </section>
+      </div>
 
-      <section style={{ marginTop: "32px" }}>
-        <div className="panel-header" style={{ marginBottom: "16px" }}>
-          <h2>Ecosystem</h2>
+      <section style={{ marginTop: "var(--space-8)" }}>
+        <div className="panel-header" style={{ marginBottom: "var(--space-5)" }}>
+          <p className="section-kicker">Ecosystem</p>
+          <h2 className="panel-title">Platform Modules</h2>
         </div>
-        <div className="grid">
+        <div className="grid grid-3">
           <article className="card">
-            <h3>SEH - Skill Eval Harness</h3>
-            <p>Standardized evaluation framework for testing AI agent skills against defined test cases.</p>
+            <h3 style={{ fontSize: "var(--text-lg)", marginBottom: "var(--space-3)", color: "var(--ink-strong)" }}>SEH - Skill Eval Harness</h3>
+            <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
+              Standardized evaluation framework for testing AI agent skills against defined test cases.
+            </p>
           </article>
           <article className="card">
-            <h3>Skill Registry</h3>
-            <p>Version-controlled SOPs as executable skills with approval workflows.</p>
+            <h3 style={{ fontSize: "var(--text-lg)", marginBottom: "var(--space-3)", color: "var(--ink-strong)" }}>Skill Registry</h3>
+            <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
+              Version-controlled SOPs as executable skills with approval workflows.
+            </p>
           </article>
           <article className="card">
-            <h3>Trace & Replay</h3>
-            <p>Full execution traces and deterministic replay for debugging AI behaviors.</p>
+            <h3 style={{ fontSize: "var(--text-lg)", marginBottom: "var(--space-3)", color: "var(--ink-strong)" }}>Trace & Replay</h3>
+            <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
+              Full execution traces and deterministic replay for debugging AI behaviors.
+            </p>
           </article>
           <article className="card">
-            <h3>Benchmark Engine</h3>
-            <p>Quantitative performance metrics across different models and configurations.</p>
+            <h3 style={{ fontSize: "var(--text-lg)", marginBottom: "var(--space-3)", color: "var(--ink-strong)" }}>Benchmark Engine</h3>
+            <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
+              Quantitative performance metrics across different models and configurations.
+            </p>
+          </article>
+          <article className="card">
+            <h3 style={{ fontSize: "var(--text-lg)", marginBottom: "var(--space-3)", color: "var(--ink-strong)" }}>Approval Gates</h3>
+            <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
+              Human-in-the-loop checkpoints for high-risk operations and policy enforcement.
+            </p>
+          </article>
+          <article className="card">
+            <h3 style={{ fontSize: "var(--text-lg)", marginBottom: "var(--space-3)", color: "var(--ink-strong)" }}>Experiment Tracking</h3>
+            <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
+              A/B comparison runs for skills, agents, and model configurations.
+            </p>
           </article>
         </div>
       </section>

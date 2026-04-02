@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { getDashboard } from "../lib/api";
-import { SkeletonPanel } from "../components/SkeletonPanel";
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) {
@@ -14,24 +13,31 @@ function formatDuration(seconds: number): string {
 function SkeletonDashboardPage() {
   return (
     <main className="shell">
-      <section className="hero-page hero-compact">
+      <header className="hero-page hero-compact">
         <p className="eyebrow">Observability</p>
         <h1>Skill hub at a glance.</h1>
         <p className="lede">
           Summary metrics and recent activity across your governed skill ecosystem.
         </p>
-      </section>
+      </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "18px", marginBottom: "18px" }}>
+      <div className="stats">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="metric" style={{ minHeight: 120 }}>
-            <div className="loading-pulse loading-pulse-short" style={{ width: 100, marginBottom: 12 }} />
-            <div className="loading-pulse loading-pulse-medium" style={{ width: 60 }} />
+          <div key={i} className="metric-card">
+            <div className="loading-pulse loading-pulse-short" style={{ width: 80, marginBottom: 8 }} />
+            <div className="loading-pulse" style={{ width: 60, height: 32 }} />
           </div>
         ))}
       </div>
 
-      <SkeletonPanel height={320} />
+      <div className="panel">
+        <div className="loading-pulse loading-pulse-medium" style={{ marginBottom: 16 }} />
+        <div className="skeleton-grid">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="skeleton-card" />
+          ))}
+        </div>
+      </div>
     </main>
   );
 }
@@ -39,32 +45,33 @@ function SkeletonDashboardPage() {
 async function DashboardContent() {
   const dashboard = await getDashboard();
   const summary = dashboard.summary;
-  const recentExecutions = dashboard.recent_executions.slice(0, 5);
+  const recentExecutions = dashboard.recent_executions.slice(0, 6);
 
   const metrics = [
-    { label: "Active Skills", value: summary.active_skills },
-    { label: "Published Versions", value: summary.published_versions },
-    { label: "Running Executions", value: summary.running_executions },
-    { label: "Waiting Approvals", value: summary.waiting_approvals },
-    { label: "Success Rate", value: `${Math.round(summary.success_rate * 100)}%` },
-    { label: "Avg Duration", value: formatDuration(summary.avg_duration_seconds) },
+    { label: "Active Skills", value: summary.active_skills, icon: "◉" },
+    { label: "Published Versions", value: summary.published_versions, icon: "◎" },
+    { label: "Running Executions", value: summary.running_executions, icon: "▶" },
+    { label: "Waiting Approvals", value: summary.waiting_approvals, icon: "◐" },
+    { label: "Success Rate", value: `${Math.round(summary.success_rate * 100)}%`, icon: "✓" },
+    { label: "Avg Duration", value: formatDuration(summary.avg_duration_seconds), icon: "⏱" },
   ];
 
   return (
     <main className="shell">
-      <section className="hero-page hero-compact">
+      <header className="hero-page hero-compact">
         <p className="eyebrow">Observability</p>
         <h1>Skill hub at a glance.</h1>
         <p className="lede">
           Summary metrics and recent activity across your governed skill ecosystem.
         </p>
-      </section>
+      </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "18px", marginBottom: "18px" }}>
+      <div className="stats">
         {metrics.map((metric) => (
-          <article className="metric" key={metric.label}>
-            <p>{metric.label}</p>
-            <strong>{metric.value}</strong>
+          <article className="metric-card" key={metric.label}>
+            <div className="metric-card-icon">{metric.icon}</div>
+            <div className="metric-card-value">{metric.value}</div>
+            <div className="metric-card-label">{metric.label}</div>
           </article>
         ))}
       </div>
@@ -72,26 +79,29 @@ async function DashboardContent() {
       <section className="panel">
         <div className="panel-header">
           <p className="section-kicker">Activity</p>
-          <h2>Recent executions</h2>
+          <h2 className="panel-title">Recent executions</h2>
         </div>
         <div className="list">
-          {recentExecutions.map((execution) => (
-            <article className="list-card" key={execution.id}>
-              <div>
-                <h3>{execution.skill_name}</h3>
-                <p>
-                  {execution.current_step_id} · started {new Date(execution.started_at).toLocaleString()}
-                </p>
-                <a
-                  href={`/executions/${execution.id}/traces`}
-                  className="trace-link"
-                >
-                  View trace →
-                </a>
-              </div>
-              <span className={`badge badge-${execution.status}`}>{execution.status}</span>
-            </article>
-          ))}
+          {recentExecutions.length === 0 ? (
+            <p className="empty-note">No executions yet</p>
+          ) : (
+            recentExecutions.map((execution) => (
+              <article className="list-card" key={execution.id}>
+                <div className="list-card-main">
+                  <h3 className="list-card-title">{execution.skill_name}</h3>
+                  <p className="list-card-meta">
+                    {execution.current_step_id} · started {new Date(execution.started_at).toLocaleString()}
+                  </p>
+                </div>
+                <div className="list-card-actions">
+                  <a href={`/executions/${execution.id}/traces`} className="trace-link">
+                    View trace →
+                  </a>
+                  <span className={`badge badge-${execution.status}`}>{execution.status}</span>
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </section>
     </main>
