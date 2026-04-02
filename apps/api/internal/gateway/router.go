@@ -13,6 +13,8 @@ func (s *Server) handleLLMGateway(w http.ResponseWriter, r *http.Request) {
 		s.handleOpenAIChat(w, r)
 	case path == "/v1/messages":
 		s.handleAnthropicMessages(w, r)
+	case path == "/v1/embeddings":
+		s.HandleEmbeddings(w, r)
 	default:
 		writeError(w, http.StatusNotFound, "not_found", "Unknown endpoint")
 	}

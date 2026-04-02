@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import NavBar from "../components/NavBar";
+import Sidebar from "../components/Sidebar";
+import AdminHeader from "../components/AdminHeader";
 import { AuthProvider } from "../context/AuthContext";
 
 export const metadata: Metadata = {
@@ -17,8 +18,15 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>
-          <NavBar />
-          {children}
+          <div className="admin-layout">
+            <Sidebar />
+            <div className="admin-main">
+              <AdminHeader />
+              <div className="admin-content">
+                {children}
+              </div>
+            </div>
+          </div>
         </AuthProvider>
       </body>
     </html>

@@ -99,3 +99,7 @@ func (c *DeepSeekClient) Provider() Provider {
 func (c *DeepSeekClient) Model() Model {
 	return c.model
 }
+
+func (c *DeepSeekClient) GenerateStream(ctx context.Context, messages []Message, opts ...Option) (StreamReader, error) {
+	return nil, fmt.Errorf("streaming is not yet supported for DeepSeek")
+}

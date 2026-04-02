@@ -30,38 +30,28 @@ func main() {
 	cfg := config.Load()
 	server.SetLogger(slog.Default())
 
-	if cfg.Database.Enabled() {
-		repo, err := postgres.New(cfg.Database.DSN)
-		if err != nil {
-			slog.Warn("postgres initialization failed, falling back to in-memory store", slog.String("error", err.Error()))
-			store := server.NewStore()
-			llmClient := createLLMClient()
-			agent := createLLMAgent(llmClient)
-			evalRunner := createEvaluationRunner(store, agent, llmClient)
-			taskRunnerAdapter := newTaskRunnerAdapter(evalRunner)
-			experimentSvc := createExperimentService(store, taskRunnerAdapter)
-			srv := server.NewWithRepository(cfg, store, nil, experimentSvc)
-			startServer(srv)
-			return
-		}
-
-		llmClient := createLLMClient()
-		agent := createLLMAgent(llmClient)
-		evalRunner := createEvaluationRunner(repo, agent, llmClient)
-		taskRunnerAdapter := newTaskRunnerAdapter(evalRunner)
-		experimentSvc := createExperimentService(repo, taskRunnerAdapter)
-
-		srv := server.NewWithRepository(cfg, repo, repo.Close, experimentSvc)
-
-		execEngine := engine.NewExecutionEngine(repo, engine.NewToolGateway())
-		worker := engine.NewWorker(execEngine, repo, 2*time.Second)
-		go worker.Start(context.Background())
-
-		startServer(srv)
-	} else {
-		srv := server.New(cfg)
-		startServer(srv)
+	if !cfg.Database.Enabled() {
+		log.Fatal("DATABASE_URL and DB_DRIVER are required. PostgreSQL is the only supported database.")
 	}
+
+	repo, err := postgres.New(cfg.Database.DSN)
+	if err != nil {
+		log.Fatalf("failed to connect to PostgreSQL: %v", err)
+	}
+
+	llmClient := createLLMClient()
+	agent := createLLMAgent(llmClient)
+	evalRunner := createEvaluationRunner(repo, agent, llmClient)
+	taskRunnerAdapter := newTaskRunnerAdapter(evalRunner)
+	experimentSvc := createExperimentService(repo, taskRunnerAdapter)
+
+	srv := server.NewWithRepository(cfg, repo, repo.Close, experimentSvc)
+
+	execEngine := engine.NewExecutionEngine(repo, engine.NewToolGateway())
+	worker := engine.NewWorker(execEngine, repo, 2*time.Second)
+	go worker.Start(context.Background())
+
+	startServer(srv)
 }
 
 func startServer(srv *server.Server) {

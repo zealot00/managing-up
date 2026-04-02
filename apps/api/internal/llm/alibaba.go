@@ -101,3 +101,7 @@ func (c *AlibabaClient) Provider() Provider {
 func (c *AlibabaClient) Model() Model {
 	return c.model
 }
+
+func (c *AlibabaClient) GenerateStream(ctx context.Context, messages []Message, opts ...Option) (StreamReader, error) {
+	return nil, fmt.Errorf("streaming is not yet supported for Alibaba Qwen")
+}

@@ -37,6 +37,8 @@ type gatewayUsageRecorder struct {
 }
 
 func (r gatewayUsageRecorder) RecordUsage(ctx context.Context, record gateway.UsageRecord) error {
+	cost := gateway.CalculateCost(string(record.Model), record.PromptTokens, record.CompletionTokens)
+
 	event := GatewayUsageEvent{
 		ID:               generateRequestID(),
 		APIKeyID:         record.APIKeyID,
@@ -48,6 +50,7 @@ func (r gatewayUsageRecorder) RecordUsage(ctx context.Context, record gateway.Us
 		PromptTokens:     record.PromptTokens,
 		CompletionTokens: record.CompletionTokens,
 		TotalTokens:      record.TotalTokens,
+		Cost:             cost,
 		CreatedAt:        time.Now().UTC(),
 	}
 	return r.repo.CreateGatewayUsageEvent(event)

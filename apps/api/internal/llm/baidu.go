@@ -99,3 +99,7 @@ func (c *BaiduClient) Provider() Provider {
 func (c *BaiduClient) Model() Model {
 	return c.model
 }
+
+func (c *BaiduClient) GenerateStream(ctx context.Context, messages []Message, opts ...Option) (StreamReader, error) {
+	return nil, fmt.Errorf("streaming is not yet supported for Baidu ERNIE")
+}

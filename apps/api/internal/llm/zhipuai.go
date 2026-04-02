@@ -99,3 +99,7 @@ func (c *ZhipuAIClient) Provider() Provider {
 func (c *ZhipuAIClient) Model() Model {
 	return c.model
 }
+
+func (c *ZhipuAIClient) GenerateStream(ctx context.Context, messages []Message, opts ...Option) (StreamReader, error) {
+	return nil, fmt.Errorf("streaming is not yet supported for ZhipuAI")
+}

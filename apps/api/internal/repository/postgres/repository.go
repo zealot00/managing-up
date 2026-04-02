@@ -1252,9 +1252,10 @@ func (r *Repository) CreateGatewayUsageEvent(event server.GatewayUsageEvent) err
 			prompt_tokens,
 			completion_tokens,
 			total_tokens,
+			cost,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 	_, err := r.db.Exec(
 		query,
@@ -1267,6 +1268,7 @@ func (r *Repository) CreateGatewayUsageEvent(event server.GatewayUsageEvent) err
 		event.PromptTokens,
 		event.CompletionTokens,
 		event.TotalTokens,
+		event.Cost,
 		event.CreatedAt,
 	)
 	return err
@@ -1282,7 +1284,8 @@ func (r *Repository) ListGatewayUsageByUser(userID string, from, to *time.Time) 
 			COUNT(*) AS request_count,
 			COALESCE(SUM(e.prompt_tokens), 0) AS prompt_tokens,
 			COALESCE(SUM(e.completion_tokens), 0) AS completion_tokens,
-			COALESCE(SUM(e.total_tokens), 0) AS total_tokens
+			COALESCE(SUM(e.total_tokens), 0) AS total_tokens,
+			COALESCE(SUM(e.cost), 0) AS total_cost
 		FROM gateway_usage_events e
 		LEFT JOIN users u ON u.id = e.user_id
 		WHERE e.user_id = $1
@@ -1309,6 +1312,7 @@ func (r *Repository) ListGatewayUsageByUser(userID string, from, to *time.Time) 
 			&item.PromptTokens,
 			&item.CompletionTokens,
 			&item.TotalTokens,
+			&item.TotalCost,
 		); err != nil {
 			continue
 		}
@@ -1325,7 +1329,8 @@ func (r *Repository) ListGatewayUsageByUsers(from, to *time.Time) []server.Gatew
 			COUNT(*) AS request_count,
 			COALESCE(SUM(e.prompt_tokens), 0) AS prompt_tokens,
 			COALESCE(SUM(e.completion_tokens), 0) AS completion_tokens,
-			COALESCE(SUM(e.total_tokens), 0) AS total_tokens
+			COALESCE(SUM(e.total_tokens), 0) AS total_tokens,
+			COALESCE(SUM(e.cost), 0) AS total_cost
 		FROM gateway_usage_events e
 		LEFT JOIN users u ON u.id = e.user_id
 		WHERE ($1::timestamptz IS NULL OR e.created_at >= $1::timestamptz)
@@ -1349,10 +1354,38 @@ func (r *Repository) ListGatewayUsageByUsers(from, to *time.Time) []server.Gatew
 			&item.PromptTokens,
 			&item.CompletionTokens,
 			&item.TotalTokens,
+			&item.TotalCost,
 		); err != nil {
 			continue
 		}
 		items = append(items, item)
 	}
 	return items
+}
+
+func (r *Repository) GetRandomTip() (server.Tip, bool) {
+	query := `
+		SELECT id, content, author, category, is_active, created_at, updated_at
+		FROM tips
+		WHERE is_active = TRUE
+		ORDER BY RANDOM()
+		LIMIT 1
+	`
+	var tip server.Tip
+	var author sql.NullString
+	if err := r.db.QueryRow(query).Scan(
+		&tip.ID,
+		&tip.Content,
+		&author,
+		&tip.Category,
+		&tip.IsActive,
+		&tip.CreatedAt,
+		&tip.UpdatedAt,
+	); err != nil {
+		return server.Tip{}, false
+	}
+	if author.Valid {
+		tip.Author = author.String
+	}
+	return tip, true
 }

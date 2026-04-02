@@ -27,6 +27,7 @@ type UsageRecord struct {
 	PromptTokens     int
 	CompletionTokens int
 	TotalTokens      int
+	Cost             float64
 }
 
 type UsageRecorder interface {

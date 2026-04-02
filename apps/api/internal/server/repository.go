@@ -56,6 +56,7 @@ type Repository interface {
 	CreateGatewayUsageEvent(event GatewayUsageEvent) error
 	ListGatewayUsageByUser(userID string, from, to *time.Time) []GatewayUsageAggregate
 	ListGatewayUsageByUsers(from, to *time.Time) []GatewayUserUsageAggregate
+	GetRandomTip() (Tip, bool)
 }
 
 // ExecutionRepository extends Repository with methods needed by the runtime engine.

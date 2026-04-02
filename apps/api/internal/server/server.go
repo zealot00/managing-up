@@ -505,17 +505,18 @@ func (s *ExperimentRunService) UpdateExperimentRun(run ExperimentRun) error {
 
 // Server wraps the HTTP server and route registration for the API service.
 type Server struct {
-	httpServer    *http.Server
-	repo          Repository
-	skillSvc      *service.SkillService
-	execSvc       *service.ExecutionService
-	taskSvc       *service.TaskService
-	experimentSvc *service.ExperimentService
-	gatewayServer *gateway.Server
-	orchestrator  *orchestrator.Server
-	sehServer     *seh.Server
-	authHandler   *handlers.AuthHandler
-	closeFn       func() error
+	httpServer     *http.Server
+	repo           Repository
+	skillSvc       *service.SkillService
+	execSvc        *service.ExecutionService
+	taskSvc        *service.TaskService
+	experimentSvc  *service.ExperimentService
+	gatewayServer  *gateway.Server
+	gatewayLimiter *gateway.RateLimiter
+	orchestrator   *orchestrator.Server
+	sehServer      *seh.Server
+	authHandler    *handlers.AuthHandler
+	closeFn        func() error
 }
 
 // New creates a configured API server.
@@ -540,6 +541,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	gatewayValidator := gatewayAPIKeyValidator{repo: repo}
 	gatewayRecorder := gatewayUsageRecorder{repo: repo}
 	gatewayProviderKeyResolver := buildProviderKeyResolverFromEnv()
+	gatewayLimiter := gateway.NewRateLimiter(60)
 	srv := &Server{
 		repo:          repo,
 		closeFn:       closeFn,
@@ -553,9 +555,10 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 			gateway.WithUsageRecorder(gatewayRecorder),
 			gateway.WithProviderKeyResolver(gatewayProviderKeyResolver),
 		),
-		orchestrator: orchestratorServer,
-		sehServer:    sehServer,
-		authHandler:  authHandler,
+		gatewayLimiter: gatewayLimiter,
+		orchestrator:   orchestratorServer,
+		sehServer:      sehServer,
+		authHandler:    authHandler,
 	}
 
 	mux.HandleFunc("/healthz", handleHealth)
@@ -563,6 +566,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/auth/logout", srv.authHandler.Logout)
 	mux.Handle("/api/v1/auth/me", authMW.RequireAuth(http.HandlerFunc(srv.authHandler.Me)))
 	mux.HandleFunc("/api/v1/meta", handleMeta)
+	mux.HandleFunc("/api/v1/tip", srv.handleTip)
 	mux.HandleFunc("/api/v1/dashboard", srv.handleDashboard)
 	mux.HandleFunc("/api/v1/procedure-drafts", srv.handleProcedureDrafts)
 	mux.HandleFunc("/api/v1/skills", srv.handleSkills)
@@ -598,8 +602,9 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)
 	mux.HandleFunc("/api/v1/capabilities/{name}/diff", srv.handleCapabilityDiff)
 
-	mux.Handle("/v1/chat/completions", gateway.AuthMiddlewareWithValidator(gatewayValidator, http.HandlerFunc(srv.gatewayServer.HandleOpenAIChat)))
-	mux.Handle("/v1/messages", gateway.AuthMiddlewareWithValidator(gatewayValidator, http.HandlerFunc(srv.gatewayServer.HandleAnthropicMessages)))
+	mux.Handle("/v1/chat/completions", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleOpenAIChat))))
+	mux.Handle("/v1/messages", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleAnthropicMessages))))
+	mux.Handle("/v1/embeddings", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleEmbeddings))))
 	mux.Handle("/v1/models", gateway.AuthMiddlewareWithValidator(gatewayValidator, http.HandlerFunc(srv.gatewayServer.HandleModels)))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK); fmt.Fprintln(w, "ok") })
 
@@ -667,6 +672,26 @@ func handleMeta(w http.ResponseWriter, _ *http.Request) {
 			"approval",
 		},
 	})
+}
+
+func (s *Server) handleTip(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w, r.Method)
+		return
+	}
+
+	tip, ok := s.repo.GetRandomTip()
+	if !ok {
+		writeEnvelope(w, http.StatusOK, "req_tip", map[string]any{
+			"id":       "",
+			"content":  "Talk is cheap. Show me the code.",
+			"author":   "Linus Torvalds",
+			"category": "quote",
+		})
+		return
+	}
+
+	writeEnvelope(w, http.StatusOK, "req_tip", tip)
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {

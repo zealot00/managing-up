@@ -99,3 +99,7 @@ func (c *AzureClient) Provider() Provider {
 func (c *AzureClient) Model() Model {
 	return c.model
 }
+
+func (c *AzureClient) GenerateStream(ctx context.Context, messages []Message, opts ...Option) (StreamReader, error) {
+	return nil, fmt.Errorf("streaming is not yet supported for Azure OpenAI")
+}

@@ -151,6 +151,7 @@ func (s *Server) HandleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 	if s.usageRecorder != nil {
 		principal := GetPrincipalFromContext(r.Context())
 		if principal != nil {
+			cost := CalculateCost(string(model), resp.Usage.InputTokens, resp.Usage.OutputTokens)
 			_ = s.usageRecorder.RecordUsage(r.Context(), UsageRecord{
 				APIKeyID:         principal.APIKeyID,
 				UserID:           principal.UserID,
@@ -161,6 +162,7 @@ func (s *Server) HandleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 				PromptTokens:     resp.Usage.InputTokens,
 				CompletionTokens: resp.Usage.OutputTokens,
 				TotalTokens:      resp.Usage.TotalTokens,
+				Cost:             cost,
 			})
 		}
 	}

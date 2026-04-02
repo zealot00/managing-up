@@ -99,3 +99,7 @@ func (c *MinimaxClient) Provider() Provider {
 func (c *MinimaxClient) Model() Model {
 	return c.model
 }
+
+func (c *MinimaxClient) GenerateStream(ctx context.Context, messages []Message, opts ...Option) (StreamReader, error) {
+	return nil, fmt.Errorf("streaming is not yet supported for MiniMax")
+}

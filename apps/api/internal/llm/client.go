@@ -9,8 +9,30 @@ import (
 // Client 是统一接口
 type Client interface {
 	Generate(ctx context.Context, messages []Message, opts ...Option) (*Response, error)
+	GenerateStream(ctx context.Context, messages []Message, opts ...Option) (StreamReader, error)
 	Provider() Provider
 	Model() Model
+}
+
+// StreamReader is the interface for streaming LLM responses
+type StreamReader interface {
+	// Recv returns the next chunk from the stream.
+	// Returns io.EOF when the stream is finished.
+	Recv() (*StreamChunk, error)
+}
+
+// StreamChunk represents a single chunk in a streaming response
+type StreamChunk struct {
+	// Content is the text content of this chunk
+	Content string `json:"content"`
+	// Done indicates if this is the final chunk
+	Done bool `json:"done"`
+	// FinishReason indicates why the generation finished (if Done is true)
+	FinishReason string `json:"finish_reason,omitempty"`
+	// Usage contains token usage information (only in the final chunk)
+	Usage *Usage `json:"usage,omitempty"`
+	// Model contains the model used
+	Model Model `json:"model,omitempty"`
 }
 
 // Option 是生成选项

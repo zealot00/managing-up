@@ -78,12 +78,6 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Streaming not supported yet
-	if req.Stream {
-		writeError(w, http.StatusNotImplemented, "stream_not_supported", "Streaming is not yet implemented")
-		return
-	}
-
 	// Extract API key from Authorization header
 	apiKey := GetAPIKeyFromContext(r.Context())
 	if apiKey == "" {
@@ -119,6 +113,11 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		opts = append(opts, llm.WithMaxTokens(*req.MaxTokens))
 	}
 
+	if req.Stream {
+		s.handleOpenAIChatStream(w, r, apiKey, provider, model, messages, opts)
+		return
+	}
+
 	// Resolve upstream provider key:
 	// - OpenRouter-like mode: use server-side provider keys
 	// - fallback mode: passthrough user-provided key
@@ -136,8 +135,7 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Call LLM
-	resp, err := llmClient.Generate(r.Context(), messages, opts...)
+	resp, err := GenerateWithRetry(r.Context(), llmClient, messages, opts, DefaultRetryConfig())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "generation_failed", fmt.Sprintf("LLM generation failed: %v", err))
 		return
@@ -175,6 +173,7 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	if s.usageRecorder != nil {
 		principal := GetPrincipalFromContext(r.Context())
 		if principal != nil {
+			cost := CalculateCost(string(model), resp.Usage.InputTokens, resp.Usage.OutputTokens)
 			_ = s.usageRecorder.RecordUsage(r.Context(), UsageRecord{
 				APIKeyID:         principal.APIKeyID,
 				UserID:           principal.UserID,
@@ -185,6 +184,7 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 				PromptTokens:     resp.Usage.InputTokens,
 				CompletionTokens: resp.Usage.OutputTokens,
 				TotalTokens:      resp.Usage.TotalTokens,
+				Cost:             cost,
 			})
 		}
 	}
@@ -200,6 +200,111 @@ func extractBearerToken(authHeader string) string {
 
 // generateID generates a simple random ID
 func generateID() string {
-	// Simple implementation using timestamp + random suffix
 	return fmt.Sprintf("%d-%04x", time.Now().UnixNano()%1000000000, time.Now().UnixNano()%0xFFFF)
+}
+
+func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, apiKey string, provider llm.Provider, model llm.Model, messages []llm.Message, opts []llm.Option) {
+	upstreamAPIKey := apiKey
+	if s.providerKeyResolver != nil {
+		if resolved := s.providerKeyResolver.KeyFor(provider); resolved != "" {
+			upstreamAPIKey = resolved
+		}
+	}
+
+	llmClient, err := llm.NewClient(provider, model, upstreamAPIKey)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", err))
+		return
+	}
+
+	streamReader, err := llmClient.GenerateStream(r.Context(), messages, opts...)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "stream_failed", fmt.Sprintf("Failed to start stream: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "stream_not_supported", "Streaming not supported")
+		return
+	}
+
+	id := fmt.Sprintf("chatcmpl-%s", generateID())
+	var totalPromptTokens, totalCompletionTokens int
+
+	for {
+		chunk, err := streamReader.Recv()
+		if err != nil {
+			break
+		}
+
+		if chunk.Done {
+			if chunk.Usage != nil {
+				totalPromptTokens = chunk.Usage.InputTokens
+				totalCompletionTokens = chunk.Usage.OutputTokens
+			}
+
+			doneData := map[string]any{
+				"id":      id,
+				"object":  "chat.completion.chunk",
+				"created": time.Now().Unix(),
+				"model":   string(model),
+				"choices": []map[string]any{
+					{
+						"index":         0,
+						"delta":         map[string]any{},
+						"finish_reason": chunk.FinishReason,
+					},
+				},
+			}
+			doneJSON, _ := json.Marshal(doneData)
+			fmt.Fprintf(w, "data: %s\n\n", doneJSON)
+			fmt.Fprintf(w, "data: [DONE]\n\n")
+			flusher.Flush()
+			break
+		}
+
+		streamChunk := map[string]any{
+			"id":      id,
+			"object":  "chat.completion.chunk",
+			"created": time.Now().Unix(),
+			"model":   string(model),
+			"choices": []map[string]any{
+				{
+					"index": 0,
+					"delta": map[string]any{
+						"content": chunk.Content,
+					},
+					"finish_reason": nil,
+				},
+			},
+		}
+		chunkJSON, _ := json.Marshal(streamChunk)
+		fmt.Fprintf(w, "data: %s\n\n", chunkJSON)
+		flusher.Flush()
+	}
+
+	if s.usageRecorder != nil {
+		principal := GetPrincipalFromContext(r.Context())
+		if principal != nil {
+			cost := CalculateCost(string(model), totalPromptTokens, totalCompletionTokens)
+			_ = s.usageRecorder.RecordUsage(r.Context(), UsageRecord{
+				APIKeyID:         principal.APIKeyID,
+				UserID:           principal.UserID,
+				Username:         principal.Username,
+				Provider:         provider,
+				Model:            model,
+				Endpoint:         "/v1/chat/completions",
+				PromptTokens:     totalPromptTokens,
+				CompletionTokens: totalCompletionTokens,
+				TotalTokens:      totalPromptTokens + totalCompletionTokens,
+				Cost:             cost,
+			})
+		}
+	}
 }

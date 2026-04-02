@@ -12,10 +12,18 @@ import {
   listGatewayKeys,
   revokeGatewayKey,
 } from "../lib/gateway-api";
+import BarChart from "../components/BarChart";
 
 function sumBy<T>(items: T[], selector: (item: T) => number): number {
   return items.reduce((acc, item) => acc + selector(item), 0);
 }
+
+function formatCurrency(value: number): string {
+  if (value < 0.01) return `$${value.toFixed(4)}`;
+  return `$${value.toFixed(2)}`;
+}
+
+type DetailView = "requests" | "tokens" | "prompt" | "completion" | "cost" | null;
 
 export default function GatewayPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -36,10 +44,55 @@ export default function GatewayPage() {
   const [to, setTo] = useState("");
   const [adminUserID, setAdminUserID] = useState("");
 
+  const [activeDetail, setActiveDetail] = useState<DetailView>(null);
+
   const totalRequests = useMemo(() => sumBy(usage, (item) => item.request_count), [usage]);
   const totalTokens = useMemo(() => sumBy(usage, (item) => item.total_tokens), [usage]);
   const promptTokens = useMemo(() => sumBy(usage, (item) => item.prompt_tokens), [usage]);
   const completionTokens = useMemo(() => sumBy(usage, (item) => item.completion_tokens), [usage]);
+  const totalCost = useMemo(() => sumBy(usage, (item) => item.total_cost), [usage]);
+
+  const requestsByProviderData = useMemo(() => {
+    return usage
+      .map((u) => ({ label: `${u.provider}/${u.model}`, value: u.request_count }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [usage]);
+
+  const tokensByModelData = useMemo(() => {
+    return usage
+      .map((u) => ({ label: `${u.provider}/${u.model}`, value: u.total_tokens }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [usage]);
+
+  const promptByModelData = useMemo(() => {
+    return usage
+      .map((u) => ({ label: `${u.provider}/${u.model}`, value: u.prompt_tokens }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [usage]);
+
+  const completionByModelData = useMemo(() => {
+    return usage
+      .map((u) => ({ label: `${u.provider}/${u.model}`, value: u.completion_tokens }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [usage]);
+
+  const costByProviderData = useMemo(() => {
+    return usage
+      .map((u) => ({ label: `${u.provider}/${u.model}`, value: u.total_cost }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [usage]);
+
+  const tokenRankingData = useMemo(() => {
+    return usageByUsers
+      .map((u) => ({ label: u.username || u.user_id, value: u.total_tokens }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [usageByUsers]);
 
   async function loadData(opts?: { preserveError?: boolean }) {
     if (!opts?.preserveError) setError(null);
@@ -71,7 +124,6 @@ export default function GatewayPage() {
     if (!isAuthLoading) {
       void loadData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthLoading, isAdmin]);
 
   async function handleCreateKey(e: FormEvent<HTMLFormElement>) {
@@ -107,105 +159,81 @@ export default function GatewayPage() {
     await loadData();
   }
 
+  const statCards = [
+    { id: "requests" as DetailView, icon: "#", value: totalRequests.toLocaleString(), label: "Total Requests", detail: requestsByProviderData },
+    { id: "tokens" as DetailView, icon: "Σ", value: totalTokens.toLocaleString(), label: "Total Tokens", detail: tokensByModelData },
+    { id: "prompt" as DetailView, icon: "↑", value: promptTokens.toLocaleString(), label: "Prompt Tokens", detail: promptByModelData },
+    { id: "completion" as DetailView, icon: "↓", value: completionTokens.toLocaleString(), label: "Completion Tokens", detail: completionByModelData },
+    { id: "cost" as DetailView, icon: "$", value: formatCurrency(totalCost), label: "Total Cost", detail: costByProviderData },
+  ];
+
+  const activeCard = statCards.find((c) => c.id === activeDetail);
+
   if (isAuthLoading || isLoading) {
     return (
-      <main className="shell">
-        <header className="hero-page hero-compact">
-          <p className="eyebrow">Gateway</p>
-          <h1>Model Proxy & Usage</h1>
-          <p className="lede">Loading gateway configuration and usage data.</p>
-        </header>
+      <>
+        <div className="dashboard-stats">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="dashboard-stat-card">
+              <div className="loading-pulse loading-pulse-short" style={{ width: 80, marginBottom: 8 }} />
+              <div className="loading-pulse" style={{ width: 60, height: 32 }} />
+            </div>
+          ))}
+        </div>
         <div className="skeleton-grid">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2].map((i) => (
             <div key={i} className="skeleton-card" />
           ))}
         </div>
-      </main>
+      </>
     );
   }
 
   return (
-    <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">Gateway</p>
-        <h1>Model Proxy & Usage</h1>
-        <p className="lede">
-          Manage platform API keys, proxy model requests, and track token consumption by user/provider/model.
-        </p>
-      </header>
-
+    <>
       {error && (
-        <section className="panel">
+        <div className="dashboard-section" style={{ borderColor: "var(--ink-strong)", background: "rgba(0,0,0,0.03)" }}>
           <p className="form-error">{error}</p>
-        </section>
+        </div>
       )}
 
-      <section className="panel grid panel-grid-wide">
-        <article className="form-panel">
-          <div className="form-header">
-            <h2 className="form-title">Create Gateway Key</h2>
-            <p className="form-description">Each key maps to your account and can be revoked independently.</p>
-          </div>
-          <form className="form-fields" onSubmit={handleCreateKey}>
-            <label className="form-label" htmlFor="gateway-key-name">
-              Key Name
-            </label>
-            <input
-              id="gateway-key-name"
-              className="form-input"
-              value={keyName}
-              onChange={(e) => setKeyName(e.target.value)}
-              placeholder="default"
-              disabled={isSubmitting}
-            />
-            <button className="form-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Key"}
+      <div className="dashboard-stats">
+        {statCards.map((card) => (
+          <article
+            key={card.id}
+            className={`dashboard-stat-card ${activeDetail === card.id ? "dashboard-stat-card-active" : ""}`}
+            onClick={() => setActiveDetail(activeDetail === card.id ? null : card.id)}
+            style={{ cursor: "pointer" }}
+          >
+            <div className="dashboard-stat-icon">{card.icon}</div>
+            <div className="dashboard-stat-value">{card.value}</div>
+            <div className="dashboard-stat-label">{card.label}</div>
+            <div className="dashboard-stat-expand">CLICK FOR DETAILS</div>
+          </article>
+        ))}
+      </div>
+
+      {activeCard && (
+        <div className="dashboard-section dashboard-detail-panel">
+          <div className="dashboard-section-header">
+            <h2 className="dashboard-section-title">{activeCard.label} — Detail Breakdown</h2>
+            <button
+              className="dashboard-detail-close"
+              onClick={() => setActiveDetail(null)}
+            >
+              ✕ CLOSE
             </button>
-          </form>
-          {newKeyValue && (
-            <div className="gateway-secret">
-              <p className="gateway-secret-title">Copy now: this key is shown only once</p>
-              <code className="gateway-secret-code">{newKeyValue}</code>
-            </div>
-          )}
-        </article>
-
-        <article className="panel">
-          <div className="panel-header">
-            <p className="section-kicker">Your Keys</p>
-            <h2 className="panel-title">Active & Revoked</h2>
           </div>
-          {keys.length === 0 ? (
-            <p className="empty-note">No gateway keys yet.</p>
-          ) : (
-            <div className="list">
-              {keys.map((key) => (
-                <article className="list-card" key={key.id}>
-                  <div className="list-card-main">
-                    <h3 className="list-card-title">{key.name}</h3>
-                    <p className="list-card-meta">
-                      {key.key_prefix}... · created {new Date(key.created_at).toLocaleString()}
-                      {key.last_used_at ? ` · last used ${new Date(key.last_used_at).toLocaleString()}` : ""}
-                    </p>
-                  </div>
-                  <div className="list-card-actions">
-                    <span className={`badge ${key.revoked_at ? "badge-failed" : "badge-completed"}`}>
-                      {key.revoked_at ? "revoked" : "active"}
-                    </span>
-                    {!key.revoked_at && (
-                      <button className="gateway-button-secondary" onClick={() => void handleRevokeKey(key.id)}>
-                        Revoke
-                      </button>
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </article>
-      </section>
+          <BarChart
+            data={activeCard.detail}
+            title={`By Provider / Model (Top 10)`}
+            valuePrefix={activeCard.id === "cost" ? "$" : ""}
+            valueSuffix={activeCard.id !== "cost" ? " tokens" : ""}
+          />
+        </div>
+      )}
 
-      <section className="panel">
+      <div className="dashboard-section">
         <form className="form-fields form-row gateway-filter" onSubmit={handleApplyFilter}>
           <div>
             <label className="form-label" htmlFor="gateway-from">From</label>
@@ -243,35 +271,30 @@ export default function GatewayPage() {
             <button className="form-submit" type="submit">Apply Filter</button>
           </div>
         </form>
-      </section>
+      </div>
 
-      <section className="stats">
-        <article className="metric-card">
-          <div className="metric-card-icon">#</div>
-          <div className="metric-card-value">{totalRequests}</div>
-          <div className="metric-card-label">Requests</div>
-        </article>
-        <article className="metric-card">
-          <div className="metric-card-icon">Σ</div>
-          <div className="metric-card-value">{totalTokens}</div>
-          <div className="metric-card-label">Total Tokens</div>
-        </article>
-        <article className="metric-card">
-          <div className="metric-card-icon">↑</div>
-          <div className="metric-card-value">{promptTokens}</div>
-          <div className="metric-card-label">Prompt Tokens</div>
-        </article>
-        <article className="metric-card">
-          <div className="metric-card-icon">↓</div>
-          <div className="metric-card-value">{completionTokens}</div>
-          <div className="metric-card-label">Completion Tokens</div>
-        </article>
-      </section>
+      {isAdmin && tokenRankingData.length > 0 && (
+        <div className="chart-grid">
+          <div className="dashboard-section">
+            <BarChart
+              data={tokenRankingData}
+              title="Token Usage by User"
+              valueSuffix=" tokens"
+            />
+          </div>
+          <div className="dashboard-section">
+            <BarChart
+              data={costByProviderData}
+              title="Cost by Provider / Model"
+              valuePrefix="$"
+            />
+          </div>
+        </div>
+      )}
 
-      <section className="panel">
-        <div className="panel-header">
-          <p className="section-kicker">Usage</p>
-          <h2 className="panel-title">By Provider / Model</h2>
+      <div className="dashboard-section">
+        <div className="dashboard-section-header">
+          <h2 className="dashboard-section-title">Usage by Provider / Model</h2>
         </div>
         {usage.length === 0 ? (
           <p className="empty-note">No usage data in the selected time range.</p>
@@ -286,6 +309,7 @@ export default function GatewayPage() {
                   <th>Prompt</th>
                   <th>Completion</th>
                   <th>Total</th>
+                  <th>Cost</th>
                 </tr>
               </thead>
               <tbody>
@@ -293,23 +317,86 @@ export default function GatewayPage() {
                   <tr key={`${row.provider}:${row.model}`}>
                     <td>{row.provider}</td>
                     <td>{row.model}</td>
-                    <td>{row.request_count}</td>
-                    <td>{row.prompt_tokens}</td>
-                    <td>{row.completion_tokens}</td>
-                    <td>{row.total_tokens}</td>
+                    <td>{row.request_count.toLocaleString()}</td>
+                    <td>{row.prompt_tokens.toLocaleString()}</td>
+                    <td>{row.completion_tokens.toLocaleString()}</td>
+                    <td>{row.total_tokens.toLocaleString()}</td>
+                    <td>{formatCurrency(row.total_cost)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </section>
+      </div>
+
+      <div className="dashboard-section">
+        <div className="dashboard-section-header">
+          <div>
+            <h2 className="dashboard-section-title">Gateway API Keys</h2>
+          </div>
+        </div>
+        <div className="gateway-keys-grid">
+          <div className="gateway-keys-form">
+            <form className="form-fields" onSubmit={handleCreateKey}>
+              <label className="form-label" htmlFor="gateway-key-name">
+                Key Name
+              </label>
+              <input
+                id="gateway-key-name"
+                className="form-input"
+                value={keyName}
+                onChange={(e) => setKeyName(e.target.value)}
+                placeholder="default"
+                disabled={isSubmitting}
+              />
+              <button className="form-submit" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Creating..." : "Create Key"}
+              </button>
+            </form>
+            {newKeyValue && (
+              <div className="gateway-secret">
+                <p className="gateway-secret-title">Copy now: this key is shown only once</p>
+                <code className="gateway-secret-code">{newKeyValue}</code>
+              </div>
+            )}
+          </div>
+          <div className="gateway-keys-list">
+            {keys.length === 0 ? (
+              <p className="empty-note">No gateway keys yet.</p>
+            ) : (
+              <div className="list">
+                {keys.map((key) => (
+                  <article className="list-card" key={key.id}>
+                    <div className="list-card-main">
+                      <h3 className="list-card-title">{key.name}</h3>
+                      <p className="list-card-meta">
+                        {key.key_prefix}... · created {new Date(key.created_at).toLocaleString()}
+                        {key.last_used_at ? ` · last used ${new Date(key.last_used_at).toLocaleString()}` : ""}
+                      </p>
+                    </div>
+                    <div className="list-card-actions">
+                      <span className={`badge ${key.revoked_at ? "badge-failed" : "badge-completed"}`}>
+                        {key.revoked_at ? "revoked" : "active"}
+                      </span>
+                      {!key.revoked_at && (
+                        <button className="gateway-button-secondary" onClick={() => void handleRevokeKey(key.id)}>
+                          Revoke
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {isAdmin && (
-        <section className="panel">
-          <div className="panel-header">
-            <p className="section-kicker">Admin</p>
-            <h2 className="panel-title">All Users Usage</h2>
+        <div className="dashboard-section">
+          <div className="dashboard-section-header">
+            <h2 className="dashboard-section-title">All Users Usage</h2>
           </div>
           {usageByUsers.length === 0 ? (
             <p className="empty-note">No user-level usage data yet.</p>
@@ -324,6 +411,7 @@ export default function GatewayPage() {
                     <th>Prompt</th>
                     <th>Completion</th>
                     <th>Total</th>
+                    <th>Cost</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -331,18 +419,19 @@ export default function GatewayPage() {
                     <tr key={row.user_id}>
                       <td>{row.username}</td>
                       <td>{row.user_id}</td>
-                      <td>{row.request_count}</td>
-                      <td>{row.prompt_tokens}</td>
-                      <td>{row.completion_tokens}</td>
-                      <td>{row.total_tokens}</td>
+                      <td>{row.request_count.toLocaleString()}</td>
+                      <td>{row.prompt_tokens.toLocaleString()}</td>
+                      <td>{row.completion_tokens.toLocaleString()}</td>
+                      <td>{row.total_tokens.toLocaleString()}</td>
+                      <td>{formatCurrency(row.total_cost)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </section>
+        </div>
       )}
-    </main>
+    </>
   );
 }

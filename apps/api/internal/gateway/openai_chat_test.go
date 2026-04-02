@@ -100,8 +100,8 @@ func TestHandleOpenAIChat_StreamNotSupported(t *testing.T) {
 	w := httptest.NewRecorder()
 	s.HandleOpenAIChat(w, req)
 
-	if w.Code != http.StatusNotImplemented {
-		t.Errorf("expected status %d, got %d", http.StatusNotImplemented, w.Code)
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
 	}
 
 	var resp map[string]interface{}
@@ -114,8 +114,8 @@ func TestHandleOpenAIChat_StreamNotSupported(t *testing.T) {
 		t.Fatalf("expected error object in response")
 	}
 
-	if errObj["code"] != "stream_not_supported" {
-		t.Errorf("expected error code 'stream_not_supported', got %v", errObj["code"])
+	if errObj["code"] != "stream_failed" {
+		t.Errorf("expected error code 'stream_failed', got %v", errObj["code"])
 	}
 }
 

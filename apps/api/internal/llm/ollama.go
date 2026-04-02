@@ -94,3 +94,7 @@ func (c *OllamaClient) Provider() Provider {
 func (c *OllamaClient) Model() Model {
 	return c.model
 }
+
+func (c *OllamaClient) GenerateStream(ctx context.Context, messages []Message, opts ...Option) (StreamReader, error) {
+	return nil, fmt.Errorf("streaming is not yet supported for Ollama")
+}

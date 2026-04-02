@@ -1,0 +1,1 @@
+ALTER TABLE gateway_usage_events ADD COLUMN cost DECIMAL(10, 6) NOT NULL DEFAULT 0;

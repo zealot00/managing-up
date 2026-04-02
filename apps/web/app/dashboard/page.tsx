@@ -12,25 +12,17 @@ function formatDuration(seconds: number): string {
 
 function SkeletonDashboardPage() {
   return (
-    <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">Observability</p>
-        <h1>Skill hub at a glance.</h1>
-        <p className="lede">
-          Summary metrics and recent activity across your governed skill ecosystem.
-        </p>
-      </header>
-
-      <div className="stats">
+    <>
+      <div className="dashboard-stats">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="metric-card">
+          <div key={i} className="dashboard-stat-card">
             <div className="loading-pulse loading-pulse-short" style={{ width: 80, marginBottom: 8 }} />
             <div className="loading-pulse" style={{ width: 60, height: 32 }} />
           </div>
         ))}
       </div>
 
-      <div className="panel">
+      <div className="dashboard-section">
         <div className="loading-pulse loading-pulse-medium" style={{ marginBottom: 16 }} />
         <div className="skeleton-grid">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -38,7 +30,7 @@ function SkeletonDashboardPage() {
           ))}
         </div>
       </div>
-    </main>
+    </>
   );
 }
 
@@ -50,51 +42,42 @@ async function DashboardContent() {
   const metrics = [
     { label: "Active Skills", value: summary.active_skills, icon: "◉" },
     { label: "Published Versions", value: summary.published_versions, icon: "◎" },
-    { label: "Running Executions", value: summary.running_executions, icon: "▶" },
+    { label: "Running Executions", value: summary.running_executions, icon: "▸" },
     { label: "Waiting Approvals", value: summary.waiting_approvals, icon: "◐" },
     { label: "Success Rate", value: `${Math.round(summary.success_rate * 100)}%`, icon: "✓" },
     { label: "Avg Duration", value: formatDuration(summary.avg_duration_seconds), icon: "⏱" },
   ];
 
   return (
-    <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">Observability</p>
-        <h1>Skill hub at a glance.</h1>
-        <p className="lede">
-          Summary metrics and recent activity across your governed skill ecosystem.
-        </p>
-      </header>
-
-      <div className="stats">
+    <>
+      <div className="dashboard-stats">
         {metrics.map((metric) => (
-          <article className="metric-card" key={metric.label}>
-            <div className="metric-card-icon">{metric.icon}</div>
-            <div className="metric-card-value">{metric.value}</div>
-            <div className="metric-card-label">{metric.label}</div>
+          <article className="dashboard-stat-card" key={metric.label}>
+            <div className="dashboard-stat-icon">{metric.icon}</div>
+            <div className="dashboard-stat-value">{metric.value}</div>
+            <div className="dashboard-stat-label">{metric.label}</div>
           </article>
         ))}
       </div>
 
-      <section className="panel">
-        <div className="panel-header">
-          <p className="section-kicker">Activity</p>
-          <h2 className="panel-title">Recent executions</h2>
+      <section className="dashboard-section">
+        <div className="dashboard-section-header">
+          <h2 className="dashboard-section-title">Recent executions</h2>
         </div>
-        <div className="list">
+        <div className="dashboard-list">
           {recentExecutions.length === 0 ? (
             <p className="empty-note">No executions yet</p>
           ) : (
             recentExecutions.map((execution) => (
-              <article className="list-card" key={execution.id}>
-                <div className="list-card-main">
-                  <h3 className="list-card-title">{execution.skill_name}</h3>
-                  <p className="list-card-meta">
+              <article className="dashboard-list-item" key={execution.id}>
+                <div className="dashboard-list-main">
+                  <h3 className="dashboard-list-title">{execution.skill_name}</h3>
+                  <p className="dashboard-list-meta">
                     {execution.current_step_id} · started {new Date(execution.started_at).toLocaleString()}
                   </p>
                 </div>
-                <div className="list-card-actions">
-                  <a href={`/executions/${execution.id}/traces`} className="trace-link">
+                <div className="dashboard-list-actions">
+                  <a href={`/executions/${execution.id}/traces`} className="dashboard-list-link">
                     View trace →
                   </a>
                   <span className={`badge badge-${execution.status}`}>{execution.status}</span>
@@ -104,7 +87,7 @@ async function DashboardContent() {
           )}
         </div>
       </section>
-    </main>
+    </>
   );
 }
 

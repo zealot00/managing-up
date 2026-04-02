@@ -352,3 +352,13 @@ type CapabilityScore struct {
 	Score          float64 `json:"score"`
 	Timestamp      string  `json:"timestamp"`
 }
+
+type Tip struct {
+	ID        string    `json:"id"`
+	Content   string    `json:"content"`
+	Author    string    `json:"author"`
+	Category  string    `json:"category"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

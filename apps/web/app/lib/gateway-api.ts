@@ -25,6 +25,7 @@ export type GatewayUsageRow = {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  total_cost: number;
 };
 
 export type GatewayUserUsageRow = {
@@ -34,6 +35,7 @@ export type GatewayUserUsageRow = {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  total_cost: number;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

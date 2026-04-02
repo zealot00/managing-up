@@ -115,3 +115,7 @@ func (c *GoogleClient) Provider() Provider {
 func (c *GoogleClient) Model() Model {
 	return c.model
 }
+
+func (c *GoogleClient) GenerateStream(ctx context.Context, messages []Message, opts ...Option) (StreamReader, error) {
+	return nil, fmt.Errorf("streaming is not yet supported for Google Gemini")
+}

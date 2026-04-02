@@ -748,6 +748,7 @@ func (s *store) ListGatewayUsageByUser(userID string, from, to *time.Time) []Gat
 		agg.PromptTokens += int64(item.PromptTokens)
 		agg.CompletionTokens += int64(item.CompletionTokens)
 		agg.TotalTokens += int64(item.TotalTokens)
+		agg.TotalCost += item.Cost
 		if agg.Username == "" {
 			if user, ok := s.users[item.UserID]; ok {
 				agg.Username = user.Username
@@ -781,6 +782,7 @@ func (s *store) ListGatewayUsageByUsers(from, to *time.Time) []GatewayUserUsageA
 		agg.PromptTokens += int64(item.PromptTokens)
 		agg.CompletionTokens += int64(item.CompletionTokens)
 		agg.TotalTokens += int64(item.TotalTokens)
+		agg.TotalCost += item.Cost
 		if user, ok := s.users[item.UserID]; ok {
 			agg.Username = user.Username
 		}
@@ -799,4 +801,8 @@ func (s *store) CreateUser(user models.User) error {
 	defer s.mu.Unlock()
 	s.users[user.ID] = user
 	return nil
+}
+
+func (s *store) GetRandomTip() (Tip, bool) {
+	return Tip{}, false
 }

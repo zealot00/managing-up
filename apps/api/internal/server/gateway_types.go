@@ -33,27 +33,30 @@ type GatewayUsageEvent struct {
 	PromptTokens     int       `json:"prompt_tokens"`
 	CompletionTokens int       `json:"completion_tokens"`
 	TotalTokens      int       `json:"total_tokens"`
+	Cost             float64   `json:"cost"`
 	CreatedAt        time.Time `json:"created_at"`
 }
 
 type GatewayUsageAggregate struct {
-	UserID           string `json:"user_id"`
-	Username         string `json:"username,omitempty"`
-	Provider         string `json:"provider"`
-	Model            string `json:"model"`
-	RequestCount     int64  `json:"request_count"`
-	PromptTokens     int64  `json:"prompt_tokens"`
-	CompletionTokens int64  `json:"completion_tokens"`
-	TotalTokens      int64  `json:"total_tokens"`
+	UserID           string  `json:"user_id"`
+	Username         string  `json:"username,omitempty"`
+	Provider         string  `json:"provider"`
+	Model            string  `json:"model"`
+	RequestCount     int64   `json:"request_count"`
+	PromptTokens     int64   `json:"prompt_tokens"`
+	CompletionTokens int64   `json:"completion_tokens"`
+	TotalTokens      int64   `json:"total_tokens"`
+	TotalCost        float64 `json:"total_cost"`
 }
 
 type GatewayUserUsageAggregate struct {
-	UserID           string `json:"user_id"`
-	Username         string `json:"username"`
-	RequestCount     int64  `json:"request_count"`
-	PromptTokens     int64  `json:"prompt_tokens"`
-	CompletionTokens int64  `json:"completion_tokens"`
-	TotalTokens      int64  `json:"total_tokens"`
+	UserID           string  `json:"user_id"`
+	Username         string  `json:"username"`
+	RequestCount     int64   `json:"request_count"`
+	PromptTokens     int64   `json:"prompt_tokens"`
+	CompletionTokens int64   `json:"completion_tokens"`
+	TotalTokens      int64   `json:"total_tokens"`
+	TotalCost        float64 `json:"total_cost"`
 }
 
 func GenerateGatewayAPIKey() (string, error) {

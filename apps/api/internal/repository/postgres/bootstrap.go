@@ -74,6 +74,9 @@ func Seed(dsn string) error {
 	if err := seedUsers(tx, now); err != nil {
 		return err
 	}
+	if err := seedTips(tx, now); err != nil {
+		return err
+	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit seed transaction: %w", err)
@@ -247,7 +250,6 @@ func seedUsers(tx *sql.Tx, now time.Time) error {
 			updated_at = EXCLUDED.updated_at
 	`
 
-	// password is "admin" - bcrypt hash
 	hash := "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.rsAOGe8W3p3cKo.OC"
 	records := [][]any{
 		{"user_admin", "admin", hash, "admin", now, now},
@@ -263,7 +265,67 @@ func seedUsers(tx *sql.Tx, now time.Time) error {
 	return nil
 }
 
-// MigrationsDir resolves the migration directory from the API module root.
+func seedTips(tx *sql.Tx, now time.Time) error {
+	query := `
+		INSERT INTO tips (id, content, author, category, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (id) DO UPDATE SET
+			content = EXCLUDED.content,
+			author = EXCLUDED.author,
+			category = EXCLUDED.category,
+			is_active = EXCLUDED.is_active,
+			updated_at = EXCLUDED.updated_at
+	`
+
+	type tip struct {
+		id       string
+		content  string
+		author   string
+		category string
+	}
+
+	tips := []tip{
+		{"tip_001", "Talk is cheap. Show me the code.", "Linus Torvalds", "quote"},
+		{"tip_002", "Any fool can write code that a computer can understand. Good programmers write code that humans can understand.", "Martin Fowler", "quote"},
+		{"tip_003", "First, solve the problem. Then, write the code.", "John Johnson", "quote"},
+		{"tip_004", "The best error message is the one that never shows up.", "Thomas Fuchs", "quote"},
+		{"tip_005", "It works on my machine.", "", "humor"},
+		{"tip_006", "There are only two hard things in CS: cache invalidation and naming things.", "Phil Karlton", "quote"},
+		{"tip_007", "A good programmer looks both ways before crossing a one-way street.", "Doug Linder", "humor"},
+		{"tip_008", "The most dangerous phrase in programming: We've always done it this way.", "Grace Hopper", "quote"},
+		{"tip_009", "Code never lies, comments sometimes do.", "Ron Jeffries", "quote"},
+		{"tip_010", "Weeks of coding can save you hours of planning.", "", "humor"},
+		{"tip_011", "In theory, there's no difference between theory and practice. In practice, there is.", "Yogi Berra", "quote"},
+		{"tip_012", "Programming is the art of telling another human what one wants the computer to do.", "Donald Knuth", "quote"},
+		{"tip_013", "The best code is no code at all.", "Jeff Atwood", "quote"},
+		{"tip_014", "Debugging is twice as hard as writing the code in the first place.", "Brian Kernighan", "quote"},
+		{"tip_015", "Simplicity is the soul of efficiency.", "Wes F. Williams", "quote"},
+		{"tip_016", "Make it work, make it right, make it fast.", "Kent Beck", "quote"},
+		{"tip_017", "Premature optimization is the root of all evil.", "Donald Knuth", "quote"},
+		{"tip_018", "Software and cathedrals are much the same — first we build them, then we pray.", "Sam Redwine", "quote"},
+		{"tip_019", "The only way to go fast is to go well.", "Robert C. Martin", "quote"},
+		{"tip_020", "One of my most productive days was throwing away 1000 lines of code.", "Ken Thompson", "quote"},
+		{"tip_021", "Before software can be reusable it first has to be usable.", "Ralph Johnson", "quote"},
+		{"tip_022", "Good design is as little design as possible.", "Dieter Rams", "quote"},
+		{"tip_023", "The function of good software is to make the complex appear to be simple.", "Grady Booch", "quote"},
+		{"tip_024", "Measuring programming progress by lines of code is like measuring aircraft building progress by weight.", "Bill Gates", "quote"},
+		{"tip_025", "Simplicity is prerequisite for reliability.", "Edsger W. Dijkstra", "quote"},
+		{"tip_026", "Deleted code is debugged code.", "Jeff Sickel", "quote"},
+		{"tip_027", "If debugging is the process of removing bugs, then programming must be the process of putting them in.", "Edsger W. Dijkstra", "humor"},
+		{"tip_028", "The best programmers are not marginally better than merely good ones. They are an order-of-magnitude better.", "Robert C. Martin", "quote"},
+		{"tip_029", "You can't trust code that you did not totally create yourself.", "Ken Thompson", "quote"},
+		{"tip_030", "Sometimes it pays to stay in bed on Monday, rather than spending the rest of the week debugging Monday's code.", "Dan Salomon", "humor"},
+	}
+
+	for i, t := range tips {
+		if _, err := tx.Exec(query, t.id, t.content, t.author, t.category, true, now.Add(time.Duration(i)*time.Minute), now); err != nil {
+			return fmt.Errorf("seed tips: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func MigrationsDir(moduleRoot string) string {
 	return filepath.Join(strings.TrimSpace(moduleRoot), "migrations")
 }

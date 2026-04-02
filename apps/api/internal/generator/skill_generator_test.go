@@ -18,6 +18,10 @@ func (m *mockLLMClient) Generate(ctx context.Context, messages []llm.Message, op
 	return m.resp, m.err
 }
 
+func (m *mockLLMClient) GenerateStream(ctx context.Context, messages []llm.Message, opts ...llm.Option) (llm.StreamReader, error) {
+	return nil, errors.New("streaming not supported in mock")
+}
+
 func (m *mockLLMClient) Provider() llm.Provider { return llm.ProviderOpenAI }
 func (m *mockLLMClient) Model() llm.Model       { return llm.ModelGPT4o }
 

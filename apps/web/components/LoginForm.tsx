@@ -28,43 +28,49 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-panel" style={{ maxWidth: "400px", margin: "0 auto" }}>
-      <div className="panel-header">
-        <p className="section-kicker">Authentication</p>
-        <h2>Sign in</h2>
+    <form onSubmit={handleSubmit} className="login-form">
+      <div className="login-form-header">
+        <span className="login-form-label">ACCESS</span>
+        <h2 className="login-form-title">Sign in</h2>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {error && <p className="login-form-error">{error}</p>}
 
-      <div className="form-fields">
-        <label className="form-label">
-          Username
+      <div className="login-form-fields">
+        <div className="login-form-field">
+          <label className="login-form-field-label">USERNAME</label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
-            className="form-input"
+            className="login-form-input"
             autoComplete="username"
+            placeholder="admin"
           />
-        </label>
+        </div>
 
-        <label className="form-label">
-          Password
+        <div className="login-form-field">
+          <label className="login-form-field-label">PASSWORD</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="form-input"
+            className="login-form-input"
             autoComplete="current-password"
+            placeholder="••••••••"
           />
-        </label>
+        </div>
       </div>
 
-      <button type="submit" disabled={loading} className="form-submit" style={{ width: "100%" }}>
-        {loading ? "Signing in..." : "Sign in"}
+      <button type="submit" disabled={loading} className="login-form-submit">
+        {loading ? "AUTHENTICATING..." : "SIGN IN"}
       </button>
+
+      <p className="login-form-hint">
+        Default: admin / admin
+      </p>
     </form>
   );
 }
