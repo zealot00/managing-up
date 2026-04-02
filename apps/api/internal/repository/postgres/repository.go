@@ -1133,3 +1133,226 @@ func (r *Repository) CreateUser(user models.User) error {
 	_, err := r.db.Exec(query, user.ID, user.Username, user.PasswordHash, user.Role, user.CreatedAt, user.UpdatedAt)
 	return err
 }
+
+func (r *Repository) CreateGatewayAPIKey(key server.GatewayAPIKey) error {
+	query := `
+		INSERT INTO gateway_api_keys (id, user_id, name, key_prefix, key_hash, created_at, last_used_at, revoked_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+	_, err := r.db.Exec(query, key.ID, key.UserID, key.Name, key.KeyPrefix, key.KeyHash, key.CreatedAt, key.LastUsedAt, key.RevokedAt)
+	return err
+}
+
+func (r *Repository) ListGatewayAPIKeys(userID string) []server.GatewayAPIKey {
+	query := `
+		SELECT k.id, k.user_id, k.name, k.key_prefix, k.created_at, k.last_used_at, k.revoked_at
+		FROM gateway_api_keys k
+		WHERE ($1 = '' OR k.user_id = $1)
+		ORDER BY k.created_at DESC
+	`
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return []server.GatewayAPIKey{}
+	}
+	defer rows.Close()
+
+	items := make([]server.GatewayAPIKey, 0)
+	for rows.Next() {
+		var item server.GatewayAPIKey
+		var lastUsedAt sql.NullTime
+		var revokedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.UserID, &item.Name, &item.KeyPrefix, &item.CreatedAt, &lastUsedAt, &revokedAt); err != nil {
+			continue
+		}
+		if lastUsedAt.Valid {
+			t := lastUsedAt.Time
+			item.LastUsedAt = &t
+		}
+		if revokedAt.Valid {
+			t := revokedAt.Time
+			item.RevokedAt = &t
+		}
+		items = append(items, item)
+	}
+	return items
+}
+
+func (r *Repository) GetGatewayAPIKeyByHash(keyHash string) (server.GatewayAPIKey, bool) {
+	query := `
+		SELECT
+			k.id,
+			k.user_id,
+			k.name,
+			k.key_prefix,
+			k.key_hash,
+			k.created_at,
+			k.last_used_at,
+			k.revoked_at,
+			COALESCE(u.username, ''),
+			COALESCE(u.role, '')
+		FROM gateway_api_keys k
+		LEFT JOIN users u ON u.id = k.user_id
+		WHERE k.key_hash = $1
+		  AND k.revoked_at IS NULL
+	`
+	var item server.GatewayAPIKey
+	var lastUsedAt sql.NullTime
+	var revokedAt sql.NullTime
+	if err := r.db.QueryRow(query, keyHash).Scan(
+		&item.ID,
+		&item.UserID,
+		&item.Name,
+		&item.KeyPrefix,
+		&item.KeyHash,
+		&item.CreatedAt,
+		&lastUsedAt,
+		&revokedAt,
+		&item.Username,
+		&item.Role,
+	); err != nil {
+		return server.GatewayAPIKey{}, false
+	}
+	if lastUsedAt.Valid {
+		t := lastUsedAt.Time
+		item.LastUsedAt = &t
+	}
+	if revokedAt.Valid {
+		t := revokedAt.Time
+		item.RevokedAt = &t
+	}
+	return item, true
+}
+
+func (r *Repository) TouchGatewayAPIKeyLastUsed(id string, usedAt time.Time) error {
+	query := `UPDATE gateway_api_keys SET last_used_at = $2 WHERE id = $1`
+	_, err := r.db.Exec(query, id, usedAt)
+	return err
+}
+
+func (r *Repository) RevokeGatewayAPIKey(id string, userID string) error {
+	query := `
+		UPDATE gateway_api_keys
+		SET revoked_at = NOW()
+		WHERE id = $1
+		  AND ($2 = '' OR user_id = $2)
+	`
+	_, err := r.db.Exec(query, id, userID)
+	return err
+}
+
+func (r *Repository) CreateGatewayUsageEvent(event server.GatewayUsageEvent) error {
+	query := `
+		INSERT INTO gateway_usage_events (
+			id,
+			api_key_id,
+			user_id,
+			provider,
+			model,
+			endpoint,
+			prompt_tokens,
+			completion_tokens,
+			total_tokens,
+			created_at
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+	_, err := r.db.Exec(
+		query,
+		event.ID,
+		event.APIKeyID,
+		event.UserID,
+		event.Provider,
+		event.Model,
+		event.Endpoint,
+		event.PromptTokens,
+		event.CompletionTokens,
+		event.TotalTokens,
+		event.CreatedAt,
+	)
+	return err
+}
+
+func (r *Repository) ListGatewayUsageByUser(userID string, from, to *time.Time) []server.GatewayUsageAggregate {
+	query := `
+		SELECT
+			e.user_id,
+			COALESCE(u.username, ''),
+			e.provider,
+			e.model,
+			COUNT(*) AS request_count,
+			COALESCE(SUM(e.prompt_tokens), 0) AS prompt_tokens,
+			COALESCE(SUM(e.completion_tokens), 0) AS completion_tokens,
+			COALESCE(SUM(e.total_tokens), 0) AS total_tokens
+		FROM gateway_usage_events e
+		LEFT JOIN users u ON u.id = e.user_id
+		WHERE e.user_id = $1
+		  AND ($2::timestamptz IS NULL OR e.created_at >= $2::timestamptz)
+		  AND ($3::timestamptz IS NULL OR e.created_at <= $3::timestamptz)
+		GROUP BY e.user_id, u.username, e.provider, e.model
+		ORDER BY total_tokens DESC
+	`
+	rows, err := r.db.Query(query, userID, from, to)
+	if err != nil {
+		return []server.GatewayUsageAggregate{}
+	}
+	defer rows.Close()
+
+	items := make([]server.GatewayUsageAggregate, 0)
+	for rows.Next() {
+		var item server.GatewayUsageAggregate
+		if err := rows.Scan(
+			&item.UserID,
+			&item.Username,
+			&item.Provider,
+			&item.Model,
+			&item.RequestCount,
+			&item.PromptTokens,
+			&item.CompletionTokens,
+			&item.TotalTokens,
+		); err != nil {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items
+}
+
+func (r *Repository) ListGatewayUsageByUsers(from, to *time.Time) []server.GatewayUserUsageAggregate {
+	query := `
+		SELECT
+			e.user_id,
+			COALESCE(u.username, '') AS username,
+			COUNT(*) AS request_count,
+			COALESCE(SUM(e.prompt_tokens), 0) AS prompt_tokens,
+			COALESCE(SUM(e.completion_tokens), 0) AS completion_tokens,
+			COALESCE(SUM(e.total_tokens), 0) AS total_tokens
+		FROM gateway_usage_events e
+		LEFT JOIN users u ON u.id = e.user_id
+		WHERE ($1::timestamptz IS NULL OR e.created_at >= $1::timestamptz)
+		  AND ($2::timestamptz IS NULL OR e.created_at <= $2::timestamptz)
+		GROUP BY e.user_id, u.username
+		ORDER BY total_tokens DESC
+	`
+	rows, err := r.db.Query(query, from, to)
+	if err != nil {
+		return []server.GatewayUserUsageAggregate{}
+	}
+	defer rows.Close()
+
+	items := make([]server.GatewayUserUsageAggregate, 0)
+	for rows.Next() {
+		var item server.GatewayUserUsageAggregate
+		if err := rows.Scan(
+			&item.UserID,
+			&item.Username,
+			&item.RequestCount,
+			&item.PromptTokens,
+			&item.CompletionTokens,
+			&item.TotalTokens,
+		); err != nil {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items
+}

@@ -85,7 +85,10 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract API key from Authorization header
-	apiKey := extractBearerToken(r.Header.Get("Authorization"))
+	apiKey := GetAPIKeyFromContext(r.Context())
+	if apiKey == "" {
+		apiKey = extractAPIKey(r)
+	}
 	if apiKey == "" {
 		writeError(w, http.StatusUnauthorized, "missing_api_key", "Authorization header with Bearer token is required")
 		return
@@ -116,8 +119,18 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		opts = append(opts, llm.WithMaxTokens(*req.MaxTokens))
 	}
 
+	// Resolve upstream provider key:
+	// - OpenRouter-like mode: use server-side provider keys
+	// - fallback mode: passthrough user-provided key
+	upstreamAPIKey := apiKey
+	if s.providerKeyResolver != nil {
+		if resolved := s.providerKeyResolver.KeyFor(provider); resolved != "" {
+			upstreamAPIKey = resolved
+		}
+	}
+
 	// Create LLM client
-	llmClient, err := llm.NewClient(provider, model, apiKey)
+	llmClient, err := llm.NewClient(provider, model, upstreamAPIKey)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", err))
 		return
@@ -157,6 +170,23 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(chatResp); err != nil {
 		writeError(w, http.StatusInternalServerError, "encoding_failed", "Failed to encode response")
 		return
+	}
+
+	if s.usageRecorder != nil {
+		principal := GetPrincipalFromContext(r.Context())
+		if principal != nil {
+			_ = s.usageRecorder.RecordUsage(r.Context(), UsageRecord{
+				APIKeyID:         principal.APIKeyID,
+				UserID:           principal.UserID,
+				Username:         principal.Username,
+				Provider:         provider,
+				Model:            model,
+				Endpoint:         "/v1/chat/completions",
+				PromptTokens:     resp.Usage.InputTokens,
+				CompletionTokens: resp.Usage.OutputTokens,
+				TotalTokens:      resp.Usage.TotalTokens,
+			})
+		}
 	}
 }
 

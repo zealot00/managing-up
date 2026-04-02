@@ -27,12 +27,18 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 }
 
 type Server struct {
-	httpServer *http.Server
+	httpServer          *http.Server
+	apiKeyValidator     APIKeyValidator
+	usageRecorder       UsageRecorder
+	providerKeyResolver ProviderKeyResolver
 }
 
-func New(addr string) *Server {
+func New(addr string, opts ...Option) *Server {
 	mux := http.NewServeMux()
 	srv := &Server{}
+	for _, opt := range opts {
+		opt(srv)
+	}
 
 	mux.HandleFunc("/v1/chat/completions", srv.handleLLMGateway)
 	mux.HandleFunc("/v1/messages", srv.handleLLMGateway)

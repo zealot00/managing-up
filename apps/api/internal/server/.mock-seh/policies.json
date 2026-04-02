@@ -1,0 +1,84 @@
+[
+  {
+    "policy_id": "pol_strict01",
+    "name": "Strict Policy",
+    "require_provenance": true,
+    "require_approved_for_score": true,
+    "min_source_diversity": 3,
+    "min_golden_weight": 0.5,
+    "source_policies": [
+      {
+        "source": "golden",
+        "weight": 0.4,
+        "count_in_score": true,
+        "min_success_rate": 0.9,
+        "adversarial_threshold": 0
+      },
+      {
+        "source": "adversarial",
+        "weight": 0.3,
+        "count_in_score": true,
+        "min_success_rate": 0.7,
+        "adversarial_threshold": 0
+      },
+      {
+        "source": "synthetic",
+        "weight": 0.3,
+        "count_in_score": true,
+        "min_success_rate": 0.8,
+        "adversarial_threshold": 0
+      }
+    ],
+    "created_at": "2026-03-01T00:00:00Z"
+  },
+  {
+    "policy_id": "pol_relaxed02",
+    "name": "Relaxed Policy",
+    "require_provenance": false,
+    "require_approved_for_score": false,
+    "min_source_diversity": 2,
+    "min_golden_weight": 0.3,
+    "source_policies": [
+      {
+        "source": "golden",
+        "weight": 0.3,
+        "count_in_score": true,
+        "min_success_rate": 0.7,
+        "adversarial_threshold": 0
+      },
+      {
+        "source": "production",
+        "weight": 0.4,
+        "count_in_score": true,
+        "min_success_rate": 0.6,
+        "adversarial_threshold": 0
+      },
+      {
+        "source": "synthetic",
+        "weight": 0.3,
+        "count_in_score": true,
+        "min_success_rate": 0.5,
+        "adversarial_threshold": 0
+      }
+    ],
+    "created_at": "2026-03-10T00:00:00Z"
+  },
+  {
+    "policy_id": "pol_default",
+    "name": "Default Policy",
+    "require_provenance": false,
+    "require_approved_for_score": false,
+    "min_source_diversity": 1,
+    "min_golden_weight": 0,
+    "source_policies": [
+      {
+        "source": "golden",
+        "weight": 1,
+        "count_in_score": true,
+        "min_success_rate": 0.5,
+        "adversarial_threshold": 0
+      }
+    ],
+    "created_at": "2026-03-15T00:00:00Z"
+  }
+]

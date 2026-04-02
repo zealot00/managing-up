@@ -48,6 +48,14 @@ type Repository interface {
 	GetUserByUsername(username string) (models.User, bool)
 	GetUserByID(id string) (models.User, bool)
 	CreateUser(user models.User) error
+	CreateGatewayAPIKey(key GatewayAPIKey) error
+	ListGatewayAPIKeys(userID string) []GatewayAPIKey
+	GetGatewayAPIKeyByHash(keyHash string) (GatewayAPIKey, bool)
+	TouchGatewayAPIKeyLastUsed(id string, usedAt time.Time) error
+	RevokeGatewayAPIKey(id string, userID string) error
+	CreateGatewayUsageEvent(event GatewayUsageEvent) error
+	ListGatewayUsageByUser(userID string, from, to *time.Time) []GatewayUsageAggregate
+	ListGatewayUsageByUsers(from, to *time.Time) []GatewayUserUsageAggregate
 }
 
 // ExecutionRepository extends Repository with methods needed by the runtime engine.

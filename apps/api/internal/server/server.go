@@ -537,6 +537,9 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	sehServer := seh.NewServer(sehAuthConfig)
 	authMW := middleware.NewAuthMiddleware()
 	authHandler := handlers.NewAuthHandler(service.NewAuthService(repo), authMW)
+	gatewayValidator := gatewayAPIKeyValidator{repo: repo}
+	gatewayRecorder := gatewayUsageRecorder{repo: repo}
+	gatewayProviderKeyResolver := buildProviderKeyResolverFromEnv()
 	srv := &Server{
 		repo:          repo,
 		closeFn:       closeFn,
@@ -544,10 +547,15 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		execSvc:       service.NewExecutionService(repoToExecutionRepoAdapter{repo}),
 		taskSvc:       service.NewTaskService(repoToTaskRepoAdapter{repo}),
 		experimentSvc: experimentSvc,
-		gatewayServer: gateway.New(""),
-		orchestrator:  orchestratorServer,
-		sehServer:     sehServer,
-		authHandler:   authHandler,
+		gatewayServer: gateway.New(
+			"",
+			gateway.WithAPIKeyValidator(gatewayValidator),
+			gateway.WithUsageRecorder(gatewayRecorder),
+			gateway.WithProviderKeyResolver(gatewayProviderKeyResolver),
+		),
+		orchestrator: orchestratorServer,
+		sehServer:    sehServer,
+		authHandler:  authHandler,
 	}
 
 	mux.HandleFunc("/healthz", handleHealth)
@@ -581,14 +589,18 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/check-regression", srv.handleCheckRegression)
 	mux.HandleFunc("/api/v1/replay-snapshots", srv.handleReplaySnapshots)
 	mux.HandleFunc("/api/v1/replay-snapshots/", srv.handleReplaySnapshotByID)
+	mux.Handle("/api/v1/gateway/keys", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayKeys)))
+	mux.Handle("/api/v1/gateway/keys/", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayKeyByID)))
+	mux.Handle("/api/v1/gateway/usage", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayUsage)))
+	mux.Handle("/api/v1/gateway/usage/users", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayUsageByUsers)))
 
 	mux.HandleFunc("/api/v1/capabilities", srv.handleCapabilities)
 	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)
 	mux.HandleFunc("/api/v1/capabilities/{name}/diff", srv.handleCapabilityDiff)
 
-	mux.Handle("/v1/chat/completions", gateway.AuthMiddleware(http.HandlerFunc(srv.gatewayServer.HandleOpenAIChat)))
-	mux.Handle("/v1/messages", gateway.AuthMiddleware(http.HandlerFunc(srv.gatewayServer.HandleAnthropicMessages)))
-	mux.Handle("/v1/models", gateway.AuthMiddleware(http.HandlerFunc(srv.gatewayServer.HandleModels)))
+	mux.Handle("/v1/chat/completions", gateway.AuthMiddlewareWithValidator(gatewayValidator, http.HandlerFunc(srv.gatewayServer.HandleOpenAIChat)))
+	mux.Handle("/v1/messages", gateway.AuthMiddlewareWithValidator(gatewayValidator, http.HandlerFunc(srv.gatewayServer.HandleAnthropicMessages)))
+	mux.Handle("/v1/models", gateway.AuthMiddlewareWithValidator(gatewayValidator, http.HandlerFunc(srv.gatewayServer.HandleModels)))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK); fmt.Fprintln(w, "ok") })
 
 	orchestratorAuth := orchestrator.AuthMiddleware(orchestrator.AuthConfig{

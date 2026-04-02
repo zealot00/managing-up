@@ -12,6 +12,7 @@ const navLinks = [
   { href: "/executions", label: "Executions" },
   { href: "/approvals", label: "Approvals" },
   { href: "/tasks", label: "Tasks" },
+  { href: "/gateway", label: "Gateway" },
   { href: "/evaluations", label: "Evaluations" },
   { href: "/experiments", label: "Experiments" },
   { href: "/replays", label: "Replays" },

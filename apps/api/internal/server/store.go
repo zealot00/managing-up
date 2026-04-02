@@ -19,6 +19,9 @@ type store struct {
 	tasks           map[string]Task
 	experiments     map[string]Experiment
 	experimentRuns  map[string]ExperimentRun
+	users           map[string]models.User
+	gatewayAPIKeys  map[string]GatewayAPIKey
+	gatewayUsage    []GatewayUsageEvent
 }
 
 var _ Repository = (*store)(nil)
@@ -146,6 +149,9 @@ func NewStore() *store {
 		tasks:          make(map[string]Task),
 		experiments:    make(map[string]Experiment),
 		experimentRuns: make(map[string]ExperimentRun),
+		users:          make(map[string]models.User),
+		gatewayAPIKeys: make(map[string]GatewayAPIKey),
+		gatewayUsage:   make([]GatewayUsageEvent, 0),
 	}
 }
 
@@ -632,13 +638,165 @@ func (s *store) CreateReplaySnapshot(snap ReplaySnapshot) (ReplaySnapshot, error
 }
 
 func (s *store) GetUserByUsername(username string) (models.User, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, u := range s.users {
+		if u.Username == username {
+			return u, true
+		}
+	}
 	return models.User{}, false
 }
 
 func (s *store) GetUserByID(id string) (models.User, bool) {
-	return models.User{}, false
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	u, ok := s.users[id]
+	return u, ok
+}
+
+func (s *store) CreateGatewayAPIKey(key GatewayAPIKey) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.gatewayAPIKeys[key.ID] = key
+	return nil
+}
+
+func (s *store) ListGatewayAPIKeys(userID string) []GatewayAPIKey {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]GatewayAPIKey, 0)
+	for _, item := range s.gatewayAPIKeys {
+		if userID == "" || item.UserID == userID {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
+func (s *store) GetGatewayAPIKeyByHash(keyHash string) (GatewayAPIKey, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, item := range s.gatewayAPIKeys {
+		if item.KeyHash == keyHash && item.RevokedAt == nil {
+			if user, ok := s.users[item.UserID]; ok {
+				item.Username = user.Username
+				item.Role = user.Role
+			}
+			return item, true
+		}
+	}
+	return GatewayAPIKey{}, false
+}
+
+func (s *store) TouchGatewayAPIKeyLastUsed(id string, usedAt time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, ok := s.gatewayAPIKeys[id]
+	if !ok {
+		return fmt.Errorf("gateway api key not found: %s", id)
+	}
+	item.LastUsedAt = &usedAt
+	s.gatewayAPIKeys[id] = item
+	return nil
+}
+
+func (s *store) RevokeGatewayAPIKey(id string, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, ok := s.gatewayAPIKeys[id]
+	if !ok {
+		return fmt.Errorf("gateway api key not found: %s", id)
+	}
+	if userID != "" && item.UserID != userID {
+		return fmt.Errorf("gateway api key does not belong to user: %s", userID)
+	}
+	now := time.Now().UTC()
+	item.RevokedAt = &now
+	s.gatewayAPIKeys[id] = item
+	return nil
+}
+
+func (s *store) CreateGatewayUsageEvent(event GatewayUsageEvent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.gatewayUsage = append(s.gatewayUsage, event)
+	return nil
+}
+
+func (s *store) ListGatewayUsageByUser(userID string, from, to *time.Time) []GatewayUsageAggregate {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	acc := map[string]GatewayUsageAggregate{}
+	for _, item := range s.gatewayUsage {
+		if userID != "" && item.UserID != userID {
+			continue
+		}
+		if from != nil && item.CreatedAt.Before(*from) {
+			continue
+		}
+		if to != nil && item.CreatedAt.After(*to) {
+			continue
+		}
+		key := item.Provider + "|" + item.Model
+		agg := acc[key]
+		agg.UserID = item.UserID
+		agg.Provider = item.Provider
+		agg.Model = item.Model
+		agg.RequestCount++
+		agg.PromptTokens += int64(item.PromptTokens)
+		agg.CompletionTokens += int64(item.CompletionTokens)
+		agg.TotalTokens += int64(item.TotalTokens)
+		if agg.Username == "" {
+			if user, ok := s.users[item.UserID]; ok {
+				agg.Username = user.Username
+			}
+		}
+		acc[key] = agg
+	}
+
+	items := make([]GatewayUsageAggregate, 0, len(acc))
+	for _, item := range acc {
+		items = append(items, item)
+	}
+	return items
+}
+
+func (s *store) ListGatewayUsageByUsers(from, to *time.Time) []GatewayUserUsageAggregate {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	acc := map[string]GatewayUserUsageAggregate{}
+	for _, item := range s.gatewayUsage {
+		if from != nil && item.CreatedAt.Before(*from) {
+			continue
+		}
+		if to != nil && item.CreatedAt.After(*to) {
+			continue
+		}
+		agg := acc[item.UserID]
+		agg.UserID = item.UserID
+		agg.RequestCount++
+		agg.PromptTokens += int64(item.PromptTokens)
+		agg.CompletionTokens += int64(item.CompletionTokens)
+		agg.TotalTokens += int64(item.TotalTokens)
+		if user, ok := s.users[item.UserID]; ok {
+			agg.Username = user.Username
+		}
+		acc[item.UserID] = agg
+	}
+
+	items := make([]GatewayUserUsageAggregate, 0, len(acc))
+	for _, item := range acc {
+		items = append(items, item)
+	}
+	return items
 }
 
 func (s *store) CreateUser(user models.User) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.users[user.ID] = user
 	return nil
 }
