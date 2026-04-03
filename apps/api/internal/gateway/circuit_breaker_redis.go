@@ -39,6 +39,7 @@ end
 
 if state == 'closed' then
     local count = redis.call('INCR', countKey)
+    redis.call('PEXPIRE', stateKey, timeout)
     if count >= failureThreshold then
         redis.call('SET', stateKey, 'open', 'PX', timeout)
         redis.call('SET', countKey .. ':failures', 1, 'PX', timeout)
@@ -77,10 +78,8 @@ local state = redis.call('GET', stateKey)
 if state == 'half_open' then
     local count = redis.call('INCR', countKey)
     if count >= successThreshold then
-        -- Enough successes, close the circuit
         redis.call('SET', stateKey, 'closed', 'PX', timeout)
-        redis.call('DEL', countKey)
-        redis.call('DEL', countKey .. ':failures')
+        redis.call('DEL', countKey, countKey .. ':failures', countKey .. ':successes')
         return 0
     end
     redis.call('PEXPIRE', countKey, timeout)
@@ -105,10 +104,8 @@ local timeout = tonumber(ARGV[2])
 local state = redis.call('GET', stateKey)
 
 if state == 'half_open' then
-    -- Any failure in half_open opens the circuit
     redis.call('SET', stateKey, 'open', 'PX', timeout)
-    redis.call('DEL', countKey)
-    redis.call('DEL', countKey .. ':successes')
+    redis.call('DEL', countKey, countKey .. ':failures', countKey .. ':successes')
     return 1
 end
 
@@ -180,6 +177,7 @@ func (cb *RedisCircuitBreaker) State(ctx context.Context, key string) (CircuitBr
 
 // Allow checks if the circuit breaker allows the operation
 // Returns true if the circuit is closed or half_open (allowing requests)
+// If Redis is unavailable, fails open (allows request) to avoid blocking all traffic
 func (cb *RedisCircuitBreaker) Allow(ctx context.Context, key string) (bool, error) {
 	now := time.Now().UnixMilli()
 
@@ -192,11 +190,9 @@ func (cb *RedisCircuitBreaker) Allow(ctx context.Context, key string) (bool, err
 		now,
 	).Int()
 	if err != nil {
-		return false, err
+		return true, err
 	}
 
-	// result: 0=closed, 1=open, 2=half_open
-	// Allow if closed (0) or half_open (2)
 	return result != 1, nil
 }
 
