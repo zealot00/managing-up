@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -13,6 +14,7 @@ type RateLimiter interface {
 	Remaining(ctx context.Context, key string) (int, error)
 	ResetAt(ctx context.Context, key string) (time.Time, error)
 	Reset(ctx context.Context, key string) error
+	Limit() int
 }
 
 // RateLimiterFactory creates rate limiters
@@ -108,6 +110,10 @@ func (rl *InMemoryRateLimiter) Reset(ctx context.Context, key string) error {
 	return nil
 }
 
+func (rl *InMemoryRateLimiter) Limit() int {
+	return rl.limit
+}
+
 func (rl *InMemoryRateLimiter) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
@@ -147,7 +153,7 @@ func RateLimitMiddleware(limiter RateLimiter, next http.Handler) http.Handler {
 		}
 		if !allowed {
 			resetAt, _ := limiter.ResetAt(r.Context(), key)
-			w.Header().Set("X-RateLimit-Limit", "60")
+			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(limiter.Limit()))
 			w.Header().Set("X-RateLimit-Remaining", "0")
 			w.Header().Set("X-RateLimit-Reset", resetAt.Format(time.RFC3339))
 			w.Header().Set("Retry-After", "60")
@@ -157,8 +163,8 @@ func RateLimitMiddleware(limiter RateLimiter, next http.Handler) http.Handler {
 
 		remaining, _ := limiter.Remaining(r.Context(), key)
 		resetAt, _ := limiter.ResetAt(r.Context(), key)
-		w.Header().Set("X-RateLimit-Limit", "60")
-		w.Header().Set("X-RateLimit-Remaining", string(rune(remaining+'0')))
+		w.Header().Set("X-RateLimit-Limit", strconv.Itoa(limiter.Limit()))
+		w.Header().Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
 		if !resetAt.IsZero() {
 			w.Header().Set("X-RateLimit-Reset", resetAt.Format(time.RFC3339))
 		}

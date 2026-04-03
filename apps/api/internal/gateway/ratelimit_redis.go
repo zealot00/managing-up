@@ -17,7 +17,7 @@ local now = tonumber(ARGV[3])
 local current = redis.call('GET', key)
 if current == false then
     redis.call('SET', key, 1, 'PX', window)
-    redis.call('SET', key .. ':reset', now + window / 1000)
+    redis.call('SET', key .. ':reset', now + window)
     return 1
 end
 
@@ -29,7 +29,7 @@ end
 local new_count = redis.call('INCR', key)
 if new_count == 1 then
     redis.call('PEXPIRE', key, window)
-    redis.call('SET', key .. ':reset', now + window / 1000)
+    redis.call('SET', key .. ':reset', now + window)
 end
 
 return 1
@@ -110,4 +110,8 @@ type RedisRateLimiterFactory struct {
 
 func (f *RedisRateLimiterFactory) Create(keyPrefix string, limit int, window time.Duration) RateLimiter {
 	return NewRedisRateLimiter(f.Client, keyPrefix, limit, window)
+}
+
+func (rl *RedisRateLimiter) Limit() int {
+	return rl.limit
 }
