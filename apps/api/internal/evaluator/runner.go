@@ -76,7 +76,6 @@ func NewEvaluationRunner(
 	if agentLLM != nil {
 		builtInJudges := BuiltInJudgeFunctions(agentLLM)
 		for judgeType, judgeFn := range builtInJudges {
-			registry.Register(NewJudgeModelEvaluator(judgeFn))
 			registry.evaluators[string(judgeType)] = NewJudgeModelEvaluator(judgeFn)
 		}
 	}
