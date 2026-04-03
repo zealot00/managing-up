@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TaskExecution, Task, Metric, runTaskEvaluation, createMetric } from "../lib/api";
+import { useTranslations } from "next-intl";
 import RunEvaluationForm from "./RunEvaluationForm";
 import CreateMetricForm from "./CreateMetricForm";
 
@@ -13,86 +14,80 @@ type Props = {
 };
 
 export default function EvaluationManager({ executions, tasks, metrics }: Props) {
+  const t = useTranslations("evaluations");
   const [showRunEval, setShowRunEval] = useState(false);
   const [showCreateMetric, setShowCreateMetric] = useState(false);
 
   return (
     <>
-      <section aria-label="Available metrics" style={{ marginTop: "var(--space-6)" }}>
-        <div className="page-header" style={{ marginBottom: "var(--space-3)", paddingBottom: 0, borderBottom: "none" }}>
-          <div className="page-header-content">
-            <h2 className="section-kicker" style={{ margin: 0 }}>
-              Available Metrics ({metrics.length})
-            </h2>
-          </div>
-          <div className="page-header-actions">
-            <button
-              className="btn btn-sm btn-secondary"
-              onClick={() => setShowCreateMetric(!showCreateMetric)}
-            >
-              {showCreateMetric ? "Cancel" : "+ New Metric"}
-            </button>
-          </div>
+      <div className="page-header" style={{ marginBottom: "var(--space-6)", marginTop: "var(--space-4)", paddingBottom: 0, borderBottom: "none" }}>
+        <div className="page-header-content">
+          <p className="section-kicker" style={{ margin: 0 }}>
+            {t("taskExecutions", { count: executions.length })}
+          </p>
         </div>
+        <div className="page-header-actions">
+          <button className="btn btn-secondary" onClick={() => { setShowCreateMetric(!showCreateMetric); setShowRunEval(false); }}>
+            {showCreateMetric ? "Cancel" : t("newMetric")}
+          </button>
+          <button className="btn btn-primary" onClick={() => { setShowRunEval(!showRunEval); setShowCreateMetric(false); }}>
+            {showRunEval ? "Cancel" : t("runEvaluation")}
+          </button>
+        </div>
+      </div>
 
-        {showCreateMetric && <CreateMetricForm onCreated={() => setShowCreateMetric(false)} />}
+      {showCreateMetric && <CreateMetricForm onCreated={() => setShowCreateMetric(false)} />}
+      {showRunEval && <RunEvaluationForm tasks={tasks} onCreated={() => setShowRunEval(false)} />}
 
-        <div className="tags">
-          {metrics.map((metric) => (
-            <span key={metric.id} className="tag">
-              {metric.name} ({metric.type})
-            </span>
-          ))}
-          {metrics.length === 0 && !showCreateMetric && (
-            <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
-              No metrics defined.
-            </span>
+      <section aria-label="Available metrics" style={{ marginTop: "var(--space-6)" }}>
+        <div className="panel">
+          <div className="panel-header">
+            <p className="section-kicker">{t("metrics")}</p>
+            <h2 className="panel-title">{t("availableMetrics", { count: metrics.length })}</h2>
+          </div>
+          {metrics.length > 0 ? (
+            <div className="tags">
+              {metrics.map((metric) => (
+                <span key={metric.id} className="tag">
+                  {metric.name} <span style={{ opacity: 0.6 }}>({metric.type})</span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-note">{t("noMetrics")}</p>
           )}
         </div>
       </section>
 
-      <section aria-label="Task executions" style={{ marginTop: "var(--space-8)" }}>
-        <div className="page-header" style={{ marginBottom: "var(--space-3)", paddingBottom: 0, borderBottom: "none" }}>
-          <div className="page-header-content">
-            <h2 className="section-kicker" style={{ margin: 0 }}>
-              Task Executions ({executions.length})
-            </h2>
+      <section aria-label="Task executions" style={{ marginTop: "var(--space-6)" }}>
+        <div className="panel">
+          <div className="panel-header">
+            <p className="section-kicker">{t("eyebrow")}</p>
+            <h2 className="panel-title">{t("taskExecutions", { count: executions.length })}</h2>
           </div>
-          <div className="page-header-actions">
-            <button
-              className="btn btn-sm btn-primary"
-              onClick={() => setShowRunEval(!showRunEval)}
-            >
-              {showRunEval ? "Cancel" : "Run Evaluation"}
-            </button>
-          </div>
+          {executions.length > 0 ? (
+            <div className="eval-grid">
+              {executions.map((exec) => (
+                <ExecutionCard key={exec.id} exec={exec} tasks={tasks} />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-state-icon">◎</div>
+              <h3 className="empty-state-title">{t("noExecutions")}</h3>
+              <p className="empty-state-description">{t("noExecutionsDesc")}</p>
+            </div>
+          )}
         </div>
-
-        {showRunEval && <RunEvaluationForm tasks={tasks} onCreated={() => setShowRunEval(false)} />}
-
-        {executions.length > 0 ? (
-          <div className="eval-grid">
-            {executions.map((exec) => (
-              <ExecutionCard key={exec.id} exec={exec} tasks={tasks} />
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon">◎</div>
-            <h3 className="empty-state-title">No executions yet</h3>
-            <p className="empty-state-description">
-              Run an evaluation to see agent performance metrics here.
-            </p>
-          </div>
-        )}
       </section>
 
-      <section aria-label="Task overview" style={{ marginTop: "var(--space-8)" }}>
-        <h2 className="section-kicker" style={{ marginBottom: "var(--space-3)" }}>
-          Task Overview ({tasks.length} tasks)
-        </h2>
-        {tasks.length > 0 ? (
-          <div className="panel">
+      <section aria-label="Task overview" style={{ marginTop: "var(--space-6)" }}>
+        <div className="panel">
+          <div className="panel-header">
+            <p className="section-kicker">Tasks</p>
+            <h2 className="panel-title">{t("taskOverview", { count: tasks.length })}</h2>
+          </div>
+          {tasks.length > 0 ? (
             <div className="list">
               {tasks.map((task) => (
                 <article className="list-card" key={task.id}>
@@ -108,18 +103,17 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
                 </article>
               ))}
             </div>
-          </div>
-        ) : (
-          <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
-            No tasks defined. Create tasks via the Tasks page.
-          </p>
-        )}
+          ) : (
+            <p className="empty-note">{t("noTasksDesc")}</p>
+          )}
+        </div>
       </section>
     </>
   );
 }
 
 function ExecutionCard({ exec, tasks }: { exec: TaskExecution; tasks: Task[] }) {
+  const t = useTranslations("evaluations");
   const task = tasks.find((t) => t.id === exec.task_id);
   const taskName = task?.name || exec.task_id;
 
@@ -128,7 +122,7 @@ function ExecutionCard({ exec, tasks }: { exec: TaskExecution; tasks: Task[] }) 
       <div className="eval-card-header">
         <div>
           <h3 className="eval-card-title">{taskName}</h3>
-          <p className="eval-card-meta">Agent: {exec.agent_id}</p>
+          <p className="eval-card-meta">{t("agent")}: {exec.agent_id}</p>
         </div>
         <span className={`badge badge-${exec.status === "completed" ? "succeeded" : exec.status === "failed" ? "failed" : "running"}`}>
           {exec.status}
@@ -136,11 +130,11 @@ function ExecutionCard({ exec, tasks }: { exec: TaskExecution; tasks: Task[] }) 
       </div>
       {exec.duration_ms && (
         <p className="eval-card-body" style={{ marginTop: "var(--space-3)" }}>
-          Duration: {exec.duration_ms}ms
+          {t("duration", { ms: exec.duration_ms })}
         </p>
       )}
       <div className="eval-card-footer">
-        <span>Created {new Date(exec.created_at).toLocaleString()}</span>
+        <span>{t("createdAt")} {new Date(exec.created_at).toLocaleString()}</span>
       </div>
     </article>
   );

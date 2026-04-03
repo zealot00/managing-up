@@ -3,12 +3,14 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { approveExecution, Approval } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   approval: Approval;
 };
 
 export default function ApprovalForm({ approval }: Props) {
+  const t = useTranslations("approvals");
   const router = useRouter();
   const [approver, setApprover] = useState("");
   const [note, setNote] = useState("");
@@ -17,7 +19,7 @@ export default function ApprovalForm({ approval }: Props) {
 
   async function handleDecision(decision: "approved" | "rejected") {
     if (!approver.trim()) {
-      setError("Approver name is required");
+      setError(t("approverPlaceholder"));
       return;
     }
     setLoading(true);
@@ -40,31 +42,31 @@ export default function ApprovalForm({ approval }: Props) {
   return (
     <div className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">Human Control</p>
-        <h2>Decision for {approval.skill_name}</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("decision", { skill_name: approval.skill_name })}</h2>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">
         <label className="form-label">
-          Approver
+          {t("approver")}
           <input
             type="text"
             value={approver}
             onChange={(e) => setApprover(e.target.value)}
-            placeholder="e.g. ops_manager"
+            placeholder={t("approverPlaceholder")}
             required
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Resolution note
+          {t("resolutionNote")}
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Optional note..."
+            placeholder={t("notePlaceholder")}
             rows={2}
             className="form-textarea"
           />
@@ -78,7 +80,7 @@ export default function ApprovalForm({ approval }: Props) {
           disabled={loading || !approver.trim()}
           className="btn-approve"
         >
-          {loading ? "Submitting..." : "Approve"}
+          {loading ? t("submitting") : t("approve")}
         </button>
         <button
           type="button"
@@ -86,7 +88,7 @@ export default function ApprovalForm({ approval }: Props) {
           disabled={loading || !approver.trim()}
           className="btn-reject"
         >
-          {loading ? "Submitting..." : "Reject"}
+          {loading ? t("submitting") : t("reject")}
         </button>
       </div>
     </div>

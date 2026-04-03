@@ -74,7 +74,7 @@ body {
     radial-gradient(ellipse at top right, rgba(255, 255, 255, 0.4) 0%, transparent 40%),
     linear-gradient(180deg, #eef2f5 0%, var(--bg) 40%, var(--bg-deep) 100%);
   color: var(--ink);
-  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  font-family: "IBM Plex Sans", "Noto Sans SC", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   font-size: var(--text-base);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -264,6 +264,43 @@ body {
 .sidebar-child-link {
   font-size: var(--text-xs);
   padding: 4px 12px;
+}
+
+.lang-switcher {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  margin-top: 8px;
+  border-top: 1px solid var(--sidebar-border);
+  padding-top: 12px;
+}
+
+.lang-btn {
+  background: none;
+  border: none;
+  color: var(--sidebar-text);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  transition: all var(--transition-fast);
+  font-weight: 500;
+}
+
+.lang-btn:hover {
+  color: var(--sidebar-text-active);
+  background: var(--sidebar-bg-hover);
+}
+
+.lang-btn-active {
+  color: var(--sidebar-text-active) !important;
+  background: var(--sidebar-bg-active);
+}
+
+.lang-separator {
+  color: var(--sidebar-border);
+  font-size: var(--text-xs);
 }
 
 .sidebar-footer {
@@ -2553,7 +2590,9 @@ body {
 }
 
 @media (max-width: 768px) {
-  :root {
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+:root {
     --space-12: 32px;
     --space-16: 48px;
   }

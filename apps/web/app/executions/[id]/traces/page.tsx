@@ -1,7 +1,7 @@
 import { Suspense } from "react";
+import { getTranslations } from "next-intl/server";
 import { getExecution, getTraces } from "../../../lib/api";
 import type { Execution, TraceEvent } from "../../../lib/api";
-import { SkeletonPanel } from "../../../components/SkeletonPanel";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -92,6 +92,8 @@ function TraceEventCard({ event }: { event: TraceEvent }) {
 }
 
 async function TraceContent({ id }: { id: string }) {
+  const t = await getTranslations("executions");
+  const tc = await getTranslations("common");
   let execution: Execution | null = null;
   let traces: TraceEvent[] = [];
 
@@ -106,22 +108,22 @@ async function TraceContent({ id }: { id: string }) {
     <main className="shell">
       <section className="toprail">
         <a className="toprail-link" href="/executions">
-          ← Executions
+          ← {tc("executions")}
         </a>
         <a className="toprail-link" href="/">
-          Dashboard
+          {tc("dashboard")}
         </a>
       </section>
 
       {execution ? (
         <>
           <section className="hero-page hero-compact" style={{ marginBottom: 24 }}>
-            <p className="eyebrow">Execution Trace</p>
+            <p className="eyebrow">{t("eyebrow")}</p>
             <h1>{execution.skill_name}</h1>
             <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center" }}>
               <span className={`badge badge-${execution.status}`}>{execution.status}</span>
               <span style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
-                ID: {execution.id}
+                {tc("id")}: {execution.id}
               </span>
             </div>
           </section>
@@ -150,19 +152,15 @@ async function TraceContent({ id }: { id: string }) {
             </div>
             <div className="detail-grid">
               <div className="detail-row">
-                <span className="detail-label">Execution ID</span>
-                <span className="detail-value">{execution.id}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Skill ID</span>
+                <span className="detail-label">{t("skill").split(" ")[0]} ID</span>
                 <span className="detail-value">{execution.skill_id}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Status</span>
+                <span className="detail-label">{tc("status")}</span>
                 <span className="detail-value">{execution.status}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Triggered By</span>
+                <span className="detail-label">{t("triggeredBy")}</span>
                 <span className="detail-value">{execution.triggered_by}</span>
               </div>
               <div className="detail-row">
@@ -170,7 +168,7 @@ async function TraceContent({ id }: { id: string }) {
                 <span className="detail-value">{new Date(execution.started_at).toLocaleString()}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Current Step</span>
+                <span className="detail-label">{t("currentStep")}</span>
                 <span className="detail-value">{execution.current_step_id}</span>
               </div>
             </div>

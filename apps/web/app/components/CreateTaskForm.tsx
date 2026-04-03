@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createTask, getSkills, Skill } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   skills: Skill[];
@@ -10,6 +11,8 @@ type Props = {
 };
 
 export default function CreateTaskForm({ skills, onCreated }: Props) {
+  const t = useTranslations("tasks");
+  const te = useTranslations("errors");
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -30,7 +33,7 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
       try {
         parsedTestCases = JSON.parse(testCases);
       } catch {
-        setError("Test cases must be valid JSON array");
+        setError(te("testCasesInvalid"));
         setLoading(false);
         return;
       }
@@ -63,27 +66,27 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
   return (
     <form onSubmit={handleSubmit} className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">Task Registry</p>
-        <h2>Create new task</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("createTask")}</h2>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">
         <label className="form-label">
-          Task name
+          {t("taskName")}
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. parse_log_errors"
+            placeholder={t("taskNamePlaceholder")}
             required
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Description
+          {t("description")}
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -94,13 +97,13 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
         </label>
 
         <label className="form-label">
-          Linked skill
+          {t("linkedSkill")}
           <select
             value={skillId}
             onChange={(e) => setSkillId(e.target.value)}
             className="form-select"
           >
-            <option value="">No skill</option>
+            <option value="">{t("noSkill")}</option>
             {skills.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -110,35 +113,35 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
         </label>
 
         <label className="form-label">
-          Difficulty
+          {t("difficulty")}
           <select
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value)}
             className="form-select"
           >
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
+            <option value="easy">{t("easy")}</option>
+            <option value="medium">{t("medium")}</option>
+            <option value="hard">{t("hard")}</option>
           </select>
         </label>
 
         <label className="form-label">
-          Tags (comma-separated)
+          {t("tags")}
           <input
             type="text"
             value={tags}
             onChange={(e) => setTags(e.target.value)}
-            placeholder="e.g. parsing, error-handling"
+            placeholder={t("tagsPlaceholder")}
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Test cases (JSON array)
+          {t("testCases")}
           <textarea
             value={testCases}
             onChange={(e) => setTestCases(e.target.value)}
-            placeholder='[{"input": {"text": "hello"}, "expected": "greeting"}]'
+            placeholder={t("testCasesPlaceholder")}
             rows={3}
             className="form-textarea"
           />
@@ -146,7 +149,7 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
       </div>
 
       <button type="submit" disabled={loading} className="form-submit">
-        {loading ? "Creating..." : "Create task"}
+        {loading ? t("creating") : t("create")}
       </button>
     </form>
   );

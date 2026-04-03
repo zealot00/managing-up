@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "../../context/AuthContext";
 import {
   createGatewayKey,
@@ -26,6 +27,8 @@ function formatCurrency(value: number): string {
 type DetailView = "requests" | "tokens" | "prompt" | "completion" | "cost" | null;
 
 export default function GatewayPage() {
+  const t = useTranslations("gateway");
+  const tc = useTranslations("common");
   const { user, isLoading: isAuthLoading } = useAuth();
   const isAdmin = user?.role === "admin";
 
@@ -160,11 +163,11 @@ export default function GatewayPage() {
   }
 
   const statCards = [
-    { id: "requests" as DetailView, icon: "#", value: totalRequests.toLocaleString(), label: "Total Requests", detail: requestsByProviderData },
-    { id: "tokens" as DetailView, icon: "Σ", value: totalTokens.toLocaleString(), label: "Total Tokens", detail: tokensByModelData },
-    { id: "prompt" as DetailView, icon: "↑", value: promptTokens.toLocaleString(), label: "Prompt Tokens", detail: promptByModelData },
-    { id: "completion" as DetailView, icon: "↓", value: completionTokens.toLocaleString(), label: "Completion Tokens", detail: completionByModelData },
-    { id: "cost" as DetailView, icon: "$", value: formatCurrency(totalCost), label: "Total Cost", detail: costByProviderData },
+    { id: "requests" as DetailView, icon: "#", value: totalRequests.toLocaleString(), label: t("totalRequests"), detail: requestsByProviderData },
+    { id: "tokens" as DetailView, icon: "Σ", value: totalTokens.toLocaleString(), label: t("totalTokens"), detail: tokensByModelData },
+    { id: "prompt" as DetailView, icon: "↑", value: promptTokens.toLocaleString(), label: t("promptTokens"), detail: promptByModelData },
+    { id: "completion" as DetailView, icon: "↓", value: completionTokens.toLocaleString(), label: t("completionTokens"), detail: completionByModelData },
+    { id: "cost" as DetailView, icon: "$", value: formatCurrency(totalCost), label: t("totalCost"), detail: costByProviderData },
   ];
 
   const activeCard = statCards.find((c) => c.id === activeDetail);
@@ -236,7 +239,7 @@ export default function GatewayPage() {
       <div className="dashboard-section">
         <form className="form-fields form-row gateway-filter" onSubmit={handleApplyFilter}>
           <div>
-            <label className="form-label" htmlFor="gateway-from">From</label>
+            <label className="form-label" htmlFor="gateway-from">{t("startDate")}</label>
             <input
               id="gateway-from"
               type="date"
@@ -246,7 +249,7 @@ export default function GatewayPage() {
             />
           </div>
           <div>
-            <label className="form-label" htmlFor="gateway-to">To</label>
+            <label className="form-label" htmlFor="gateway-to">{t("endDate")}</label>
             <input
               id="gateway-to"
               type="date"
@@ -257,7 +260,7 @@ export default function GatewayPage() {
           </div>
           {isAdmin && (
             <div>
-              <label className="form-label" htmlFor="gateway-user-id">User ID (admin)</label>
+              <label className="form-label" htmlFor="gateway-user-id">{t("user")} ID (admin)</label>
               <input
                 id="gateway-user-id"
                 className="form-input"
@@ -268,7 +271,7 @@ export default function GatewayPage() {
             </div>
           )}
           <div className="gateway-filter-submit">
-            <button className="form-submit" type="submit">Apply Filter</button>
+            <button className="form-submit" type="submit">{t("apply")}</button>
           </div>
         </form>
       </div>
@@ -278,14 +281,14 @@ export default function GatewayPage() {
           <div className="dashboard-section">
             <BarChart
               data={tokenRankingData}
-              title="Token Usage by User"
+              title={t("userUsage")}
               valueSuffix=" tokens"
             />
           </div>
           <div className="dashboard-section">
             <BarChart
               data={costByProviderData}
-              title="Cost by Provider / Model"
+              title={t("cost") + " " + t("providerUsage")}
               valuePrefix="$"
             />
           </div>
@@ -294,22 +297,22 @@ export default function GatewayPage() {
 
       <div className="dashboard-section">
         <div className="dashboard-section-header">
-          <h2 className="dashboard-section-title">Usage by Provider / Model</h2>
+          <h2 className="dashboard-section-title">{t("providerUsage")}</h2>
         </div>
         {usage.length === 0 ? (
-          <p className="empty-note">No usage data in the selected time range.</p>
+          <p className="empty-note">{t("noUsage")}</p>
         ) : (
           <div className="gateway-table-wrapper">
             <table className="gateway-table">
               <thead>
                 <tr>
-                  <th>Provider</th>
-                  <th>Model</th>
-                  <th>Requests</th>
-                  <th>Prompt</th>
-                  <th>Completion</th>
-                  <th>Total</th>
-                  <th>Cost</th>
+                  <th>{t("provider")}</th>
+                  <th>{t("model")}</th>
+                  <th>{t("requests")}</th>
+                  <th>{t("promptTokens").split(" ")[0]}</th>
+                  <th>{t("completionTokens").split(" ")[0]}</th>
+                  <th>{t("totalTokens").split(" ")[0]}</th>
+                  <th>{t("cost")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -333,37 +336,37 @@ export default function GatewayPage() {
       <div className="dashboard-section">
         <div className="dashboard-section-header">
           <div>
-            <h2 className="dashboard-section-title">Gateway API Keys</h2>
+            <h2 className="dashboard-section-title">{t("keyManagement")}</h2>
           </div>
         </div>
         <div className="gateway-keys-grid">
           <div className="gateway-keys-form">
             <form className="form-fields" onSubmit={handleCreateKey}>
               <label className="form-label" htmlFor="gateway-key-name">
-                Key Name
+                {t("keyName")}
               </label>
               <input
                 id="gateway-key-name"
                 className="form-input"
                 value={keyName}
                 onChange={(e) => setKeyName(e.target.value)}
-                placeholder="default"
+                placeholder={t("keyNamePlaceholder")}
                 disabled={isSubmitting}
               />
               <button className="form-submit" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Key"}
+                {isSubmitting ? t("creating") : t("newKey")}
               </button>
             </form>
             {newKeyValue && (
               <div className="gateway-secret">
-                <p className="gateway-secret-title">Copy now: this key is shown only once</p>
+                <p className="gateway-secret-title">{t("secretWarning")}</p>
                 <code className="gateway-secret-code">{newKeyValue}</code>
               </div>
             )}
           </div>
           <div className="gateway-keys-list">
             {keys.length === 0 ? (
-              <p className="empty-note">No gateway keys yet.</p>
+              <p className="empty-note">{t("noKeys")}</p>
             ) : (
               <div className="list">
                 {keys.map((key) => (
@@ -371,17 +374,17 @@ export default function GatewayPage() {
                     <div className="list-card-main">
                       <h3 className="list-card-title">{key.name}</h3>
                       <p className="list-card-meta">
-                        {key.key_prefix}... · created {new Date(key.created_at).toLocaleString()}
+                        {key.key_prefix}... · {tc("createdAt")} {new Date(key.created_at).toLocaleString()}
                         {key.last_used_at ? ` · last used ${new Date(key.last_used_at).toLocaleString()}` : ""}
                       </p>
                     </div>
                     <div className="list-card-actions">
                       <span className={`badge ${key.revoked_at ? "badge-failed" : "badge-completed"}`}>
-                        {key.revoked_at ? "revoked" : "active"}
+                        {key.revoked_at ? t("revoke") : tc("status")}
                       </span>
                       {!key.revoked_at && (
                         <button className="gateway-button-secondary" onClick={() => void handleRevokeKey(key.id)}>
-                          Revoke
+                          {t("revoke")}
                         </button>
                       )}
                     </div>
@@ -396,22 +399,22 @@ export default function GatewayPage() {
       {isAdmin && (
         <div className="dashboard-section">
           <div className="dashboard-section-header">
-            <h2 className="dashboard-section-title">All Users Usage</h2>
+            <h2 className="dashboard-section-title">{t("userUsage")}</h2>
           </div>
           {usageByUsers.length === 0 ? (
-            <p className="empty-note">No user-level usage data yet.</p>
+            <p className="empty-note">{t("noUsage")}</p>
           ) : (
             <div className="gateway-table-wrapper">
               <table className="gateway-table">
                 <thead>
                   <tr>
-                    <th>User</th>
-                    <th>User ID</th>
-                    <th>Requests</th>
-                    <th>Prompt</th>
-                    <th>Completion</th>
-                    <th>Total</th>
-                    <th>Cost</th>
+                    <th>{t("user")}</th>
+                    <th>{t("user")} ID</th>
+                    <th>{t("requests")}</th>
+                    <th>{t("promptTokens").split(" ")[0]}</th>
+                    <th>{t("completionTokens").split(" ")[0]}</th>
+                    <th>{t("totalTokens").split(" ")[0]}</th>
+                    <th>{t("cost")}</th>
                   </tr>
                 </thead>
                 <tbody>

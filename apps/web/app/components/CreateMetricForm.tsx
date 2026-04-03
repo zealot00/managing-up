@@ -3,12 +3,15 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createMetric } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   onCreated?: () => void;
 };
 
 export default function CreateMetricForm({ onCreated }: Props) {
+  const t = useTranslations("evaluations");
+  const te = useTranslations("errors");
   const router = useRouter();
   const [name, setName] = useState("");
   const [type, setType] = useState("exact_match");
@@ -26,7 +29,7 @@ export default function CreateMetricForm({ onCreated }: Props) {
       try {
         parsedConfig = JSON.parse(config);
       } catch {
-        setError("Config must be valid JSON");
+        setError(te("configInvalid"));
         setLoading(false);
         return;
       }
@@ -53,44 +56,44 @@ export default function CreateMetricForm({ onCreated }: Props) {
   return (
     <form onSubmit={handleSubmit} className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">Evaluation Engine</p>
-        <h2>Create metric</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("createMetric")}</h2>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">
         <label className="form-label">
-          Metric name
+          {t("metricName")}
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. exact_match_score"
+            placeholder={t("metricNamePlaceholder")}
             required
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Type
+          {t("metricType")}
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
             className="form-select"
           >
-            <option value="exact_match">Exact Match</option>
-            <option value="llm_judge">LLM Judge</option>
-            <option value="custom">Custom</option>
+            <option value="exact_match">{t("exactMatch")}</option>
+            <option value="llm_judge">{t("llmJudge")}</option>
+            <option value="custom">{t("custom")}</option>
           </select>
         </label>
 
         <label className="form-label">
-          Config (JSON)
+          {t("config")}
           <textarea
             value={config}
             onChange={(e) => setConfig(e.target.value)}
-            placeholder='{"threshold": 0.8}'
+            placeholder={t("configPlaceholder")}
             rows={3}
             className="form-textarea"
           />
@@ -98,7 +101,7 @@ export default function CreateMetricForm({ onCreated }: Props) {
       </div>
 
       <button type="submit" disabled={loading} className="form-submit">
-        {loading ? "Creating..." : "Create metric"}
+        {loading ? t("creating") : t("createMetric")}
       </button>
     </form>
   );

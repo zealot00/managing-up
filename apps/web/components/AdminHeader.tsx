@@ -2,23 +2,25 @@
 
 import { usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
-
-const pageTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/skills": "Skills Registry",
-  "/executions": "Executions",
-  "/approvals": "Approvals",
-  "/tasks": "Tasks",
-  "/evaluations": "Evaluations",
-  "/experiments": "Experiments",
-  "/replays": "Replays",
-  "/gateway": "Gateway",
-  "/seh": "SEH Module",
-};
+import { useTranslations } from "next-intl";
 
 export default function AdminHeader() {
+  const t = useTranslations("nav");
   const pathname = usePathname();
   const { user, isAuthenticated } = useAuth();
+
+  const pageTitles: Record<string, string> = {
+    "/dashboard": t("dashboard"),
+    "/skills": t("skills"),
+    "/executions": t("executions"),
+    "/approvals": t("approvals"),
+    "/tasks": t("tasks"),
+    "/evaluations": t("evaluations"),
+    "/experiments": t("experiments"),
+    "/replays": t("replays"),
+    "/gateway": t("gateway"),
+    "/seh": t("sehModule"),
+  };
 
   if (!isAuthenticated) {
     return null;

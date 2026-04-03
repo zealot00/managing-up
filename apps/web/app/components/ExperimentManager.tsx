@@ -5,6 +5,7 @@ import { Experiment, Task } from "../lib/api";
 import CreateExperimentForm from "./CreateExperimentForm";
 import CompareExperimentsForm from "./CompareExperimentsForm";
 import ExperimentCardWithActions from "./ExperimentCardWithActions";
+import { useTranslations } from "next-intl";
 
 type Props = {
   experiments: Experiment[];
@@ -12,6 +13,8 @@ type Props = {
 };
 
 export default function ExperimentManager({ experiments, tasks }: Props) {
+  const t = useTranslations("experiments");
+  const tc = useTranslations("common");
   const [showCreate, setShowCreate] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
 
@@ -20,15 +23,15 @@ export default function ExperimentManager({ experiments, tasks }: Props) {
       <div className="page-header" style={{ marginBottom: "var(--space-6)", marginTop: "var(--space-4)", paddingBottom: 0, borderBottom: "none" }}>
         <div className="page-header-content">
           <p className="section-kicker" style={{ margin: 0 }}>
-            {experiments.length} experiments defined
+            {t("count", { count: experiments.length })}
           </p>
         </div>
         <div className="page-header-actions">
           <button className="btn btn-secondary" onClick={() => { setShowCompare(!showCompare); setShowCreate(false); }}>
-            {showCompare ? "Cancel" : "Compare"}
+            {showCompare ? tc("cancel") : t("compare")}
           </button>
           <button className="btn btn-primary" onClick={() => { setShowCreate(!showCreate); setShowCompare(false); }}>
-            {showCreate ? "Cancel" : "+ New Experiment"}
+            {showCreate ? tc("cancel") : t("newExperiment")}
           </button>
         </div>
       </div>
@@ -54,13 +57,13 @@ export default function ExperimentManager({ experiments, tasks }: Props) {
         ) : (
           <div className="empty-state">
             <div className="empty-state-icon">◎</div>
-            <h3 className="empty-state-title">No experiments yet</h3>
+            <h3 className="empty-state-title">{t("noExperiments")}</h3>
             <p className="empty-state-description">
-              Create your first experiment to start comparing agent performance across tasks.
+              {t("noExperimentsDesc")}
             </p>
             <div style={{ marginTop: "var(--space-5)" }}>
               <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-                Create Experiment
+                {t("createExperiment")}
               </button>
             </div>
           </div>

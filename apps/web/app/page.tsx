@@ -3,8 +3,11 @@
 import { useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 export default function HomePage() {
+  const t = useTranslations("common");
+  const tl = useTranslations("landing");
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
@@ -33,15 +36,14 @@ export default function HomePage() {
   return (
     <div className="landing-page">
       <section className="landing-hero">
-        <p className="landing-eyebrow">Enterprise AI Quality Infrastructure</p>
-        <h1 className="landing-title">Managing Up</h1>
+        <p className="landing-eyebrow">{tl("eyebrow")}</p>
+        <h1 className="landing-title">{tl("title")}</h1>
         <p className="landing-subtitle">
-          Benchmark testing, regression detection, and harness evaluation for AI agents.
-          Full audit trails, human approvals, and quantitative reporting.
+          {tl("subtitle")}
         </p>
         <div className="landing-actions">
-          <a href="/login" className="landing-btn landing-btn-primary">Get Started</a>
-          <a href="https://github.com/your-org/managing-up" className="landing-btn landing-btn-secondary" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+          <a href="/login" className="landing-btn landing-btn-primary">{t("getStarted")}</a>
+          <a href="https://github.com/your-org/managing-up" className="landing-btn landing-btn-secondary" target="_blank" rel="noopener noreferrer">{t("viewOnGitHub")}</a>
         </div>
       </section>
 
@@ -49,23 +51,23 @@ export default function HomePage() {
         <div className="landing-features-grid">
           <article className="landing-feature">
             <div className="landing-feature-icon">◈</div>
-            <h3 className="landing-feature-title">Skill Registry</h3>
-            <p className="landing-feature-desc">Version-controlled SOPs as executable skills with approval workflows.</p>
+            <h3 className="landing-feature-title">{tl("features.skillRegistry.title")}</h3>
+            <p className="landing-feature-desc">{tl("features.skillRegistry.desc")}</p>
           </article>
           <article className="landing-feature">
             <div className="landing-feature-icon">▸</div>
-            <h3 className="landing-feature-title">Execution Engine</h3>
-            <p className="landing-feature-desc">State machine with checkpoints, human approvals, and full trace capture.</p>
+            <h3 className="landing-feature-title">{tl("features.executionEngine.title")}</h3>
+            <p className="landing-feature-desc">{tl("features.executionEngine.desc")}</p>
           </article>
           <article className="landing-feature">
             <div className="landing-feature-icon">◎</div>
-            <h3 className="landing-feature-title">Evaluation Pipeline</h3>
-            <p className="landing-feature-desc">Multiple evaluator types with regression detection and A/B comparison.</p>
+            <h3 className="landing-feature-title">{tl("features.evaluationPipeline.title")}</h3>
+            <p className="landing-feature-desc">{tl("features.evaluationPipeline.desc")}</p>
           </article>
           <article className="landing-feature">
             <div className="landing-feature-icon">↻</div>
-            <h3 className="landing-feature-title">Trace Replay</h3>
-            <p className="landing-feature-desc">Deterministic reproduction of AI agent behaviors for debugging.</p>
+            <h3 className="landing-feature-title">{tl("features.traceReplay.title")}</h3>
+            <p className="landing-feature-desc">{tl("features.traceReplay.desc")}</p>
           </article>
         </div>
       </section>

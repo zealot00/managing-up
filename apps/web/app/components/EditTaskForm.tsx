@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { updateTask, getSkills, Skill, Task } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   task: Task;
@@ -12,6 +13,9 @@ type Props = {
 };
 
 export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Props) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const router = useRouter();
   const [name, setName] = useState(task.name);
   const [description, setDescription] = useState(task.description);
@@ -32,7 +36,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
       try {
         parsedTestCases = JSON.parse(testCases);
       } catch {
-        setError("Test cases must be valid JSON array");
+        setError(te("testCasesInvalid"));
         setLoading(false);
         return;
       }
@@ -59,15 +63,15 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
   return (
     <form onSubmit={handleSubmit} className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">Task Registry</p>
-        <h2>Edit task: {task.name}</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("editTask", { name: task.name })}</h2>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">
         <label className="form-label">
-          Task name
+          {t("taskName")}
           <input
             type="text"
             value={name}
@@ -78,7 +82,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
         </label>
 
         <label className="form-label">
-          Description
+          {tc("description")}
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -88,13 +92,13 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
         </label>
 
         <label className="form-label">
-          Linked skill
+          {t("linkedSkill")}
           <select
             value={skillId}
             onChange={(e) => setSkillId(e.target.value)}
             className="form-select"
           >
-            <option value="">No skill</option>
+            <option value="">{t("noSkill")}</option>
             {skills.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -104,20 +108,20 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
         </label>
 
         <label className="form-label">
-          Difficulty
+          {t("difficulty")}
           <select
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value)}
             className="form-select"
           >
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
+            <option value="easy">{t("easy")}</option>
+            <option value="medium">{t("medium")}</option>
+            <option value="hard">{t("hard")}</option>
           </select>
         </label>
 
         <label className="form-label">
-          Tags (comma-separated)
+          {t("tags")}
           <input
             type="text"
             value={tags}
@@ -127,7 +131,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
         </label>
 
         <label className="form-label">
-          Test cases (JSON array)
+          {t("testCases")}
           <textarea
             value={testCases}
             onChange={(e) => setTestCases(e.target.value)}
@@ -139,10 +143,10 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
 
       <div className="form-actions">
         <button type="submit" disabled={loading} className="form-submit" style={{ flex: 1 }}>
-          {loading ? "Saving..." : "Save changes"}
+          {loading ? t("saving") : t("saveChanges")}
         </button>
         <button type="button" onClick={onCancel} className="btn btn-secondary" style={{ flex: 1 }}>
-          Cancel
+          {tc("cancel")}
         </button>
       </div>
     </form>

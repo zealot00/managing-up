@@ -1,33 +1,36 @@
+import { getTranslations } from "next-intl/server";
 import TaskFromTraceForm from "../../../components/TaskFromTraceForm";
 
-export default function TaskBuilderPage() {
+export default async function TaskBuilderPage() {
+  const t = await getTranslations("tasks");
+  const tc = await getTranslations("common");
+
   return (
     <main className="shell">
       <section className="toprail" aria-label="Tasks navigation">
         <a className="toprail-link" href="/">
-          Dashboard
+          {tc("dashboard")}
         </a>
         <a className="toprail-link" href="/tasks">
-          Tasks
+          {tc("tasks")}
         </a>
         <a className="toprail-link" href="/tasks/from-trace">
-          Task Builder
+          {t("taskBuilder")}
         </a>
       </section>
 
       <section className="hero-page hero-compact">
-        <p className="eyebrow">Task Builder</p>
-        <h1>Build Task from Trace</h1>
+        <p className="eyebrow">{t("taskBuilder")}</p>
+        <h1>{t("taskBuilder.title")}</h1>
         <p className="lede">
-          Generate a reusable evaluation task from an existing execution trace.
-          The system extracts input parameters and expected outputs automatically.
+          {t("taskBuilder.lede")}
         </p>
       </section>
 
       <div className="content-grid">
         <article className="panel">
           <div className="panel-header">
-            <h2>Task Configuration</h2>
+            <h2>{t("taskBuilder.taskConfig")}</h2>
           </div>
 
           <TaskFromTraceForm />

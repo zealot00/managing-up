@@ -1,6 +1,34 @@
 import { Suspense } from "react";
+import { getTranslations } from "next-intl/server";
 import { getSEHDashboardSummary, getSEHDatasets, getSEHRuns, getSEHPolicies } from "../lib/seh-api";
 import SEHManager from "../components/SEHManager";
+
+async function SEHDashboardContent() {
+  const t = await getTranslations("seh");
+  const summary = await getSEHDashboardSummary();
+  const datasets = await getSEHDatasets(50, 0);
+  const runs = await getSEHRuns(50, 0);
+  const policies = await getSEHPolicies();
+
+  return (
+    <main className="shell">
+      <header className="hero-page hero-compact">
+        <p className="eyebrow">{t("eyebrow")}</p>
+        <h1>{t("title")}</h1>
+        <p className="lede">
+          {t("lede")}
+        </p>
+      </header>
+
+      <SEHManager
+        summary={summary}
+        datasets={datasets.datasets}
+        runs={runs.runs}
+        policies={policies}
+      />
+    </main>
+  );
+}
 
 function SkeletonSEHDashboard() {
   return (
@@ -36,32 +64,6 @@ function SkeletonSEHDashboard() {
           </div>
         </div>
       </div>
-    </main>
-  );
-}
-
-async function SEHDashboardContent() {
-  const summary = await getSEHDashboardSummary();
-  const datasets = await getSEHDatasets(50, 0);
-  const runs = await getSEHRuns(50, 0);
-  const policies = await getSEHPolicies();
-
-  return (
-    <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">Skill Evaluation Hub</p>
-        <h1>SEH Dashboard</h1>
-        <p className="lede">
-          Monitoring and management for datasets, evaluation runs, and governance policies.
-        </p>
-      </header>
-
-      <SEHManager
-        summary={summary}
-        datasets={datasets.datasets}
-        runs={runs.runs}
-        policies={policies}
-      />
     </main>
   );
 }

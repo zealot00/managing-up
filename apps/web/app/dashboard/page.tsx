@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { getTranslations } from "next-intl/server";
 import { getDashboard } from "../lib/api";
 
 function formatDuration(seconds: number): string {
@@ -35,17 +36,16 @@ function SkeletonDashboardPage() {
 }
 
 async function DashboardContent() {
+  const t = await getTranslations("dashboard");
   const dashboard = await getDashboard();
   const summary = dashboard.summary;
   const recentExecutions = dashboard.recent_executions.slice(0, 6);
 
   const metrics = [
-    { label: "Active Skills", value: summary.active_skills, icon: "◉" },
-    { label: "Published Versions", value: summary.published_versions, icon: "◎" },
-    { label: "Running Executions", value: summary.running_executions, icon: "▸" },
-    { label: "Waiting Approvals", value: summary.waiting_approvals, icon: "◐" },
-    { label: "Success Rate", value: `${Math.round(summary.success_rate * 100)}%`, icon: "✓" },
-    { label: "Avg Duration", value: formatDuration(summary.avg_duration_seconds), icon: "⏱" },
+    { label: t("totalSkills"), value: summary.active_skills, icon: "◉" },
+    { label: t("activeExecutions"), value: summary.running_executions, icon: "▸" },
+    { label: t("pendingApprovals"), value: summary.waiting_approvals, icon: "◐" },
+    { label: t("avgSkillScore"), value: `${Math.round(summary.success_rate * 100)}%`, icon: "✓" },
   ];
 
   return (
@@ -62,11 +62,11 @@ async function DashboardContent() {
 
       <section className="dashboard-section">
         <div className="dashboard-section-header">
-          <h2 className="dashboard-section-title">Recent executions</h2>
+          <h2 className="dashboard-section-title">{t("recentActivity")}</h2>
         </div>
         <div className="dashboard-list">
           {recentExecutions.length === 0 ? (
-            <p className="empty-note">No executions yet</p>
+            <p className="empty-note">{t("noExecutions", { namespace: "executions" })}</p>
           ) : (
             recentExecutions.map((execution) => (
               <article className="dashboard-list-item" key={execution.id}>
@@ -78,7 +78,7 @@ async function DashboardContent() {
                 </div>
                 <div className="dashboard-list-actions">
                   <a href={`/executions/${execution.id}/traces`} className="dashboard-list-link">
-                    View trace →
+                    {t("viewTrace", { namespace: "executions" })}
                   </a>
                   <span className={`badge badge-${execution.status}`}>{execution.status}</span>
                 </div>

@@ -3,8 +3,10 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSkill } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 export default function CreateSkillForm() {
+  const t = useTranslations("skills");
   const router = useRouter();
   const [name, setName] = useState("");
   const [ownerTeam, setOwnerTeam] = useState("");
@@ -33,53 +35,53 @@ export default function CreateSkillForm() {
   return (
     <form onSubmit={handleSubmit} className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">Registry</p>
-        <h2>Register new skill</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("registerSkill")}</h2>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">
         <label className="form-label">
-          Skill name
+          {t("skillName")}
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. restart_service_skill"
+            placeholder={t("skillNamePlaceholder")}
             required
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Owner team
+          {t("ownerTeam")}
           <input
             type="text"
             value={ownerTeam}
             onChange={(e) => setOwnerTeam(e.target.value)}
-            placeholder="e.g. platform_team"
+            placeholder={t("ownerTeamPlaceholder")}
             required
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Risk level
+          {t("riskLevel")}
           <select
             value={riskLevel}
             onChange={(e) => setRiskLevel(e.target.value)}
             className="form-select"
           >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
+            <option value="low">{t("low")}</option>
+            <option value="medium">{t("medium")}</option>
+            <option value="high">{t("high")}</option>
           </select>
         </label>
       </div>
 
       <button type="submit" disabled={loading} className="form-submit">
-        {loading ? "Registering..." : "Register skill"}
+        {loading ? t("registering") : t("registerSkill")}
       </button>
     </form>
   );

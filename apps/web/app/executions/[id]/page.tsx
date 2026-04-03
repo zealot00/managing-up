@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { getExecution, getTraces } from "../../lib/api";
 
 type Props = {
@@ -6,6 +7,8 @@ type Props = {
 };
 
 export default async function ExecutionDetailPage({ params }: Props) {
+  const t = await getTranslations("executions");
+  const tc = await getTranslations("common");
   const { id } = await params;
 
   let execution;
@@ -27,14 +30,14 @@ export default async function ExecutionDetailPage({ params }: Props) {
   return (
     <main className="shell">
       <section className="toprail">
-        <a href="/executions">← Back to executions</a>
+        <a href="/executions">{tc("back")} to {tc("executions")}</a>
       </section>
 
       <section className="hero-page hero-compact">
-        <p className="eyebrow">Execution Timeline</p>
+        <p className="eyebrow">{t("eyebrow")}</p>
         <h1>{execution.skill_name}</h1>
         <p className="lede">
-          {execution.current_step_id} · triggered by {execution.triggered_by} ·{" "}
+          {execution.current_step_id} · {t("triggeredBy")} {execution.triggered_by} ·{" "}
           <span className={`badge badge-${execution.status}`}>{execution.status}</span>
         </p>
       </section>
@@ -42,30 +45,30 @@ export default async function ExecutionDetailPage({ params }: Props) {
       <section className="panel-grid panel-grid-wide">
         <article className="panel">
           <div className="panel-header">
-            <p className="section-kicker">Execution</p>
+            <p className="section-kicker">{t("runs")}</p>
             <h2>Run details</h2>
           </div>
           <div className="detail-grid">
             <div className="detail-row">
-              <span className="detail-label">ID</span>
+              <span className="detail-label">{tc("id")}</span>
               <span className="detail-value">{execution.id}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Skill ID</span>
+              <span className="detail-label">{t("skill").split(" ")[0]} ID</span>
               <span className="detail-value">{execution.skill_id}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Skill name</span>
+              <span className="detail-label">{t("skill").split(" ")[0]} {tc("name")}</span>
               <span className="detail-value">{execution.skill_name}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Status</span>
+              <span className="detail-label">{tc("status")}</span>
               <span className="detail-value">
                 <span className={`badge badge-${execution.status}`}>{execution.status}</span>
               </span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Triggered by</span>
+              <span className="detail-label">{t("triggeredBy")}</span>
               <span className="detail-value">{execution.triggered_by}</span>
             </div>
             <div className="detail-row">
@@ -73,7 +76,7 @@ export default async function ExecutionDetailPage({ params }: Props) {
               <span className="detail-value">{execution.started_at}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Current step</span>
+              <span className="detail-label">{t("currentStep")}</span>
               <span className="detail-value">{execution.current_step_id}</span>
             </div>
           </div>
@@ -81,8 +84,8 @@ export default async function ExecutionDetailPage({ params }: Props) {
 
         <article className="panel">
           <div className="panel-header">
-            <p className="section-kicker">Execution</p>
-            <h2>Input payload</h2>
+            <p className="section-kicker">{t("runs")}</p>
+            <h2>{t("input").split("(")[0].trim()} payload</h2>
           </div>
           <pre className="json-block">
             {Object.keys(execution.input || {}).length > 0
@@ -93,7 +96,7 @@ export default async function ExecutionDetailPage({ params }: Props) {
 
         <article className="panel">
           <div className="panel-header">
-            <p className="section-kicker">Execution</p>
+            <p className="section-kicker">{t("runs")}</p>
             <h2>Trace timeline</h2>
           </div>
           {traces.length === 0 ? (

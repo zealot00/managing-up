@@ -3,6 +3,7 @@
 import { useState } from "react";
 import CreateDatasetForm from "./CreateDatasetForm";
 import CreatePolicyForm from "./CreatePolicyForm";
+import { useTranslations } from "next-intl";
 
 type Dataset = { dataset_id: string; name: string; version: string; owner: string; case_count: number };
 type Run = { run_id: string; skill: string; metrics: { score: number; success_rate: number } };
@@ -16,21 +17,23 @@ type Props = {
 };
 
 export default function SEHManager({ summary, datasets, runs, policies }: Props) {
+  const t = useTranslations("seh");
+  const tc = useTranslations("common");
   const [activeTab, setActiveTab] = useState<"datasets" | "runs" | "policies">("datasets");
   const [showCreateDataset, setShowCreateDataset] = useState(false);
   const [showCreatePolicy, setShowCreatePolicy] = useState(false);
 
   const metrics = [
-    { label: "Datasets", value: summary.total_datasets, icon: "□" },
-    { label: "Evaluation Runs", value: summary.total_runs, icon: "▶" },
-    { label: "Governance Policies", value: summary.total_policies, icon: "◎" },
-    { label: "Avg Score", value: summary.avg_score > 0 ? summary.avg_score.toFixed(2) : "—", icon: "◉" },
+    { label: t("datasets"), value: summary.total_datasets, icon: "□" },
+    { label: t("runs"), value: summary.total_runs, icon: "▶" },
+    { label: t("policies"), value: summary.total_policies, icon: "◎" },
+    { label: t("avgSkillScore").split(" ").slice(1).join(" "), value: summary.avg_score > 0 ? summary.avg_score.toFixed(2) : "—", icon: "◉" },
   ];
 
   const tabs: { key: "datasets" | "runs" | "policies"; label: string; count: number }[] = [
-    { key: "datasets", label: "Datasets", count: datasets.length },
-    { key: "runs", label: "Runs", count: runs.length },
-    { key: "policies", label: "Policies", count: policies.length },
+    { key: "datasets", label: t("datasets"), count: datasets.length },
+    { key: "runs", label: t("runs"), count: runs.length },
+    { key: "policies", label: t("policies"), count: policies.length },
   ];
 
   return (
@@ -66,12 +69,12 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
         <div className="page-header-actions">
           {activeTab === "datasets" && (
             <button className="btn btn-primary" onClick={() => { setShowCreateDataset(!showCreateDataset); setShowCreatePolicy(false); }}>
-              {showCreateDataset ? "Cancel" : "+ New Dataset"}
+              {showCreateDataset ? tc("cancel") : t("newDataset")}
             </button>
           )}
           {activeTab === "policies" && (
             <button className="btn btn-primary" onClick={() => { setShowCreatePolicy(!showCreatePolicy); setShowCreateDataset(false); }}>
-              {showCreatePolicy ? "Cancel" : "+ New Policy"}
+              {showCreatePolicy ? tc("cancel") : t("newPolicy")}
             </button>
           )}
         </div>
@@ -89,19 +92,19 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
         {activeTab === "datasets" && (
           <>
             <div className="panel-header">
-              <p className="section-kicker">Datasets</p>
-              <h2 className="panel-title">All Datasets ({datasets.length})</h2>
+              <p className="section-kicker">{t("datasets")}</p>
+              <h2 className="panel-title">{t("allDatasets", { count: datasets.length })}</h2>
             </div>
             <div className="list">
               {datasets.length === 0 ? (
-                <p className="empty-note">No datasets found</p>
+                <p className="empty-note">{t("noDatasets")}</p>
               ) : (
                 datasets.map((ds) => (
                   <article className="list-card" key={ds.dataset_id}>
                     <div className="list-card-main">
                       <h3 className="list-card-title">{ds.name}</h3>
                       <p className="list-card-meta">
-                        {ds.version} · {ds.owner} · {ds.case_count} cases
+                        {ds.version} · {ds.owner} · {ds.case_count} {t("cases")}
                       </p>
                     </div>
                     <span className="badge badge-muted">{ds.dataset_id}</span>
@@ -115,19 +118,19 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
         {activeTab === "runs" && (
           <>
             <div className="panel-header">
-              <p className="section-kicker">Performance</p>
-              <h2 className="panel-title">All Runs ({runs.length})</h2>
+              <p className="section-kicker">{t("performance")}</p>
+              <h2 className="panel-title">{t("allRuns", { count: runs.length })}</h2>
             </div>
             <div className="list">
               {runs.length === 0 ? (
-                <p className="empty-note">No runs found</p>
+                <p className="empty-note">{t("noRuns")}</p>
               ) : (
                 runs.map((run) => (
                   <article className="list-card" key={run.run_id}>
                     <div className="list-card-main">
                       <h3 className="list-card-title">{run.skill}</h3>
                       <p className="list-card-meta">
-                        Score: {run.metrics.score.toFixed(2)} · Success: {(run.metrics.success_rate * 100).toFixed(0)}%
+                        {t("score")}: {run.metrics.score.toFixed(2)} · {t("success")}: {(run.metrics.success_rate * 100).toFixed(0)}%
                       </p>
                     </div>
                     <span className={`badge badge-${run.metrics.score >= 0.75 ? "succeeded" : "failed"}`}>
@@ -143,20 +146,20 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
         {activeTab === "policies" && (
           <>
             <div className="panel-header">
-              <p className="section-kicker">Governance</p>
-              <h2 className="panel-title">Active Policies ({policies.length})</h2>
+              <p className="section-kicker">{t("governance")}</p>
+              <h2 className="panel-title">{t("activePolicies", { count: policies.length })}</h2>
             </div>
             <div className="list">
               {policies.length === 0 ? (
-                <p className="empty-note">No policies found</p>
+                <p className="empty-note">{t("noPolicies")}</p>
               ) : (
                 policies.map((policy) => (
                   <article className="list-card" key={policy.policy_id}>
                     <div className="list-card-main">
                       <h3 className="list-card-title">{policy.name}</h3>
                       <p className="list-card-meta">
-                        {policy.require_provenance ? "Provenance required · " : ""}
-                        Min diversity: {policy.min_source_diversity} · Min golden: {policy.min_golden_weight}
+                        {policy.require_provenance ? `${t("provenanceRequired")} · ` : ""}
+                        {t("minDiversity")}: {policy.min_source_diversity} · {t("minGolden")}: {policy.min_golden_weight}
                       </p>
                     </div>
                     <span className="badge badge-muted">{policy.policy_id}</span>

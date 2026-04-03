@@ -3,12 +3,15 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createExecution, Skill } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   skills: Skill[];
 };
 
 export default function TriggerExecutionForm({ skills }: Props) {
+  const t = useTranslations("executions");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [skillId, setSkillId] = useState("");
@@ -27,7 +30,7 @@ export default function TriggerExecutionForm({ skills }: Props) {
       try {
         parsedInput = JSON.parse(input);
       } catch {
-        setError("Input must be valid JSON");
+        setError(tc("errors.inputInvalid"));
         setLoading(false);
         return;
       }
@@ -57,28 +60,28 @@ export default function TriggerExecutionForm({ skills }: Props) {
         onClick={() => setIsOpen(!isOpen)}
         className="trigger-btn"
       >
-        {isOpen ? "Cancel" : "Trigger Execution"}
+        {isOpen ? tc("cancel") : t("triggerExecution")}
       </button>
 
       {isOpen && (
         <form onSubmit={handleSubmit} className="form-panel">
           <div className="panel-header">
-            <p className="section-kicker">Execution Timeline</p>
-            <h2>Trigger execution</h2>
+            <p className="section-kicker">{t("eyebrow")}</p>
+            <h2>{t("trigger")}</h2>
           </div>
 
           {error && <p className="form-error">{error}</p>}
 
           <div className="form-fields">
             <label className="form-label">
-              Skill
+              {t("skill")}
               <select
                 value={skillId}
                 onChange={(e) => setSkillId(e.target.value)}
                 required
                 className="form-select"
               >
-                <option value="">Select a skill...</option>
+                <option value="">{t("selectSkill")}</option>
                 {skills.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} ({s.owner_team})
@@ -88,23 +91,23 @@ export default function TriggerExecutionForm({ skills }: Props) {
             </label>
 
             <label className="form-label">
-              Triggered by
+              {t("triggeredBy")}
               <input
                 type="text"
                 value={triggeredBy}
                 onChange={(e) => setTriggeredBy(e.target.value)}
-                placeholder="e.g. platform_operator"
+                placeholder={t("triggeredByPlaceholder")}
                 required
                 className="form-input"
               />
             </label>
 
             <label className="form-label">
-              Input (JSON)
+              {t("input")}
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder='{"server_id": "srv-001"}'
+                placeholder={t("inputPlaceholder")}
                 rows={3}
                 className="form-textarea"
               />
@@ -112,7 +115,7 @@ export default function TriggerExecutionForm({ skills }: Props) {
           </div>
 
           <button type="submit" disabled={loading} className="form-submit">
-            {loading ? "Triggering..." : "Trigger execution"}
+            {loading ? t("triggering") : t("trigger")}
           </button>
         </form>
       )}

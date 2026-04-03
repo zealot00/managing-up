@@ -6,6 +6,7 @@ import { Task, Skill, createTask, updateTask, deleteTask } from "../lib/api";
 import CreateTaskForm from "./CreateTaskForm";
 import TaskCardWithActions from "./TaskCardWithActions";
 import EditTaskForm from "./EditTaskForm";
+import { useTranslations } from "next-intl";
 
 type Props = {
   tasks: Task[];
@@ -13,6 +14,8 @@ type Props = {
 };
 
 export default function TaskManagerClient({ tasks, skills }: Props) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -21,17 +24,17 @@ export default function TaskManagerClient({ tasks, skills }: Props) {
     <>
       <div className="page-header" style={{ marginBottom: "var(--space-6)", marginTop: "var(--space-4)", paddingBottom: 0, borderBottom: "none" }}>
         <div className="page-header-content">
-          <p className="section-kicker" style={{ margin: 0 }}>{tasks.length} tasks defined</p>
+          <p className="section-kicker" style={{ margin: 0 }}>{t("count", { count: tasks.length })}</p>
         </div>
         <div className="page-header-actions">
           <a href="/tasks/from-trace" className="btn btn-secondary">
-            Build from Trace
+            {t("buildFromTrace")}
           </a>
           <button
             className="btn btn-primary"
             onClick={() => { setShowCreate(true); setEditingTask(null); }}
           >
-            + New Task
+            {t("newTask")}
           </button>
         </div>
       </div>
@@ -67,16 +70,16 @@ export default function TaskManagerClient({ tasks, skills }: Props) {
         ) : (
           <div className="empty-state">
             <div className="empty-state-icon">◎</div>
-            <h3 className="empty-state-title">No tasks yet</h3>
+            <h3 className="empty-state-title">{t("noTasks")}</h3>
             <p className="empty-state-description">
-              Create your first evaluation task or build one from an execution trace.
+              {t("noTasksDesc")}
             </p>
             <div style={{ marginTop: "var(--space-5)", display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
               <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-                Create Task
+                {t("createTask")}
               </button>
               <a href="/tasks/from-trace" className="btn btn-secondary">
-                Build from Trace
+                {t("buildFromTrace")}
               </a>
             </div>
           </div>

@@ -3,8 +3,10 @@
 import { useState, FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 export default function LoginForm() {
+  const t = useTranslations("login");
   const { login } = useAuth();
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -21,7 +23,7 @@ export default function LoginForm() {
       await login(username, password);
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(t("invalidCredentials"));
     } finally {
       setLoading(false);
     }
@@ -31,14 +33,14 @@ export default function LoginForm() {
     <form onSubmit={handleSubmit} className="login-form">
       <div className="login-form-header">
         <span className="login-form-label">ACCESS</span>
-        <h2 className="login-form-title">Sign in</h2>
+        <h2 className="login-form-title">{t("title")}</h2>
       </div>
 
       {error && <p className="login-form-error">{error}</p>}
 
       <div className="login-form-fields">
         <div className="login-form-field">
-          <label className="login-form-field-label">USERNAME</label>
+          <label className="login-form-field-label">{t("username")}</label>
           <input
             type="text"
             value={username}
@@ -46,12 +48,12 @@ export default function LoginForm() {
             required
             className="login-form-input"
             autoComplete="username"
-            placeholder="admin"
+            placeholder={t("usernamePlaceholder")}
           />
         </div>
 
         <div className="login-form-field">
-          <label className="login-form-field-label">PASSWORD</label>
+          <label className="login-form-field-label">{t("password")}</label>
           <input
             type="password"
             value={password}
@@ -59,13 +61,13 @@ export default function LoginForm() {
             required
             className="login-form-input"
             autoComplete="current-password"
-            placeholder="••••••••"
+            placeholder={t("passwordPlaceholder")}
           />
         </div>
       </div>
 
       <button type="submit" disabled={loading} className="login-form-submit">
-        {loading ? "AUTHENTICATING..." : "SIGN IN"}
+        {loading ? t("signingIn") : t("signIn")}
       </button>
 
       <p className="login-form-hint">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteTask, Task } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   task: Task;
@@ -11,6 +12,8 @@ type Props = {
 };
 
 export default function TaskCardWithActions({ task, onEdit, onDeleted }: Props) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
 
@@ -43,21 +46,21 @@ export default function TaskCardWithActions({ task, onEdit, onDeleted }: Props) 
         ))}
       </div>
       <div className="eval-card-footer">
-        <span>{task.test_cases.length} test cases</span>
-        {task.skill_id && <span>Linked to skill</span>}
+        <span>{t("testCasesCount", { count: task.test_cases.length })}</span>
+        {task.skill_id && <span>{t("linkedToSkill")}</span>}
         <div className="list-card-actions">
           <button
             className="btn btn-sm btn-secondary"
             onClick={() => onEdit(task)}
           >
-            Edit
+            {tc("edit")}
           </button>
           <button
             className="btn btn-sm btn-ghost"
             onClick={handleDelete}
             disabled={deleting}
           >
-            {deleting ? "..." : "Delete"}
+            {deleting ? "..." : tc("delete")}
           </button>
         </div>
       </div>

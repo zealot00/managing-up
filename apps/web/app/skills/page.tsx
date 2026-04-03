@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { getSkills, getSkillVersions } from "../lib/api";
 import CreateSkillForm from "../components/CreateSkillForm";
 import CreateSkillVersionForm from "../components/CreateSkillVersionForm";
@@ -43,16 +44,15 @@ function SkeletonSkillsPage() {
 }
 
 async function SkillsContent() {
+  const t = await getTranslations("skills");
   const [skills, versions] = await Promise.all([getSkills(), getSkillVersions()]);
 
   return (
     <main className="shell">
       <header className="hero-page hero-compact">
-        <p className="eyebrow">Registry</p>
-        <h1>Skill inventory and version posture.</h1>
-        <p className="lede">
-          Track registry ownership, risk classification, and publish state across the current automation surface.
-        </p>
+        <p className="eyebrow">{t("eyebrow")}</p>
+        <h1>{t("title")}</h1>
+        <p className="lede">{t("lede")}</p>
       </header>
 
       <CreateSkillForm />
@@ -62,12 +62,12 @@ async function SkillsContent() {
       <div className="panel-grid panel-grid-wide">
         <article className="panel">
           <div className="panel-header">
-            <p className="section-kicker">Registry</p>
-            <h2 className="panel-title">Skill entries</h2>
+            <p className="section-kicker">{t("eyebrow")}</p>
+            <h2 className="panel-title">{t("title")}</h2>
           </div>
           <div className="list">
             {skills.items.length === 0 ? (
-              <p className="empty-note">No skills in registry</p>
+              <p className="empty-note">{t("noSkills")}</p>
             ) : (
               skills.items.map((skill) => (
                 <Link
@@ -79,7 +79,7 @@ async function SkillsContent() {
                   <div className="list-card-main">
                     <h3 className="list-card-title">{skill.name}</h3>
                     <p className="list-card-meta">
-                      {skill.owner_team} · {skill.risk_level} risk · {skill.current_version || "no published version"}
+                      {skill.owner_team} · {skill.risk_level} risk · {skill.current_version || t("noVersions")}
                     </p>
                   </div>
                   <span className={`badge badge-${skill.status}`}>{skill.status}</span>
@@ -91,12 +91,12 @@ async function SkillsContent() {
 
         <article className="panel">
           <div className="panel-header">
-            <p className="section-kicker">Versions</p>
-            <h2 className="panel-title">Release history</h2>
+            <p className="section-kicker">{t("versions")}</p>
+            <h2 className="panel-title">{t("versions")}</h2>
           </div>
           <div className="list">
             {versions.items.length === 0 ? (
-              <p className="empty-note">No versions yet</p>
+              <p className="empty-note">{t("noVersions")}</p>
             ) : (
               versions.items.map((version) => (
                 <article className="list-card" key={version.id}>

@@ -2,12 +2,15 @@
 
 import { useState, FormEvent } from "react";
 import { compareExperiments, Experiment } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   experiments: Experiment[];
 };
 
 export default function CompareExperimentsForm({ experiments }: Props) {
+  const t = useTranslations("experiments");
+  const te = useTranslations("errors");
   const [expA, setExpA] = useState("");
   const [expB, setExpB] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,11 +25,11 @@ export default function CompareExperimentsForm({ experiments }: Props) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!expA || !expB) {
-      setError("Select two experiments to compare");
+      setError(te("selectTwoExperiments"));
       return;
     }
     if (expA === expB) {
-      setError("Select two different experiments");
+      setError(te("selectDifferentExperiments"));
       return;
     }
     setLoading(true);
@@ -46,8 +49,8 @@ export default function CompareExperimentsForm({ experiments }: Props) {
   return (
     <div className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">Experiment DB</p>
-        <h2>Compare experiments</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("compareTitle")}</h2>
       </div>
 
       {error && <p className="form-error">{error}</p>}
@@ -56,13 +59,13 @@ export default function CompareExperimentsForm({ experiments }: Props) {
         <div className="form-fields">
           <div className="form-row">
             <label className="form-label">
-              Experiment A
+              {t("experimentA")}
               <select
                 value={expA}
                 onChange={(e) => setExpA(e.target.value)}
                 className="form-select"
               >
-                <option value="">Select...</option>
+                <option value="">{t("select")}</option>
                 {experiments.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.name}
@@ -72,13 +75,13 @@ export default function CompareExperimentsForm({ experiments }: Props) {
             </label>
 
             <label className="form-label">
-              Experiment B
+              {t("experimentB")}
               <select
                 value={expB}
                 onChange={(e) => setExpB(e.target.value)}
                 className="form-select"
               >
-                <option value="">Select...</option>
+                <option value="">{t("select")}</option>
                 {experiments.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.name}
@@ -90,7 +93,7 @@ export default function CompareExperimentsForm({ experiments }: Props) {
         </div>
 
         <button type="submit" disabled={loading} className="form-submit">
-          {loading ? "Comparing..." : "Compare"}
+          {loading ? t("comparing") : t("compareBtn")}
         </button>
       </form>
 
@@ -98,18 +101,18 @@ export default function CompareExperimentsForm({ experiments }: Props) {
         <div style={{ marginTop: "var(--space-6)" }}>
           <div className="detail-grid">
             <div className="detail-row">
-              <span className="detail-label">Experiment A</span>
+              <span className="detail-label">{t("experimentA")}</span>
               <span className="detail-value">{result.experiment}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Experiment B</span>
+              <span className="detail-label">{t("experimentB")}</span>
               <span className="detail-value">{result.compare_with}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Regression</span>
+              <span className="detail-label">{t("regression")}</span>
               <span className="detail-value">
                 <span className={`badge badge-${result.regression ? "failed" : "succeeded"}`}>
-                  {result.regression ? "Detected" : "None"}
+                  {result.regression ? t("detected") : t("none")}
                 </span>
               </span>
             </div>
@@ -120,10 +123,10 @@ export default function CompareExperimentsForm({ experiments }: Props) {
               <table className="gateway-table">
                 <thead>
                   <tr>
-                    <th>Task ID</th>
-                    <th>A Score</th>
-                    <th>B Score</th>
-                    <th>Delta</th>
+                    <th>{t("taskIds").split("(")[0].trim()}</th>
+                    <th>{t("aScore")}</th>
+                    <th>{t("bScore")}</th>
+                    <th>{t("delta")}</th>
                   </tr>
                 </thead>
                 <tbody>

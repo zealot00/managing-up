@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { runExperiment, checkRegression, Experiment } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   exp: Experiment;
@@ -10,6 +11,8 @@ type Props = {
 };
 
 export default function ExperimentCardWithActions({ exp, onRun }: Props) {
+  const t = useTranslations("experiments");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
@@ -33,26 +36,26 @@ export default function ExperimentCardWithActions({ exp, onRun }: Props) {
       <div className="eval-card-header">
         <div>
           <h3 className="eval-card-title">{exp.name}</h3>
-          <p className="eval-card-meta">{exp.description || "No description"}</p>
+          <p className="eval-card-meta">{exp.description || tc("noData")}</p>
         </div>
         <span className={`badge badge-${exp.status === "completed" ? "succeeded" : exp.status === "running" ? "running" : "muted"}`}>
           {exp.status}
         </span>
       </div>
       <div className="tags">
-        <span className="tag">{exp.task_ids.length} tasks</span>
-        <span className="tag">{exp.agent_ids.length} agents</span>
+        <span className="tag">{t("tasksCount", { count: exp.task_ids.length })}</span>
+        <span className="tag">{t("agentsCount", { count: exp.agent_ids.length })}</span>
       </div>
       {error && <p className="form-error" style={{ marginTop: "var(--space-2)" }}>{error}</p>}
       <div className="eval-card-footer">
-        <span>Created: {new Date(exp.created_at).toLocaleString()}</span>
+        <span>{tc("createdAt")}: {new Date(exp.created_at).toLocaleString()}</span>
         {exp.status === "pending" && (
           <button
             className="btn btn-sm btn-primary"
             onClick={handleRun}
             disabled={running}
           >
-            {running ? "Running..." : "Run"}
+            {running ? t("running") : t("run")}
           </button>
         )}
       </div>

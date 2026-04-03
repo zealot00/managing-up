@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 
 export default function ErrorPanel({
   error,
@@ -9,6 +10,8 @@ export default function ErrorPanel({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useTranslations("errors");
+
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -16,8 +19,8 @@ export default function ErrorPanel({
   return (
     <div className="error-shell">
       <div className="error-panel">
-        <h2>Something went wrong</h2>
-        <p>The page failed to load. The backend may be unreachable.</p>
+        <h2>{t("generic").split(".")[0]}</h2>
+        <p>{t("network")}</p>
         <button onClick={reset} className="btn-retry">
           Try again
         </button>

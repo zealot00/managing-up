@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import LoginForm from "../../components/LoginForm";
 
 const defaultTip = {
@@ -9,6 +10,7 @@ const defaultTip = {
 };
 
 export default function LoginPageClient() {
+  const t = useTranslations("login");
   const [tip, setTip] = useState(defaultTip);
 
   useEffect(() => {
@@ -52,7 +54,7 @@ export default function LoginPageClient() {
             <img src="/logo.svg" alt="managing-up" className="login-logo" />
             <div className="login-brand-text">
               <span className="login-brand-name">MANAGING UP</span>
-              <span className="login-brand-sub">向上管理</span>
+              <span className="login-brand-sub">{t("subtitle").split(" ")[0]}</span>
             </div>
           </div>
 

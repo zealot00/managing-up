@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createExperiment, Task } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   tasks: Task[];
@@ -10,6 +11,8 @@ type Props = {
 };
 
 export default function CreateExperimentForm({ tasks, onCreated }: Props) {
+  const t = useTranslations("experiments");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -46,27 +49,27 @@ export default function CreateExperimentForm({ tasks, onCreated }: Props) {
   return (
     <form onSubmit={handleSubmit} className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">Experiment DB</p>
-        <h2>Create experiment</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("createExperiment")}</h2>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">
         <label className="form-label">
-          Experiment name
+          {t("experimentName")}
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. agent-v2-vs-v3"
+            placeholder={t("experimentNamePlaceholder")}
             required
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Description
+          {tc("description")}
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -77,30 +80,30 @@ export default function CreateExperimentForm({ tasks, onCreated }: Props) {
         </label>
 
         <label className="form-label">
-          Task IDs (comma-separated)
+          {t("taskIds")}
           <input
             type="text"
             value={taskIds}
             onChange={(e) => setTaskIds(e.target.value)}
-            placeholder="e.g. task_001, task_002"
+            placeholder={t("taskIdsPlaceholder")}
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Agent IDs (comma-separated)
+          {t("agentIds")}
           <input
             type="text"
             value={agentIds}
             onChange={(e) => setAgentIds(e.target.value)}
-            placeholder="e.g. agent-v1, agent-v2"
+            placeholder={t("agentIdsPlaceholder")}
             className="form-input"
           />
         </label>
       </div>
 
       <button type="submit" disabled={loading} className="form-submit">
-        {loading ? "Creating..." : "Create experiment"}
+        {loading ? t("creating") : t("createExperiment")}
       </button>
     </form>
   );

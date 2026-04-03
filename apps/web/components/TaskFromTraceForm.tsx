@@ -2,12 +2,16 @@
 
 import { useState } from "react";
 import { buildTaskFromTrace, type Task } from "../app/lib/api";
+import { useTranslations } from "next-intl";
 
 interface TaskFromTraceFormProps {
   onTaskCreated?: (task: Task) => void;
 }
 
 export default function TaskFromTraceForm({ onTaskCreated }: TaskFromTraceFormProps) {
+  const t = useTranslations("tasks");
+  const te = useTranslations("errors");
+  const tc = useTranslations("common");
   const [form, setForm] = useState({
     execution_id: "",
     trace_id: "",
@@ -19,7 +23,7 @@ export default function TaskFromTraceForm({ onTaskCreated }: TaskFromTraceFormPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.execution_id && !form.trace_id) {
-      setError("Either execution_id or trace_id is required");
+      setError(te("executionOrTraceRequired"));
       return;
     }
 
@@ -42,48 +46,48 @@ export default function TaskFromTraceForm({ onTaskCreated }: TaskFromTraceFormPr
     <>
       <form onSubmit={handleSubmit} className="form-panel">
         <div className="panel-header">
-          <p className="section-kicker">Task Builder</p>
-          <h2>Build task from trace</h2>
+          <p className="section-kicker">{t("taskBuilder")}</p>
+          <h2>{t("taskBuilder.title")}</h2>
         </div>
 
         {error && <p className="form-error">{error}</p>}
 
         <div className="form-fields">
           <label className="form-label">
-            Execution ID
+            {t("taskBuilder.executionId")}
             <input
               id="execution_id"
               name="execution_id"
               type="text"
-              placeholder="e.g., exec_001"
+              placeholder={t("taskBuilder.executionIdPlaceholder")}
               value={form.execution_id}
               onChange={(e) => setForm({ ...form, execution_id: e.target.value })}
               disabled={loading}
               className="form-input"
             />
             <span className="form-hint">
-              The execution to extract the task from (mutually exclusive with trace_id)
+              {t("taskBuilder.executionIdHint")}
             </span>
           </label>
 
           <label className="form-label">
-            Trace ID
+            {t("taskBuilder.traceId")}
             <input
               id="trace_id"
               name="trace_id"
               type="text"
-              placeholder="e.g., trace_001"
+              placeholder={t("taskBuilder.traceIdPlaceholder")}
               value={form.trace_id}
               onChange={(e) => setForm({ ...form, trace_id: e.target.value })}
               disabled={loading}
               className="form-input"
             />
-            <span className="form-hint">Alternative to execution_id for trace-based extraction</span>
+            <span className="form-hint">{t("taskBuilder.traceIdHint")}</span>
           </label>
         </div>
 
         <button type="submit" disabled={loading} className="form-submit">
-          {loading ? "Building..." : "Build task from trace"}
+          {loading ? t("taskBuilder.building") : t("taskBuilder.buildTask")}
         </button>
       </form>
 
@@ -97,31 +101,34 @@ export default function TaskFromTraceForm({ onTaskCreated }: TaskFromTraceFormPr
 }
 
 function TaskPreview({ task }: { task: Task }) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
+
   return (
     <article className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">Preview</p>
-        <h2>Generated Task</h2>
-        <span className="badge badge-succeeded" style={{ marginLeft: "var(--space-3)" }}>Success</span>
+        <p className="section-kicker">{t("taskBuilder.preview")}</p>
+        <h2>{t("taskBuilder.generatedTask")}</h2>
+        <span className="badge badge-succeeded" style={{ marginLeft: "var(--space-3)" }}>{tc("success")}</span>
       </div>
 
       <div className="detail-grid">
         <div className="detail-row">
-          <span className="detail-label">ID</span>
+          <span className="detail-label">{tc("id")}</span>
           <span className="detail-value"><code>{task.id}</code></span>
         </div>
         <div className="detail-row">
-          <span className="detail-label">Name</span>
+          <span className="detail-label">{tc("name")}</span>
           <span className="detail-value">{task.name}</span>
         </div>
         {task.description && (
           <div className="detail-row">
-            <span className="detail-label">Description</span>
+            <span className="detail-label">{tc("description")}</span>
             <span className="detail-value">{task.description}</span>
           </div>
         )}
         <div className="detail-row">
-          <span className="detail-label">Difficulty</span>
+          <span className="detail-label">{t("difficulty")}</span>
           <span className="detail-value">
             <span className={`badge badge-${task.difficulty === "easy" ? "succeeded" : task.difficulty === "medium" ? "running" : "failed"}`}>
               {task.difficulty}
@@ -140,7 +147,7 @@ function TaskPreview({ task }: { task: Task }) {
 
       {task.test_cases && task.test_cases.length > 0 && (
         <div style={{ marginTop: "var(--space-5)" }}>
-          <h3 className="section-kicker" style={{ marginBottom: "var(--space-2)" }}>Extracted Test Cases</h3>
+          <h3 className="section-kicker" style={{ marginBottom: "var(--space-2)" }}>{t("taskBuilder.extractedTestCases")}</h3>
           <pre className="json-block">
             {JSON.stringify(task.test_cases, null, 2)}
           </pre>

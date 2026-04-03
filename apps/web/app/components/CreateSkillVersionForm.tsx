@@ -3,12 +3,15 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSkillVersion, Skill } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   skills: Skill[];
 };
 
 export default function CreateSkillVersionForm({ skills }: Props) {
+  const t = useTranslations("skills");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [skillId, setSkillId] = useState("");
@@ -49,28 +52,28 @@ export default function CreateSkillVersionForm({ skills }: Props) {
   return (
     <>
       <button onClick={() => setIsOpen(!isOpen)} className="trigger-btn">
-        {isOpen ? "Cancel" : "Create New Version"}
+        {isOpen ? tc("cancel") : t("newVersion")}
       </button>
 
       {isOpen && (
         <form onSubmit={handleSubmit} className="form-panel">
           <div className="panel-header">
-            <p className="section-kicker">Version Control</p>
-            <h2>Create skill version</h2>
+            <p className="section-kicker">{t("versions")}</p>
+            <h2>{t("createVersion")}</h2>
           </div>
 
           {error && <p className="form-error">{error}</p>}
 
           <div className="form-fields">
             <label className="form-label">
-              Skill
+              {t("skill")}
               <select
                 value={skillId}
                 onChange={(e) => setSkillId(e.target.value)}
                 required
                 className="form-select"
               >
-                <option value="">Select a skill...</option>
+                <option value="">{t("selectSkill")}</option>
                 {skills.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} ({s.owner_team})
@@ -80,24 +83,24 @@ export default function CreateSkillVersionForm({ skills }: Props) {
             </label>
 
             <label className="form-label">
-              Version
+              {t("version")}
               <input
                 type="text"
                 value={version}
                 onChange={(e) => setVersion(e.target.value)}
-                placeholder="e.g. 1.0.0"
+                placeholder={t("versionNumberPlaceholder")}
                 required
                 className="form-input"
               />
             </label>
 
             <label className="form-label">
-              Change summary
+              {t("changelog")}
               <input
                 type="text"
                 value={changeSummary}
                 onChange={(e) => setChangeSummary(e.target.value)}
-                placeholder="e.g. Added validation step for input sanitization"
+                placeholder={t("changelogPlaceholder")}
                 required
                 className="form-input"
               />
@@ -114,13 +117,11 @@ export default function CreateSkillVersionForm({ skills }: Props) {
             </label>
 
             <label className="form-label">
-              Spec YAML
+              {t("yamlSpec")}
               <textarea
                 value={specYaml}
                 onChange={(e) => setSpecYaml(e.target.value)}
-                placeholder={`name: my_skill
-description: Does something useful
-steps:\n  - id: step1\n    name: First step\n    tool: execute_command\n    args:\n      command: echo "hello"`}
+                placeholder={`name: my_skill\ndescription: Does something useful\nsteps:\n  - id: step1\n    name: First step\n    tool: execute_command\n    args:\n      command: echo "hello"`}
                 rows={10}
                 required
                 className="form-textarea"
@@ -130,7 +131,7 @@ steps:\n  - id: step1\n    name: First step\n    tool: execute_command\n    args
           </div>
 
           <button type="submit" disabled={loading} className="form-submit">
-            {loading ? "Creating..." : "Create version"}
+            {loading ? t("creating") : t("createVersion")}
           </button>
         </form>
       )}

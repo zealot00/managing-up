@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { getTranslations } from "next-intl/server";
 import { getCapabilities } from "../../lib/api";
 import RadarChart from "../../../components/RadarChart";
 import type { RadarChartData } from "../../../components/RadarChart";
@@ -52,6 +53,7 @@ interface CapabilitiesPageProps {
 }
 
 async function CapabilitiesContent({ searchParams }: CapabilitiesPageProps) {
+  const t = await getTranslations("dashboard");
   const params = await searchParams;
   const { data: capabilities } = await getCapabilities();
 
@@ -99,8 +101,8 @@ async function CapabilitiesContent({ searchParams }: CapabilitiesPageProps) {
   return (
     <main className="shell">
       <section className="hero-page hero-compact">
-        <p className="eyebrow">Capabilities</p>
-        <h1>Radar Dashboard</h1>
+        <p className="eyebrow">{t("capabilities")}</p>
+        <h1>{t("skillHealth")}</h1>
         <p className="lede">
           Multi-dimensional capability visualization with experiment comparison.
         </p>

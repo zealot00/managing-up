@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ReplaySnapshot } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   onFilter: (filtered: ReplaySnapshot[]) => void;
@@ -9,6 +10,8 @@ type Props = {
 };
 
 export default function ReplayFilter({ onFilter, allSnapshots }: Props) {
+  const t = useTranslations("replays");
+  const tc = useTranslations("common");
   const [executionId, setExecutionId] = useState("");
 
   function handleFilter() {
@@ -25,25 +28,25 @@ export default function ReplayFilter({ onFilter, allSnapshots }: Props) {
   return (
     <div className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">Replay Layer</p>
-        <h2>Filter snapshots</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("filter")}</h2>
       </div>
 
       <div className="form-fields">
         <label className="form-label">
-          Execution ID
+          {t("executionId")}
           <input
             type="text"
             value={executionId}
             onChange={(e) => setExecutionId(e.target.value)}
-            placeholder="Filter by execution ID..."
+            placeholder={t("executionIdPlaceholder")}
             className="form-input"
           />
         </label>
       </div>
 
       <button onClick={handleFilter} className="form-submit">
-        {executionId ? "Filter" : "Show All"}
+        {executionId ? tc("filter") : tc("showAll")}
       </button>
     </div>
   );

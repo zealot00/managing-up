@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { approveExecution, Approval } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   approval: Approval;
 };
 
 export default function ApprovalListCard({ approval }: Props) {
+  const t = useTranslations("approvals");
   const router = useRouter();
   const [approver, setApprover] = useState("");
   const [note, setNote] = useState("");
@@ -19,7 +21,7 @@ export default function ApprovalListCard({ approval }: Props) {
 
   async function handleDecision(decision: "approved" | "rejected") {
     if (!approver.trim()) {
-      setError("Approver name is required");
+      setError(t("approver"));
       return;
     }
     setLoading(true);
@@ -56,14 +58,14 @@ export default function ApprovalListCard({ approval }: Props) {
             type="text"
             value={approver}
             onChange={(e) => setApprover(e.target.value)}
-            placeholder="Approver name"
+            placeholder={t("approverPlaceholder")}
             required
             className="form-input"
           />
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Note (optional)"
+            placeholder={t("notePlaceholder")}
             rows={1}
             className="form-textarea"
           />
@@ -74,7 +76,7 @@ export default function ApprovalListCard({ approval }: Props) {
               disabled={loading || !approver.trim()}
               className="btn-approve"
             >
-              {loading ? "..." : "Approve"}
+              {loading ? "..." : t("approve")}
             </button>
             <button
               type="button"
@@ -82,7 +84,7 @@ export default function ApprovalListCard({ approval }: Props) {
               disabled={loading || !approver.trim()}
               className="btn-reject"
             >
-              {loading ? "..." : "Reject"}
+              {loading ? "..." : t("reject")}
             </button>
           </div>
         </div>

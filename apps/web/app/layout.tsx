@@ -3,6 +3,7 @@ import "./globals.css";
 import Sidebar from "../components/Sidebar";
 import AdminHeader from "../components/AdminHeader";
 import { AuthProvider } from "../context/AuthContext";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "managing-up — 向上管理",
@@ -18,15 +19,17 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>
-          <div className="admin-layout">
-            <Sidebar />
-            <div className="admin-main">
-              <AdminHeader />
-              <div className="admin-content">
-                {children}
+          <Providers>
+            <div className="admin-layout">
+              <Sidebar />
+              <div className="admin-main">
+                <AdminHeader />
+                <div className="admin-content">
+                  {children}
+                </div>
               </div>
             </div>
-          </div>
+          </Providers>
         </AuthProvider>
       </body>
     </html>

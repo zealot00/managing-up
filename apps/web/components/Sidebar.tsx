@@ -5,48 +5,52 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 interface NavItem {
   href: string;
-  label: string;
+  labelKey: string;
   icon: string;
-  children?: { href: string; label: string }[];
+  children?: { href: string; labelKey: string }[];
 }
 
-const navSections: { title: string; items: NavItem[] }[] = [
-  {
-    title: "Overview",
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: "◉" },
-    ],
-  },
-  {
-    title: "AI Quality",
-    items: [
-      { href: "/skills", label: "Skills", icon: "◈" },
-      { href: "/executions", label: "Executions", icon: "▸" },
-      { href: "/tasks", label: "Tasks", icon: "◉", children: [{ href: "/tasks/from-trace", label: "Task Builder" }] },
-      { href: "/evaluations", label: "Evaluations", icon: "◎" },
-      { href: "/experiments", label: "Experiments", icon: "◇" },
-    ],
-  },
-  {
-    title: "Operations",
-    items: [
-      { href: "/approvals", label: "Approvals", icon: "◐" },
-      { href: "/replays", label: "Replays", icon: "↻" },
-      { href: "/gateway", label: "Gateway", icon: "⬡" },
-    ],
-  },
-  {
-    title: "System",
-    items: [
-      { href: "/seh", label: "SEH Module", icon: "▣" },
-    ],
-  },
-];
-
 export default function Sidebar() {
+  const t = useTranslations("nav");
+
+  const navSections: { titleKey: string; items: NavItem[] }[] = [
+    {
+      titleKey: "dashboard",
+      items: [
+        { href: "/dashboard", labelKey: "dashboard", icon: "◉" },
+      ],
+    },
+    {
+      titleKey: "aiQuality",
+      items: [
+        { href: "/skills", labelKey: "skills", icon: "◈" },
+        { href: "/executions", labelKey: "executions", icon: "▸" },
+        { href: "/tasks", labelKey: "tasks", icon: "◉", children: [{ href: "/tasks/from-trace", labelKey: "taskBuilder" }] },
+        { href: "/evaluations", labelKey: "evaluations", icon: "◎" },
+        { href: "/experiments", labelKey: "experiments", icon: "◇" },
+      ],
+    },
+    {
+      titleKey: "operations",
+      items: [
+        { href: "/approvals", labelKey: "approvals", icon: "◐" },
+        { href: "/replays", labelKey: "replays", icon: "↻" },
+        { href: "/gateway", labelKey: "gateway", icon: "⬡" },
+      ],
+    },
+    {
+      titleKey: "system",
+      items: [
+        { href: "/seh", labelKey: "sehModule", icon: "▣" },
+      ],
+    },
+  ];
+
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const router = useRouter();
@@ -84,9 +88,9 @@ export default function Sidebar() {
 
       <nav className="sidebar-nav">
         {navSections.map((section) => (
-          <div key={section.title} className="sidebar-section">
+          <div key={section.titleKey} className="sidebar-section">
             {!collapsed && (
-              <div className="sidebar-section-title">{section.title}</div>
+              <div className="sidebar-section-title">{t(section.titleKey)}</div>
             )}
             {section.items.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -95,10 +99,10 @@ export default function Sidebar() {
                   <Link
                     href={item.href}
                     className={`sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
-                    title={collapsed ? item.label : undefined}
+                    title={collapsed ? t(item.labelKey) : undefined}
                   >
                     <span className="sidebar-link-icon">{item.icon}</span>
-                    {!collapsed && <span className="sidebar-link-label">{item.label}</span>}
+                    {!collapsed && <span className="sidebar-link-label">{t(item.labelKey)}</span>}
                   </Link>
                   {!collapsed && item.children && item.children.length > 0 && (
                     <div className="sidebar-children">
@@ -110,7 +114,7 @@ export default function Sidebar() {
                             href={child.href}
                             className={`sidebar-link sidebar-child-link ${isChildActive ? "sidebar-link-active" : ""}`}
                           >
-                            {child.label}
+                            {t(child.labelKey)}
                           </Link>
                         );
                       })}
@@ -135,6 +139,7 @@ export default function Sidebar() {
             </div>
           )}
         </div>
+        {!collapsed && <LanguageSwitcher />}
         <button
           onClick={handleLogout}
           className="sidebar-logout"

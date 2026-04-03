@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 
 export default function ErrorPanel({
   error,
@@ -9,6 +10,8 @@ export default function ErrorPanel({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useTranslations("errors");
+
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -17,7 +20,7 @@ export default function ErrorPanel({
     <div className="error-shell">
       <div className="error-panel">
         <h2>Failed to load executions</h2>
-        <p>Could not reach the API. Check that the backend is running on port 8080.</p>
+        <p>{t("network")}</p>
         <button onClick={reset} className="btn-retry">
           Try again
         </button>

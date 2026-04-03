@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { runTaskEvaluation, Task } from "../lib/api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   tasks: Task[];
@@ -10,6 +11,8 @@ type Props = {
 };
 
 export default function RunEvaluationForm({ tasks, onCreated }: Props) {
+  const t = useTranslations("evaluations");
+  const te = useTranslations("errors");
   const router = useRouter();
   const [taskId, setTaskId] = useState("");
   const [agentId, setAgentId] = useState("");
@@ -27,7 +30,7 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
       try {
         parsedInput = JSON.parse(input);
       } catch {
-        setError("Input must be valid JSON");
+        setError(te("inputInvalid"));
         setLoading(false);
         return;
       }
@@ -54,22 +57,22 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
   return (
     <form onSubmit={handleSubmit} className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">Evaluation Engine</p>
-        <h2>Run evaluation</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("runEvaluation")}</h2>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">
         <label className="form-label">
-          Task
+          {t("taskOverview").split("(")[0].trim()}
           <select
             value={taskId}
             onChange={(e) => setTaskId(e.target.value)}
             required
             className="form-select"
           >
-            <option value="">Select a task...</option>
+            <option value="">{t("select").split("...")[0]}...</option>
             {tasks.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -79,19 +82,19 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
         </label>
 
         <label className="form-label">
-          Agent ID
+          {t("agentId")}
           <input
             type="text"
             value={agentId}
             onChange={(e) => setAgentId(e.target.value)}
-            placeholder="e.g. agent-v1"
+            placeholder={t("agentIdPlaceholder")}
             required
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Input (JSON)
+          {t("input").split("(")[0].trim()}
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -103,7 +106,7 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
       </div>
 
       <button type="submit" disabled={loading} className="form-submit">
-        {loading ? "Running..." : "Run evaluation"}
+        {loading ? t("running") : t("run")}
       </button>
     </form>
   );

@@ -2,12 +2,14 @@
 
 import { useState, FormEvent } from "react";
 import { createSEHPolicy } from "../lib/seh-api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   onCreated?: () => void;
 };
 
 export default function CreatePolicyForm({ onCreated }: Props) {
+  const t = useTranslations("seh");
   const [name, setName] = useState("");
   const [requireProvenance, setRequireProvenance] = useState(false);
   const [requireApprovedForScore, setRequireApprovedForScore] = useState(false);
@@ -45,20 +47,20 @@ export default function CreatePolicyForm({ onCreated }: Props) {
   return (
     <form onSubmit={handleSubmit} className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">SEH Module</p>
-        <h2>Create governance policy</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("createPolicy")}</h2>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">
         <label className="form-label">
-          Policy name
+          {t("policyName")}
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. strict_release_policy"
+            placeholder={t("policyNamePlaceholder")}
             required
             className="form-input"
           />
@@ -71,7 +73,7 @@ export default function CreatePolicyForm({ onCreated }: Props) {
               checked={requireProvenance}
               onChange={(e) => setRequireProvenance(e.target.checked)}
             />
-            Require provenance
+            {t("requireProvenance")}
           </label>
 
           <label className="checkbox-label">
@@ -80,13 +82,13 @@ export default function CreatePolicyForm({ onCreated }: Props) {
               checked={requireApprovedForScore}
               onChange={(e) => setRequireApprovedForScore(e.target.checked)}
             />
-            Require approved for score
+            {t("requireApprovedForScore")}
           </label>
         </div>
 
         <div className="form-row">
           <label className="form-label">
-            Min source diversity
+            {t("minSourceDiversity")}
             <input
               type="number"
               value={minSourceDiversity}
@@ -97,7 +99,7 @@ export default function CreatePolicyForm({ onCreated }: Props) {
           </label>
 
           <label className="form-label">
-            Min golden weight
+            {t("minGoldenWeight")}
             <input
               type="number"
               value={minGoldenWeight}
@@ -112,7 +114,7 @@ export default function CreatePolicyForm({ onCreated }: Props) {
       </div>
 
       <button type="submit" disabled={loading} className="form-submit">
-        {loading ? "Creating..." : "Create policy"}
+        {loading ? t("creating") : t("createPolicy")}
       </button>
     </form>
   );

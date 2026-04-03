@@ -1,13 +1,17 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { createSEHDataset } from "../lib/seh-api";
+import { useTranslations } from "next-intl";
 
 type Props = {
   onCreated?: () => void;
 };
 
 export default function CreateDatasetForm({ onCreated }: Props) {
+  const t = useTranslations("seh");
+  const router = useRouter();
   const [name, setName] = useState("");
   const [version, setVersion] = useState("");
   const [owner, setOwner] = useState("");
@@ -27,6 +31,7 @@ export default function CreateDatasetForm({ onCreated }: Props) {
       setOwner("");
       setDescription("");
       onCreated?.();
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create dataset");
     } finally {
@@ -37,55 +42,55 @@ export default function CreateDatasetForm({ onCreated }: Props) {
   return (
     <form onSubmit={handleSubmit} className="form-panel">
       <div className="panel-header">
-        <p className="section-kicker">SEH Module</p>
-        <h2>Create dataset</h2>
+        <p className="section-kicker">{t("eyebrow")}</p>
+        <h2>{t("createDataset")}</h2>
       </div>
 
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">
         <label className="form-label">
-          Dataset name
+          {t("datasetName")}
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. production_errors_2026"
+            placeholder={t("datasetNamePlaceholder")}
             required
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Version
+          {t("datasetVersion")}
           <input
             type="text"
             value={version}
             onChange={(e) => setVersion(e.target.value)}
-            placeholder="e.g. 1.0.0"
+            placeholder={t("datasetVersionPlaceholder")}
             required
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Owner
+          {t("datasetOwner")}
           <input
             type="text"
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
-            placeholder="e.g. qa_team"
+            placeholder={t("datasetOwnerPlaceholder")}
             required
             className="form-input"
           />
         </label>
 
         <label className="form-label">
-          Description
+          {t("datasetDescription")}
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Dataset description..."
+            placeholder={t("datasetDescriptionPlaceholder")}
             rows={2}
             className="form-textarea"
           />
@@ -93,7 +98,7 @@ export default function CreateDatasetForm({ onCreated }: Props) {
       </div>
 
       <button type="submit" disabled={loading} className="form-submit">
-        {loading ? "Creating..." : "Create dataset"}
+        {loading ? t("creating") : t("createDataset")}
       </button>
     </form>
   );
