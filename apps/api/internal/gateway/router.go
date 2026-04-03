@@ -34,6 +34,7 @@ type Server struct {
 	usageRecorder       UsageRecorder
 	providerKeyResolver ProviderKeyResolver
 	router              LLMRouter
+	budgetChecker       BudgetChecker
 }
 
 func New(addr string, opts ...Option) *Server {
