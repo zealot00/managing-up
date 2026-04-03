@@ -14,18 +14,34 @@ import (
 
 const defaultMaxTurns = 10
 
-// LLMAgent implements the engine.Agent interface using an LLM client.
 type LLMAgent struct {
-	client   llm.Client
-	registry *engine.ToolRegistry
-	maxTurns int
+	client    llm.Client
+	registry  *engine.ToolRegistry
+	maxTurns  int
+	tokenizer engine.Tokenizer
+	truncator *engine.ContextTruncator
 }
 
 func NewLLMAgent(client llm.Client, registry *engine.ToolRegistry) *LLMAgent {
+	tokenizer := engine.NewNoOpTokenizer()
+	truncator := engine.NewContextTruncator(tokenizer, engine.MaxContextTokens)
 	return &LLMAgent{
-		client:   client,
-		registry: registry,
-		maxTurns: defaultMaxTurns,
+		client:    client,
+		registry:  registry,
+		maxTurns:  defaultMaxTurns,
+		tokenizer: tokenizer,
+		truncator: truncator,
+	}
+}
+
+func NewLLMAgentWithConfig(client llm.Client, registry *engine.ToolRegistry, tokenizer engine.Tokenizer, maxTokens int) *LLMAgent {
+	truncator := engine.NewContextTruncator(tokenizer, maxTokens)
+	return &LLMAgent{
+		client:    client,
+		registry:  registry,
+		maxTurns:  defaultMaxTurns,
+		tokenizer: tokenizer,
+		truncator: truncator,
 	}
 }
 
@@ -39,6 +55,16 @@ func (a *LLMAgent) Run(ctx context.Context, task server.Task, tools []engine.Too
 
 	// Build initial messages
 	messages := a.buildMessages(task, systemPrompt)
+
+	// Check context size and truncate if needed
+	messages, truncated, err := a.truncator.TruncateIfNeeded(messages)
+	if err != nil {
+		return &engine.ExecutionResult{
+			Status:   engine.StatusFailed,
+			Duration: time.Since(start),
+		}, fmt.Errorf("context truncation failed: %w", err)
+	}
+	_ = truncated
 
 	// Convert to llm messages
 	llmMessages := a.toLLMMessages(messages)
