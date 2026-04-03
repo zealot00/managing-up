@@ -1,12 +1,27 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
 )
 
-type RateLimiter struct {
+// RateLimiter defines the interface for rate limiting operations
+type RateLimiter interface {
+	Allow(ctx context.Context, key string) (bool, error)
+	Remaining(ctx context.Context, key string) (int, error)
+	ResetAt(ctx context.Context, key string) (time.Time, error)
+	Reset(ctx context.Context, key string) error
+}
+
+// RateLimiterFactory creates rate limiters
+type RateLimiterFactory interface {
+	Create(keyPrefix string, limit int, window time.Duration) RateLimiter
+}
+
+// InMemoryRateLimiter is an in-memory implementation of RateLimiter
+type InMemoryRateLimiter struct {
 	mu       sync.RWMutex
 	counters map[string]*rateCounter
 	limit    int
@@ -18,17 +33,22 @@ type rateCounter struct {
 	resetAt time.Time
 }
 
-func NewRateLimiter(requestsPerMinute int) *RateLimiter {
-	rl := &RateLimiter{
+func newRateLimiter(limit int, window time.Duration) *InMemoryRateLimiter {
+	rl := &InMemoryRateLimiter{
 		counters: make(map[string]*rateCounter),
-		limit:    requestsPerMinute,
-		window:   time.Minute,
+		limit:    limit,
+		window:   window,
 	}
 	go rl.cleanup()
 	return rl
 }
 
-func (rl *RateLimiter) Allow(key string) bool {
+// NewRateLimiter creates a new in-memory rate limiter (for backward compatibility)
+func NewRateLimiter(requestsPerMinute int) *InMemoryRateLimiter {
+	return newRateLimiter(requestsPerMinute, time.Minute)
+}
+
+func (rl *InMemoryRateLimiter) Allow(ctx context.Context, key string) (bool, error) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
@@ -40,18 +60,18 @@ func (rl *RateLimiter) Allow(key string) bool {
 			count:   1,
 			resetAt: now.Add(rl.window),
 		}
-		return true
+		return true, nil
 	}
 
 	if counter.count >= rl.limit {
-		return false
+		return false, nil
 	}
 
 	counter.count++
-	return true
+	return true, nil
 }
 
-func (rl *RateLimiter) Remaining(key string) int {
+func (rl *InMemoryRateLimiter) Remaining(ctx context.Context, key string) (int, error) {
 	rl.mu.RLock()
 	defer rl.mu.RUnlock()
 
@@ -59,28 +79,36 @@ func (rl *RateLimiter) Remaining(key string) int {
 	counter, exists := rl.counters[key]
 
 	if !exists || now.After(counter.resetAt) {
-		return rl.limit
+		return rl.limit, nil
 	}
 
 	remaining := rl.limit - counter.count
 	if remaining < 0 {
-		return 0
+		return 0, nil
 	}
-	return remaining
+	return remaining, nil
 }
 
-func (rl *RateLimiter) ResetAt(key string) time.Time {
+func (rl *InMemoryRateLimiter) ResetAt(ctx context.Context, key string) (time.Time, error) {
 	rl.mu.RLock()
 	defer rl.mu.RUnlock()
 
 	counter, exists := rl.counters[key]
 	if !exists {
-		return time.Time{}
+		return time.Time{}, nil
 	}
-	return counter.resetAt
+	return counter.resetAt, nil
 }
 
-func (rl *RateLimiter) cleanup() {
+func (rl *InMemoryRateLimiter) Reset(ctx context.Context, key string) error {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	delete(rl.counters, key)
+	return nil
+}
+
+func (rl *InMemoryRateLimiter) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
@@ -96,7 +124,14 @@ func (rl *RateLimiter) cleanup() {
 	}
 }
 
-func RateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.Handler {
+// InMemoryRateLimiterFactory creates in-memory rate limiters
+type InMemoryRateLimiterFactory struct{}
+
+func (f *InMemoryRateLimiterFactory) Create(keyPrefix string, limit int, window time.Duration) RateLimiter {
+	return newRateLimiter(limit, window)
+}
+
+func RateLimitMiddleware(limiter RateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		principal := GetPrincipalFromContext(r.Context())
 		if principal == nil {
@@ -105,8 +140,13 @@ func RateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.Handler {
 		}
 
 		key := principal.APIKeyID
-		if !limiter.Allow(key) {
-			resetAt := limiter.ResetAt(key)
+		allowed, err := limiter.Allow(r.Context(), key)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "rate_limit_error", "Rate limit check failed.")
+			return
+		}
+		if !allowed {
+			resetAt, _ := limiter.ResetAt(r.Context(), key)
 			w.Header().Set("X-RateLimit-Limit", "60")
 			w.Header().Set("X-RateLimit-Remaining", "0")
 			w.Header().Set("X-RateLimit-Reset", resetAt.Format(time.RFC3339))
@@ -115,8 +155,8 @@ func RateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.Handler {
 			return
 		}
 
-		remaining := limiter.Remaining(key)
-		resetAt := limiter.ResetAt(key)
+		remaining, _ := limiter.Remaining(r.Context(), key)
+		resetAt, _ := limiter.ResetAt(r.Context(), key)
 		w.Header().Set("X-RateLimit-Limit", "60")
 		w.Header().Set("X-RateLimit-Remaining", string(rune(remaining+'0')))
 		if !resetAt.IsZero() {

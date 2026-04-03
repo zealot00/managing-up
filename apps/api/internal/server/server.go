@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/zealot/managing-up/apps/api/internal/config"
 	"github.com/zealot/managing-up/apps/api/internal/gateway"
 	"github.com/zealot/managing-up/apps/api/internal/orchestrator"
@@ -512,7 +513,7 @@ type Server struct {
 	taskSvc        *service.TaskService
 	experimentSvc  *service.ExperimentService
 	gatewayServer  *gateway.Server
-	gatewayLimiter *gateway.RateLimiter
+	gatewayLimiter gateway.RateLimiter
 	orchestrator   *orchestrator.Server
 	sehServer      *seh.Server
 	authHandler    *handlers.AuthHandler
@@ -541,7 +542,14 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	gatewayValidator := gatewayAPIKeyValidator{repo: repo}
 	gatewayRecorder := gatewayUsageRecorder{repo: repo}
 	gatewayProviderKeyResolver := buildProviderKeyResolverFromEnv()
-	gatewayLimiter := gateway.NewRateLimiter(60)
+	var gatewayLimiterFactory gateway.RateLimiterFactory
+	if os.Getenv("REDIS_URL") != "" {
+		redisClient := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_URL")})
+		gatewayLimiterFactory = &gateway.RedisRateLimiterFactory{Client: redisClient}
+	} else {
+		gatewayLimiterFactory = &gateway.InMemoryRateLimiterFactory{}
+	}
+	gatewayLimiter := gatewayLimiterFactory.Create("gateway", 60, time.Minute)
 	srv := &Server{
 		repo:          repo,
 		closeFn:       closeFn,
