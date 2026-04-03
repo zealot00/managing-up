@@ -145,11 +145,16 @@ func isPublicEndpoint(path string) bool {
 	publicPaths := []string{
 		"/v1/healthz",
 		"/v1/models",
+		"/v1/skills",
 	}
 	for _, p := range publicPaths {
 		if path == p {
 			return true
 		}
+	}
+	// Also allow public access to skill detail and version listing paths
+	if strings.HasPrefix(path, "/v1/skills/") && !strings.Contains(path, "/promote") && !strings.Contains(path, "/rollback") {
+		return true
 	}
 	return false
 }

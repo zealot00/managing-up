@@ -65,7 +65,7 @@ async function ExecutionsContent() {
                   </p>
                 </div>
                 <div className="list-card-actions">
-                  <a href={`/executions/${execution.id}/traces`} className="trace-link">
+                  <a href={`/executions/${execution.id}`} className="trace-link">
                     View trace →
                   </a>
                   <span className={`badge badge-${execution.status}`}>{execution.status}</span>

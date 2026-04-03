@@ -1,6 +1,7 @@
 import { Suspense } from "react";
-import { getTasks } from "../lib/api";
-import type { Task } from "../lib/api";
+import { getTasks, getSkills } from "../lib/api";
+import type { Skill } from "../lib/api";
+import TaskManagerClient from "../components/TaskManagerClient";
 
 function SkeletonTasks() {
   return (
@@ -21,39 +22,14 @@ function SkeletonTasks() {
   );
 }
 
-function TaskCard({ task }: { task: Task }) {
-  return (
-    <article className="eval-card">
-      <div className="eval-card-header">
-        <div>
-          <h3 className="eval-card-title">{task.name}</h3>
-          <p className="eval-card-meta">{task.description || "No description"}</p>
-        </div>
-        <span className={`badge badge-${task.difficulty === "easy" ? "succeeded" : task.difficulty === "medium" ? "running" : "failed"}`}>
-          {task.difficulty}
-        </span>
-      </div>
-      <div className="tags">
-        {task.tags.map((tag) => (
-          <span key={tag} className="tag">{tag}</span>
-        ))}
-      </div>
-      <div className="eval-card-footer">
-        <span>{task.test_cases.length} test cases</span>
-        {task.skill_id && <span>Linked to skill</span>}
-      </div>
-    </article>
-  );
-}
-
 async function TasksContent() {
-  let tasks: { items: Task[] } | null = null;
+  const [tasksResp, skillsResp] = await Promise.all([
+    getTasks().catch(() => null),
+    getSkills().catch(() => ({ items: [] as Skill[] })),
+  ]);
 
-  try {
-    tasks = await getTasks();
-  } catch {
-    tasks = null;
-  }
+  const tasks = tasksResp?.items ?? [];
+  const skills = skillsResp?.items ?? [];
 
   return (
     <main className="shell">
@@ -65,23 +41,7 @@ async function TasksContent() {
         </p>
       </header>
 
-      <section aria-label="Task list">
-        {(tasks?.items ?? []).length > 0 ? (
-          <div className="eval-grid">
-            {tasks?.items.map((task) => (
-              <TaskCard key={task.id} task={task} />
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon">◎</div>
-            <h3 className="empty-state-title">No tasks yet</h3>
-            <p className="empty-state-description">
-              Tasks will appear here once created via the API. Use POST /api/v1/tasks to create evaluation tasks.
-            </p>
-          </div>
-        )}
-      </section>
+      <TaskManagerClient tasks={tasks} skills={skills} />
     </main>
   );
 }

@@ -165,6 +165,9 @@ npm run dev
 | `LLM_BASE_URL` | LLM API 地址 | `http://localhost:11434` |
 | `LLM_API_KEY` | LLM API Key | - |
 | `NEXT_PUBLIC_API_BASE_URL` | 前端 API 地址 | `http://localhost:8080` |
+| `ORCHESTRATOR_SKIP_AUTH` | 临时绕过 Orchestrator JWT 认证（开发模式） | `false` |
+| `ORCHESTRATOR_JWT_SECRET` | Orchestrator JWT 密钥 | - |
+| `ORCHESTRATOR_JWT_ISSUER` | Orchestrator JWT 签发者 | - |
 
 ---
 
@@ -348,8 +351,13 @@ CLI 编排 API，用于远程增强提取、Skill 版本管理、测试编排和
 | GET | `/v1/runs/{runId}/artifacts` | List artifacts |
 | POST | `/v1/extraction/enhance` | Enhanced extraction |
 | POST | `/v1/extraction/compare` | Compare extractions |
+| GET | `/v1/skills` | List skills |
 | POST | `/v1/skills` | Create skill |
+| GET | `/v1/skills/{id}` | Get skill detail |
 | GET | `/v1/skills/{id}/versions` | List versions |
+| POST | `/v1/skills/{id}/versions` | Create version |
+| GET | `/v1/skills/{id}/diff` | Diff versions |
+| POST | `/v1/skills/{id}/rollback` | Rollback version |
 | POST | `/v1/skills/{id}/promote` | Promote version |
 | POST | `/v1/tests/runs` | Create test run |
 | POST | `/v1/gates/evaluate` | Evaluate gate |

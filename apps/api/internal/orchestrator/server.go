@@ -154,6 +154,19 @@ func (s *Server) HandleCompareExtraction(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) HandleOrchestratorSkills(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
+	case http.MethodGet:
+		skills, err := s.svc.repo.ListSkills()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", fmt.Sprintf("failed to list skills: %v", err))
+			return
+		}
+		if skills == nil {
+			skills = []Skill{}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"items": skills,
+			"total": len(skills),
+		})
 	case http.MethodPost:
 		idempKey := getIdempotencyKey(r)
 		if idempKey != "" && s.svc.idempStore != nil {

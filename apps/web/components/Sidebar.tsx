@@ -25,7 +25,7 @@ const navSections: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/skills", label: "Skills", icon: "◈" },
       { href: "/executions", label: "Executions", icon: "▸" },
-      { href: "/tasks", label: "Tasks", icon: "◉" },
+      { href: "/tasks", label: "Tasks", icon: "◉", children: [{ href: "/tasks/from-trace", label: "Task Builder" }] },
       { href: "/evaluations", label: "Evaluations", icon: "◎" },
       { href: "/experiments", label: "Experiments", icon: "◇" },
     ],
@@ -91,15 +91,32 @@ export default function Sidebar() {
             {section.items.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
-                  title={collapsed ? item.label : undefined}
-                >
-                  <span className="sidebar-link-icon">{item.icon}</span>
-                  {!collapsed && <span className="sidebar-link-label">{item.label}</span>}
-                </Link>
+                <div key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <span className="sidebar-link-icon">{item.icon}</span>
+                    {!collapsed && <span className="sidebar-link-label">{item.label}</span>}
+                  </Link>
+                  {!collapsed && item.children && item.children.length > 0 && (
+                    <div className="sidebar-children">
+                      {item.children.map((child) => {
+                        const isChildActive = pathname === child.href;
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={`sidebar-link sidebar-child-link ${isChildActive ? "sidebar-link-active" : ""}`}
+                          >
+                            {child.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

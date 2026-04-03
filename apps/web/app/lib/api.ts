@@ -435,3 +435,22 @@ export async function getCapabilities(): Promise<{ data: CapabilityGraphNode[] }
 export async function getCapability(name: string): Promise<CapabilityGraphNode> {
   return readEnvelope<CapabilityGraphNode>(`/api/v1/capabilities/${name}`);
 }
+
+// Experiment API
+export async function runExperiment(id: string): Promise<{ status: string; message: string }> {
+  return postEnvelope<Record<string, never>, { status: string; message: string }>(`/api/v1/experiments/${id}/run`, {});
+}
+
+export async function compareExperiments(id: string, compareWithId: string): Promise<{ experiment: string; compare_with: string; deltas: Array<{ task_id: string; exp_score: number; other_score: number; delta: number }>; regression: boolean }> {
+  return readEnvelope<{ experiment: string; compare_with: string; deltas: Array<{ task_id: string; exp_score: number; other_score: number; delta: number }>; regression: boolean }>(`/api/v1/experiments/${id}/compare?compare_with=${compareWithId}`);
+}
+
+export type CheckRegressionRequest = {
+  current_score: number;
+  baseline_score: number;
+  threshold?: number;
+};
+
+export async function checkRegression(req: CheckRegressionRequest): Promise<{ current_score: number; baseline_score: number; delta: number; regression: boolean }> {
+  return postEnvelope<CheckRegressionRequest, { current_score: number; baseline_score: number; delta: number; regression: boolean }>("/api/v1/check-regression", req);
+}
