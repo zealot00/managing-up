@@ -118,24 +118,28 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve upstream provider key:
-	// - OpenRouter-like mode: use server-side provider keys
-	// - fallback mode: passthrough user-provided key
-	upstreamAPIKey := apiKey
-	if s.providerKeyResolver != nil {
-		if resolved := s.providerKeyResolver.KeyFor(provider); resolved != "" {
-			upstreamAPIKey = resolved
+	var resp *llm.Response
+	err = error(nil)
+
+	if s.router != nil {
+		resp, err = GenerateWithRouterRetry(r.Context(), s.router, messages, opts, DefaultRetryConfig())
+	} else {
+		upstreamAPIKey := apiKey
+		if s.providerKeyResolver != nil {
+			if resolved := s.providerKeyResolver.KeyFor(provider); resolved != "" {
+				upstreamAPIKey = resolved
+			}
 		}
+
+		llmClient, createErr := llm.NewClient(provider, model, upstreamAPIKey)
+		if createErr != nil {
+			writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", createErr))
+			return
+		}
+
+		resp, err = GenerateWithRetry(r.Context(), llmClient, messages, opts, DefaultRetryConfig())
 	}
 
-	// Create LLM client
-	llmClient, err := llm.NewClient(provider, model, upstreamAPIKey)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", err))
-		return
-	}
-
-	resp, err := GenerateWithRetry(r.Context(), llmClient, messages, opts, DefaultRetryConfig())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "generation_failed", fmt.Sprintf("LLM generation failed: %v", err))
 		return

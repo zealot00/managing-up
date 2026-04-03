@@ -57,3 +57,9 @@ func WithProviderKeyResolver(r ProviderKeyResolver) Option {
 		s.providerKeyResolver = r
 	}
 }
+
+func WithRouter(r LLMRouter) Option {
+	return func(s *Server) {
+		s.router = r
+	}
+}

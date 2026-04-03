@@ -33,6 +33,7 @@ type Server struct {
 	apiKeyValidator     APIKeyValidator
 	usageRecorder       UsageRecorder
 	providerKeyResolver ProviderKeyResolver
+	router              LLMRouter
 }
 
 func New(addr string, opts ...Option) *Server {
