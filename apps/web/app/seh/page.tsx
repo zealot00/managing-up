@@ -5,10 +5,33 @@ import SEHManager from "../components/SEHManager";
 
 async function SEHDashboardContent() {
   const t = await getTranslations("seh");
-  const summary = await getSEHDashboardSummary();
-  const datasets = await getSEHDatasets(50, 0);
-  const runs = await getSEHRuns(50, 0);
-  const policies = await getSEHPolicies();
+  const tc = await getTranslations("common");
+
+  const results = await Promise.allSettled([
+    getSEHDashboardSummary(),
+    getSEHDatasets(50, 0),
+    getSEHRuns(50, 0),
+    getSEHPolicies(),
+  ]);
+
+  const [summaryResult, datasetsResult, runsResult, policiesResult] = results;
+  const hasError = results.some(r => r.status === "rejected");
+
+  const summary = summaryResult.status === "fulfilled"
+    ? summaryResult.value
+    : { total_datasets: 0, total_runs: 0, total_policies: 0, total_cases: 0, recent_runs: [], avg_score: 0, avg_success_rate: 0 };
+
+  const datasets = datasetsResult.status === "fulfilled"
+    ? datasetsResult.value.datasets
+    : [];
+
+  const runs = runsResult.status === "fulfilled"
+    ? runsResult.value.runs
+    : [];
+
+  const policies = policiesResult.status === "fulfilled"
+    ? policiesResult.value.map(p => ({ ...p, source_policies: p.source_policies ?? undefined }))
+    : [];
 
   return (
     <main className="shell">
@@ -20,10 +43,18 @@ async function SEHDashboardContent() {
         </p>
       </header>
 
+      {hasError && (
+        <div className="alert-bar alert-bar-warning">
+          <span className="alert-bar-icon">⚠</span>
+          <span className="alert-bar-text">{t("apiUnavailable")}</span>
+          <span className="alert-bar-desc">{t("apiUnavailableDesc")}</span>
+        </div>
+      )}
+
       <SEHManager
         summary={summary}
-        datasets={datasets.datasets}
-        runs={runs.runs}
+        datasets={datasets}
+        runs={runs}
         policies={policies}
       />
     </main>
