@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ type CircuitBreaker interface {
 	Allow(ctx context.Context, key string) (bool, error)
 	RecordSuccess(ctx context.Context, key string) error
 	RecordFailure(ctx context.Context, key string) error
+	Reset(ctx context.Context, key string) error
 }
 
 // inMemoryCircuitBreaker implements CircuitBreaker in memory
@@ -133,6 +135,17 @@ func (cb *inMemoryCircuitBreaker) Reset(ctx context.Context, key string) error {
 	return nil
 }
 
+func (cb *inMemoryCircuitBreaker) State(ctx context.Context, key string) (CircuitBreakerState, error) {
+	cb.mu.RLock()
+	defer cb.mu.RUnlock()
+
+	state, exists := cb.states[key]
+	if !exists {
+		return CircuitBreakerClosed, nil
+	}
+	return state.state, nil
+}
+
 // ToolGateway handles tool invocations with circuit breaker support
 type ToolGateway struct {
 	httpClient     *http.Client
@@ -157,4 +170,27 @@ func NewToolGatewayWithCircuitBreaker(cb CircuitBreaker) *ToolGateway {
 		httpClient:     &http.Client{Timeout: 30 * time.Second},
 		circuitBreaker: cb,
 	}
+}
+
+// Invoke executes a tool invocation with circuit breaker protection
+func (gw *ToolGateway) Invoke(ctx context.Context, toolRef string) error {
+	allowed, err := gw.circuitBreaker.Allow(ctx, toolRef)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		gw.circuitBreaker.RecordFailure(ctx, toolRef)
+		return fmt.Errorf("circuit breaker open for tool: %s", toolRef)
+	}
+
+	// Simulate tool execution - in real implementation, would call actual tool
+	select {
+	case <-ctx.Done():
+		gw.circuitBreaker.RecordFailure(ctx, toolRef)
+		return ctx.Err()
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	gw.circuitBreaker.RecordSuccess(ctx, toolRef)
+	return nil
 }
