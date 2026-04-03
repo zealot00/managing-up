@@ -13,7 +13,6 @@ import (
 type ProviderConfig struct {
 	Provider llm.Provider
 	Client   llm.Client
-	Weight   int // For load balancing (future use)
 	Priority int // Lower = preferred
 }
 
