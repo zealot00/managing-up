@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { createSEHPolicy } from "../lib/seh-api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   onCreated?: () => void;
@@ -10,6 +11,8 @@ type Props = {
 
 export default function CreatePolicyForm({ onCreated }: Props) {
   const t = useTranslations("seh");
+  const tc = useTranslations("common");
+  const toast = useToast();
   const [name, setName] = useState("");
   const [requireProvenance, setRequireProvenance] = useState(false);
   const [requireApprovedForScore, setRequireApprovedForScore] = useState(false);
@@ -36,6 +39,7 @@ export default function CreatePolicyForm({ onCreated }: Props) {
       setRequireApprovedForScore(false);
       setMinSourceDiversity(2);
       setMinGoldenWeight(0.5);
+      toast.success(tc("success") + ": Policy created");
       onCreated?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create policy");

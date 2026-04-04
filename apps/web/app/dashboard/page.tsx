@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { getDashboard } from "../lib/api";
+import { Package, Play, ClipboardCheck, CheckCircle } from "lucide-react";
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) {
@@ -42,10 +43,10 @@ async function DashboardContent() {
   const recentExecutions = dashboard.recent_executions.slice(0, 6);
 
   const metrics = [
-    { label: t("totalSkills"), value: summary.active_skills, icon: "◉" },
-    { label: t("activeExecutions"), value: summary.running_executions, icon: "▸" },
-    { label: t("pendingApprovals"), value: summary.waiting_approvals, icon: "◐" },
-    { label: t("avgSkillScore"), value: `${Math.round(summary.success_rate * 100)}%`, icon: "✓" },
+    { label: t("totalSkills"), value: summary.active_skills, icon: <Package size={20} aria-hidden="true" /> },
+    { label: t("activeExecutions"), value: summary.running_executions, icon: <Play size={20} aria-hidden="true" /> },
+    { label: t("pendingApprovals"), value: summary.waiting_approvals, icon: <ClipboardCheck size={20} aria-hidden="true" /> },
+    { label: t("avgSkillScore"), value: `${Math.round(summary.success_rate * 100)}%`, icon: <CheckCircle size={20} aria-hidden="true" /> },
   ];
 
   return (

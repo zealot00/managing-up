@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { updateTask, getSkills, Skill, Task } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   task: Task;
@@ -17,6 +18,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
   const tc = useTranslations("common");
   const te = useTranslations("errors");
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = useState(task.name);
   const [description, setDescription] = useState(task.description);
   const [skillId, setSkillId] = useState(task.skill_id);
@@ -51,6 +53,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
         difficulty,
         test_cases: parsedTestCases,
       });
+      toast.success(tc("success") + ": Task updated");
       onUpdated();
       router.refresh();
     } catch (err) {

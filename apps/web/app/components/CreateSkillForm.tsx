@@ -4,10 +4,13 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSkill } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 export default function CreateSkillForm() {
   const t = useTranslations("skills");
+  const tc = useTranslations("common");
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [ownerTeam, setOwnerTeam] = useState("");
   const [riskLevel, setRiskLevel] = useState("medium");
@@ -24,6 +27,7 @@ export default function CreateSkillForm() {
       setName("");
       setOwnerTeam("");
       setRiskLevel("medium");
+      toast.success(tc("success") + ": Skill created");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create skill");

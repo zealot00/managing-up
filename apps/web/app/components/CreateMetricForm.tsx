@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createMetric } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   onCreated?: () => void;
@@ -11,8 +12,10 @@ type Props = {
 
 export default function CreateMetricForm({ onCreated }: Props) {
   const t = useTranslations("evaluations");
+  const tc = useTranslations("common");
   const te = useTranslations("errors");
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [type, setType] = useState("exact_match");
   const [config, setConfig] = useState("");
@@ -44,6 +47,7 @@ export default function CreateMetricForm({ onCreated }: Props) {
       setName("");
       setType("exact_match");
       setConfig("");
+      toast.success(tc("success") + ": Metric created");
       onCreated?.();
       router.refresh();
     } catch (err) {

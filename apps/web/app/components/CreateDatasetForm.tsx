@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSEHDataset } from "../lib/seh-api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   onCreated?: () => void;
@@ -11,7 +12,9 @@ type Props = {
 
 export default function CreateDatasetForm({ onCreated }: Props) {
   const t = useTranslations("seh");
+  const tc = useTranslations("common");
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [version, setVersion] = useState("");
   const [owner, setOwner] = useState("");
@@ -30,6 +33,7 @@ export default function CreateDatasetForm({ onCreated }: Props) {
       setVersion("");
       setOwner("");
       setDescription("");
+      toast.success(tc("success") + ": Dataset created");
       onCreated?.();
       router.refresh();
     } catch (err) {

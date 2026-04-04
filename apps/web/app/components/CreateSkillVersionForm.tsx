@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSkillVersion, Skill } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   skills: Skill[];
@@ -13,6 +14,7 @@ export default function CreateSkillVersionForm({ skills }: Props) {
   const t = useTranslations("skills");
   const tc = useTranslations("common");
   const router = useRouter();
+  const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [skillId, setSkillId] = useState("");
   const [version, setVersion] = useState("");
@@ -41,6 +43,7 @@ export default function CreateSkillVersionForm({ skills }: Props) {
       setApprovalRequired(false);
       setSpecYaml("");
       setIsOpen(false);
+      toast.success(tc("success") + ": Version created");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create skill version");

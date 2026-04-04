@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createExperiment, Task } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   tasks: Task[];
@@ -14,6 +15,7 @@ export default function CreateExperimentForm({ tasks, onCreated }: Props) {
   const t = useTranslations("experiments");
   const tc = useTranslations("common");
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [taskIds, setTaskIds] = useState("");
@@ -37,6 +39,7 @@ export default function CreateExperimentForm({ tasks, onCreated }: Props) {
       setDescription("");
       setTaskIds("");
       setAgentIds("");
+      toast.success(tc("success") + ": Experiment created");
       onCreated?.();
       router.refresh();
     } catch (err) {

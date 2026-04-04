@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { buildTaskFromTrace, type Task } from "../app/lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "./ToastProvider";
 
 interface TaskFromTraceFormProps {
   onTaskCreated?: (task: Task) => void;
@@ -12,6 +13,7 @@ export default function TaskFromTraceForm({ onTaskCreated }: TaskFromTraceFormPr
   const t = useTranslations("tasks");
   const te = useTranslations("errors");
   const tc = useTranslations("common");
+  const toast = useToast();
   const [form, setForm] = useState({
     execution_id: "",
     trace_id: "",
@@ -34,6 +36,7 @@ export default function TaskFromTraceForm({ onTaskCreated }: TaskFromTraceFormPr
     try {
       const task = await buildTaskFromTrace(form);
       setCreatedTask(task);
+      toast.success(tc("success") + ": Task built from trace");
       onTaskCreated?.(task);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to build task from trace");

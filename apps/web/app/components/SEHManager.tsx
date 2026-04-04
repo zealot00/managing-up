@@ -8,6 +8,8 @@ import CreatePolicyForm from "./CreatePolicyForm";
 import EditPolicyForm from "./EditPolicyForm";
 import { useTranslations } from "next-intl";
 import { deleteSEHDataset, createSEHRelease } from "../lib/seh-api";
+import { useToast } from "../../components/ToastProvider";
+import { Database, Play, Target, LayoutDashboard } from "lucide-react";
 
 type Dataset = { dataset_id: string; name: string; version: string; owner: string; case_count: number };
 type Run = { run_id: string; skill: string; dataset_id: string; metrics: { score: number; success_rate: number } };
@@ -24,6 +26,7 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
   const t = useTranslations("seh");
   const tc = useTranslations("common");
   const router = useRouter();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<"datasets" | "runs" | "policies">("datasets");
   const [showCreateDataset, setShowCreateDataset] = useState(false);
   const [showCreatePolicy, setShowCreatePolicy] = useState(false);
@@ -34,10 +37,10 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
   const [expandedCase, setExpandedCase] = useState<string | null>(null);
 
   const metrics = [
-    { label: t("datasets"), value: summary.total_datasets, icon: "□" },
-    { label: t("runs"), value: summary.total_runs, icon: "▶" },
-    { label: t("policies"), value: summary.total_policies, icon: "◎" },
-    { label: t("avgSkillScore"), value: summary.avg_score > 0 ? summary.avg_score.toFixed(2) : "—", icon: "◉" },
+    { label: t("datasets"), value: summary.total_datasets, icon: <Database size={20} aria-hidden="true" /> },
+    { label: t("runs"), value: summary.total_runs, icon: <Play size={20} aria-hidden="true" /> },
+    { label: t("policies"), value: summary.total_policies, icon: <Target size={20} aria-hidden="true" /> },
+    { label: t("avgSkillScore"), value: summary.avg_score > 0 ? summary.avg_score.toFixed(2) : "—", icon: <LayoutDashboard size={20} aria-hidden="true" /> },
   ];
 
   const tabs: { key: "datasets" | "runs" | "policies"; label: string; count: number }[] = [
@@ -81,7 +84,7 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
       await deleteSEHDataset(id);
       router.refresh();
     } catch {
-      alert("Failed to delete dataset");
+      toast.error(tc("failed") + ": Failed to delete dataset");
     } finally {
       setDeletingId(null);
     }
@@ -93,7 +96,7 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
       await createSEHRelease(skillId);
       router.refresh();
     } catch {
-      alert("Failed to create release");
+      toast.error(tc("failed") + ": Failed to create release");
     } finally {
       setReleasingId(null);
     }

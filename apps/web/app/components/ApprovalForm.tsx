@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { approveExecution, Approval } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   approval: Approval;
@@ -11,7 +12,9 @@ type Props = {
 
 export default function ApprovalForm({ approval }: Props) {
   const t = useTranslations("approvals");
+  const tc = useTranslations("common");
   const router = useRouter();
+  const toast = useToast();
   const [approver, setApprover] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,6 +34,7 @@ export default function ApprovalForm({ approval }: Props) {
         decision,
         note,
       });
+      toast.success(tc("success") + ": Decision submitted");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit decision");

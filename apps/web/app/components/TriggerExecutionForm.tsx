@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createExecution, Skill } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   skills: Skill[];
@@ -13,6 +14,7 @@ export default function TriggerExecutionForm({ skills }: Props) {
   const t = useTranslations("executions");
   const tc = useTranslations("common");
   const router = useRouter();
+  const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [skillId, setSkillId] = useState("");
   const [triggeredBy, setTriggeredBy] = useState("");
@@ -46,6 +48,7 @@ export default function TriggerExecutionForm({ skills }: Props) {
       setTriggeredBy("");
       setInput("");
       setIsOpen(false);
+      toast.success(tc("success") + ": Execution triggered");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to trigger execution");

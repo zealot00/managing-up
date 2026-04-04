@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { compareExperiments, Experiment } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   experiments: Experiment[];
@@ -10,7 +11,9 @@ type Props = {
 
 export default function CompareExperimentsForm({ experiments }: Props) {
   const t = useTranslations("experiments");
+  const tc = useTranslations("common");
   const te = useTranslations("errors");
+  const toast = useToast();
   const [expA, setExpA] = useState("");
   const [expB, setExpB] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,6 +42,7 @@ export default function CompareExperimentsForm({ experiments }: Props) {
     try {
       const data = await compareExperiments(expA, expB);
       setResult(data);
+      toast.success(tc("success") + ": Comparison complete");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to compare experiments");
     } finally {

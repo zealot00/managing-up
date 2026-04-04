@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { createSEHPolicy } from "../lib/seh-api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Policy = {
   policy_id: string;
@@ -21,6 +22,8 @@ type Props = {
 
 export default function EditPolicyForm({ policy, onCancel, onUpdated }: Props) {
   const t = useTranslations("seh");
+  const tc = useTranslations("common");
+  const toast = useToast();
   const [name, setName] = useState(policy.name);
   const [requireProvenance, setRequireProvenance] = useState(policy.require_provenance);
   const [requireApprovedForScore, setRequireApprovedForScore] = useState(policy.require_approved_for_score);
@@ -42,6 +45,7 @@ export default function EditPolicyForm({ policy, onCancel, onUpdated }: Props) {
         min_source_diversity: minSourceDiversity,
         min_golden_weight: minGoldenWeight,
       });
+      toast.success(tc("success") + ": Policy updated");
       onUpdated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update policy");

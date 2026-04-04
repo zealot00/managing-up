@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { runTaskEvaluation, Task } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   tasks: Task[];
@@ -12,8 +13,10 @@ type Props = {
 
 export default function RunEvaluationForm({ tasks, onCreated }: Props) {
   const t = useTranslations("evaluations");
+  const tc = useTranslations("common");
   const te = useTranslations("errors");
   const router = useRouter();
+  const toast = useToast();
   const [taskId, setTaskId] = useState("");
   const [agentId, setAgentId] = useState("");
   const [input, setInput] = useState("");
@@ -45,6 +48,7 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
       setTaskId("");
       setAgentId("");
       setInput("");
+      toast.success(tc("success") + ": Evaluation started");
       onCreated?.();
       router.refresh();
     } catch (err) {

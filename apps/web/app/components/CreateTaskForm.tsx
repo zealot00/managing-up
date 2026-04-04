@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createTask, getSkills, Skill } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   skills: Skill[];
@@ -12,8 +13,10 @@ type Props = {
 
 export default function CreateTaskForm({ skills, onCreated }: Props) {
   const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const te = useTranslations("errors");
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [skillId, setSkillId] = useState("");
@@ -54,6 +57,7 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
       setDifficulty("medium");
       setTags("");
       setTestCases("");
+      toast.success(tc("success") + ": Task created");
       onCreated?.();
       router.refresh();
     } catch (err) {
