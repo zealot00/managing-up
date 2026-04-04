@@ -14,6 +14,14 @@ func NewToolRegistry() *ToolRegistry {
 	return &ToolRegistry{tools: make(map[string]Tool)}
 }
 
+func NewToolRegistryWithTools(tools []Tool) *ToolRegistry {
+	r := &ToolRegistry{tools: make(map[string]Tool)}
+	for _, t := range tools {
+		r.tools[t.Name()] = t
+	}
+	return r
+}
+
 func (r *ToolRegistry) Register(t Tool) {
 	r.tools[t.Name()] = t
 }

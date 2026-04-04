@@ -57,6 +57,7 @@ type Repository interface {
 	ListGatewayUsageByUser(userID string, from, to *time.Time) []GatewayUsageAggregate
 	ListGatewayUsageByUsers(from, to *time.Time) []GatewayUserUsageAggregate
 	GetRandomTip() (Tip, bool)
+	ListMCPServers() []MCPServer
 }
 
 // ExecutionRepository extends Repository with methods needed by the runtime engine.
