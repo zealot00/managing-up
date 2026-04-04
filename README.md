@@ -337,6 +337,86 @@ curl http://localhost:8080/api/v1/gateway/usage/users
 
 ---
 
+## MCP Servers (Model Context Protocol)
+
+MCP Server 管理 API，允许 AI Agent 发现和使用外部 MCP 服务器提供的工具。
+
+### MCP 工作流
+
+```
+注册 MCP Server → 审批测试 → 批准上线 → Agent 使用工具
+     ↓               ↓           ↓           ↓
+   pending      validation   approved    tools available
+```
+
+### API 端点
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/mcp-servers` | 列出所有 MCP Server |
+| POST | `/api/v1/mcp-servers` | 注册新 MCP Server |
+| GET | `/api/v1/mcp-servers/{id}` | 获取详情 |
+| PUT | `/api/v1/mcp-servers/{id}` | 更新配置 |
+| DELETE | `/api/v1/mcp-servers/{id}` | 删除 |
+| POST | `/api/v1/mcp-servers/{id}/approve` | 审批/拒绝 |
+
+### 注册 MCP Server
+
+```bash
+# 注册 stdio 传输的 MCP Server
+curl -X POST http://localhost:8080/api/v1/mcp-servers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "filesystem",
+    "description": "File system operations",
+    "transport_type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+  }'
+
+# 注册 HTTP/SSE 传输的 MCP Server
+curl -X POST http://localhost:8080/api/v1/mcp-servers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "remote-api",
+    "description": "Remote HTTP MCP Server",
+    "transport_type": "sse",
+    "url": "https://mcp.example.com/sse"
+  }'
+```
+
+### 审批 MCP Server
+
+```bash
+# 批准 (会自动验证连接)
+curl -X POST http://localhost:8080/api/v1/mcp-servers/{id}/approve \
+  -H "Content-Type: application/json" \
+  -d '{"decision": "approved", "approver": "admin"}'
+
+# 拒绝
+curl -X POST http://localhost:8080/api/v1/mcp-servers/{id}/approve \
+  -H "Content-Type: application/json" \
+  -d '{"decision": "rejected", "approver": "admin", "note": "Security concern: untrusted command"}'
+```
+
+### MCP Server 状态
+
+| Status | 说明 |
+|--------|------|
+| `pending` | 新注册，待审批 |
+| `approved` | 已批准，可使用 |
+| `rejected` | 已拒绝 |
+| `disabled` | 已禁用 |
+
+### 安全特性
+
+- **命令白名单**: stdio 传输仅允许已知安全命令 (npx, node, python, docker, kubectl, gh, git, curl, wget)
+- **参数验证**: 拒绝包含 shell 元字符的参数
+- **Header 验证**: HTTP 传输头不能包含 CRLF 注入
+- **连接验证**: 批准前自动验证 MCP 服务器可访问
+
+---
+
 ## sop-to-skill Orchestrator API
 
 CLI 编排 API，用于远程增强提取、Skill 版本管理、测试编排和门禁评估。
@@ -441,6 +521,7 @@ managing-up/
 │   │   │   │   └── handlers/    # Auth handler
 │   │   │   ├── service/         # Domain logic
 │   │   │   ├── engine/          # Execution engine + trace + replay
+│   │   │   │   └── executors/  # MCP client + registry
 │   │   │   ├── evaluator/       # Evaluators + evaluation runner
 │   │   │   ├── generator/       # LLM skill generator (SOP → YAML)
 │   │   │   ├── gateway/         # LLM Gateway (OpenAI/Anthropic compatible)
@@ -474,6 +555,7 @@ managing-up/
 
 | Feature | Status | Notes |
 |---------|--------|-------|
+| MCP Server Management | ✅ | CRUD + approve workflow + validation |
 | Skill Registry | ✅ | CRUD + version control |
 | Execution Engine | ✅ | State machine with checkpoints |
 | Approval Gate | ✅ | Human-in-the-loop for high-risk ops |
