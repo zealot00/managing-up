@@ -1389,3 +1389,79 @@ func (r *Repository) GetRandomTip() (server.Tip, bool) {
 	}
 	return tip, true
 }
+
+func (r *Repository) ListMCPServers() []server.MCPServer {
+	query := `
+		SELECT id, name, description, transport_type, command, args, env, url, headers,
+		       status, rejection_reason, approved_by, approved_at, is_enabled,
+		       created_at, updated_at
+		FROM mcp_servers
+		WHERE status IN ('pending', 'approved', 'disabled')
+		ORDER BY created_at DESC
+	`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return []server.MCPServer{}
+	}
+	defer rows.Close()
+
+	servers := make([]server.MCPServer, 0)
+	for rows.Next() {
+		var s server.MCPServer
+		var desc, cmd, url, rejectionReason, approvedBy sql.NullString
+		var args, env, headers []byte
+		var approvedAt sql.NullTime
+
+		if err := rows.Scan(
+			&s.ID,
+			&s.Name,
+			&desc,
+			&s.TransportType,
+			&cmd,
+			&args,
+			&env,
+			&url,
+			&headers,
+			&s.Status,
+			&rejectionReason,
+			&approvedBy,
+			&approvedAt,
+			&s.IsEnabled,
+			&s.CreatedAt,
+			&s.UpdatedAt,
+		); err != nil {
+			continue
+		}
+
+		if desc.Valid {
+			s.Description = desc.String
+		}
+		if cmd.Valid {
+			s.Command = cmd.String
+		}
+		if url.Valid {
+			s.URL = url.String
+		}
+		if rejectionReason.Valid {
+			s.RejectionReason = rejectionReason.String
+		}
+		if approvedBy.Valid {
+			s.ApprovedBy = approvedBy.String
+		}
+		if approvedAt.Valid {
+			s.ApprovedAt = &approvedAt.Time
+		}
+		if args != nil {
+			_ = json.Unmarshal(args, &s.Args)
+		}
+		if env != nil {
+			_ = json.Unmarshal(env, &s.Env)
+		}
+		if headers != nil {
+			_ = json.Unmarshal(headers, &s.Headers)
+		}
+
+		servers = append(servers, s)
+	}
+	return servers
+}

@@ -806,3 +806,7 @@ func (s *store) CreateUser(user models.User) error {
 func (s *store) GetRandomTip() (Tip, bool) {
 	return Tip{}, false
 }
+
+func (s *store) ListMCPServers() []MCPServer {
+	return []MCPServer{}
+}
