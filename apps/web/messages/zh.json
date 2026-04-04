@@ -35,7 +35,9 @@
     "type": "类型",
     "id": "ID",
     "getStarted": "开始使用",
-    "viewOnGitHub": "查看 GitHub"
+    "viewOnGitHub": "查看 GitHub",
+    "enable": "启用",
+    "disable": "禁用"
   },
   "landing": {
     "eyebrow": "企业级 AI 质量基础设施",

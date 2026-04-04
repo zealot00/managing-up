@@ -35,7 +35,9 @@
     "type": "Type",
     "id": "ID",
     "getStarted": "Get Started",
-    "viewOnGitHub": "View on GitHub"
+    "viewOnGitHub": "View on GitHub",
+    "enable": "Enable",
+    "disable": "Disable"
   },
   "landing": {
     "eyebrow": "Enterprise AI Quality Infrastructure",

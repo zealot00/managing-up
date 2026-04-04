@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../components/ToastProvider";
+import Breadcrumb from "../../components/Breadcrumb";
 import {
   MCPServer,
   listMCPServers,
@@ -11,11 +13,49 @@ import {
   deleteMCPServer,
   approveMCPServer,
 } from "../lib/mcp-api";
+import {
+  Server,
+  Terminal,
+  Globe,
+  CheckCircle,
+  Clock,
+  XCircle,
+  Ban,
+  Trash2,
+  Plus,
+  X,
+  Power,
+  PowerOff,
+} from "lucide-react";
+
+const STATUS_CONFIG: Record<string, { label: string; badgeClass: string; icon: React.ReactNode }> = {
+  approved: {
+    label: "Approved",
+    badgeClass: "badge badge-completed",
+    icon: <CheckCircle size={12} aria-hidden="true" />,
+  },
+  pending: {
+    label: "Pending",
+    badgeClass: "badge badge-pending",
+    icon: <Clock size={12} aria-hidden="true" />,
+  },
+  rejected: {
+    label: "Rejected",
+    badgeClass: "badge badge-failed",
+    icon: <XCircle size={12} aria-hidden="true" />,
+  },
+  disabled: {
+    label: "Disabled",
+    badgeClass: "badge badge-muted",
+    icon: <Ban size={12} aria-hidden="true" />,
+  },
+};
 
 export default function MCPPage() {
   const t = useTranslations("mcp");
   const tc = useTranslations("common");
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
+  const toast = useToast();
 
   const [servers, setServers] = useState<MCPServer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,8 +63,8 @@ export default function MCPPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
@@ -46,10 +86,8 @@ export default function MCPPage() {
   }
 
   useEffect(() => {
-    if (!isAuthLoading) {
-      void loadData();
-    }
-  }, [isAuthLoading]);
+    void loadData();
+  }, []);
 
   function resetForm() {
     setFormName("");
@@ -58,91 +96,113 @@ export default function MCPPage() {
     setFormCommand("");
     setFormURL("");
     setShowCreateForm(false);
-    setEditingId(null);
   }
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!formName.trim() || !formTransportType) return;
+    if (!formName.trim()) return;
 
     setIsSubmitting(true);
     setError(null);
     try {
       await createMCPServer({
         name: formName.trim(),
-        description: formDescription.trim(),
+        description: formDescription.trim() || undefined,
         transport_type: formTransportType,
-        command: formTransportType === "stdio" ? formCommand.trim() : undefined,
-        url: formTransportType === "sse" ? formURL.trim() : undefined,
+        command: formTransportType === "stdio" ? formCommand.trim() || undefined : undefined,
+        url: formTransportType === "sse" ? formURL.trim() || undefined : undefined,
       });
+      toast.success(tc("success") + ": MCP server created");
       resetForm();
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create MCP server");
+      toast.error(err instanceof Error ? err.message : "Failed to create MCP server");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleDelete(id: string) {
-    setError(null);
     try {
       await deleteMCPServer(id);
+      toast.success(tc("success") + ": MCP server deleted");
       setDeletingId(null);
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete MCP server");
+      toast.error(err instanceof Error ? err.message : "Failed to delete MCP server");
     }
   }
 
   async function handleApprove(id: string, decision: "approved" | "rejected") {
-    setError(null);
+    setApprovingId(id);
     try {
       await approveMCPServer(id, {
         decision,
         approver: user?.username || "admin",
       });
+      toast.success(
+        decision === "approved"
+          ? tc("success") + ": MCP server approved"
+          : tc("success") + ": MCP server rejected"
+      );
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve MCP server");
+      toast.error(err instanceof Error ? err.message : "Failed to update MCP server");
+    } finally {
+      setApprovingId(null);
     }
   }
 
   async function handleToggleEnabled(server: MCPServer) {
-    setError(null);
     try {
       await updateMCPServer(server.id, {
         is_enabled: !server.is_enabled,
       });
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update MCP server");
+      toast.error(err instanceof Error ? err.message : "Failed to update MCP server");
     }
   }
 
-  if (isAuthLoading || isLoading) {
+  function connectionString(server: MCPServer): string {
+    if (server.transport_type === "stdio") {
+      return server.command || "—";
+    }
+    return server.url || "—";
+  }
+
+  if (isLoading) {
     return (
-      <div className="dashboard-content">
-        <div className="dashboard-header">
-          <div>
-            <h1 className="dashboard-title">{t("title")}</h1>
-          </div>
+      <div className="admin-content">
+        <Breadcrumb />
+        <div className="loading-pulse loading-pulse-long" style={{ marginBottom: 16 }} />
+        <div className="skeleton-grid">
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
         </div>
-        <div className="loading-pulse" style={{ width: 200, height: 24, marginTop: 16 }} />
       </div>
     );
   }
 
   return (
-    <div className="dashboard-content">
-      <div className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">{t("title")}</h1>
-          <p className="dashboard-subtitle">{t("subtitle")}</p>
+    <div className="admin-content">
+      <Breadcrumb />
+
+      <div className="page-header">
+        <div className="page-header-content">
+          <p className="section-kicker">{t("title")}</p>
+          <h1 className="panel-title">{t("subtitle")}</h1>
         </div>
-        <button className="form-submit" onClick={() => setShowCreateForm(true)}>
-          {t("newServer")}
-        </button>
+        <div className="page-header-actions">
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowCreateForm(true)}
+          >
+            <Plus size={16} aria-hidden="true" />
+            {t("newServer")}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -153,8 +213,18 @@ export default function MCPPage() {
 
       {showCreateForm && (
         <div className="form-panel">
-          <div className="form-header">
-            <h2 className="form-title">{t("createServer")}</h2>
+          <div className="form-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <p className="section-kicker">{t("title")}</p>
+              <h2 className="form-title">{t("createServer")}</h2>
+            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={resetForm}
+              aria-label={tc("close")}
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
           </div>
           <form className="form-fields" onSubmit={handleCreate}>
             <div>
@@ -166,6 +236,7 @@ export default function MCPPage() {
                 onChange={(e) => setFormName(e.target.value)}
                 placeholder={t("serverNamePlaceholder")}
                 required
+                autoFocus
               />
             </div>
             <div>
@@ -182,7 +253,7 @@ export default function MCPPage() {
               <label className="form-label" htmlFor="mcp-transport">{t("transport")}</label>
               <select
                 id="mcp-transport"
-                className="form-input"
+                className="form-select"
                 value={formTransportType}
                 onChange={(e) => setFormTransportType(e.target.value)}
               >
@@ -208,6 +279,7 @@ export default function MCPPage() {
                 <input
                   id="mcp-url"
                   className="form-input"
+                  type="url"
                   value={formURL}
                   onChange={(e) => setFormURL(e.target.value)}
                   placeholder={t("urlPlaceholder")}
@@ -215,10 +287,10 @@ export default function MCPPage() {
               </div>
             )}
             <div className="form-actions">
-              <button type="button" className="gateway-button-secondary" onClick={resetForm}>
+              <button type="button" className="btn btn-secondary" onClick={resetForm}>
                 {tc("cancel")}
               </button>
-              <button type="submit" className="form-submit" disabled={isSubmitting}>
+              <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                 {isSubmitting ? t("creating") : t("create")}
               </button>
             </div>
@@ -226,90 +298,151 @@ export default function MCPPage() {
         </div>
       )}
 
-      <div className="dashboard-section">
-        {servers.length === 0 ? (
-          <p className="empty-note">{t("noServers")}</p>
-        ) : (
-          <div className="list">
-            {servers.map((server) => (
-              <article className="list-card" key={server.id}>
-                <div className="list-card-main">
-                  <div className="list-card-header">
-                    <h3 className="list-card-title">{server.name}</h3>
-                    <span className={`badge ${
-                      server.status === "approved" ? "badge-completed" :
-                      server.status === "pending" ? "badge-pending" :
-                      server.status === "rejected" ? "badge-failed" :
-                      "badge-muted"
-                    }`}>
-                      {server.status}
-                    </span>
-                  </div>
-                  {server.description && (
-                    <p className="list-card-meta">{server.description}</p>
-                  )}
-                  <p className="list-card-meta">
-                    {server.transport_type === "stdio" ? `stdio: ${server.command}` : `sse: ${server.url}`}
-                    {server.status === "pending" && server.approved_by && (
-                      <span> · approved by {server.approved_by}</span>
-                    )}
-                  </p>
-                </div>
-                <div className="list-card-actions">
-                  <label className="toggle" title={server.is_enabled ? tc("disable") : tc("enable")}>
-                    <input
-                      type="checkbox"
-                      checked={server.is_enabled}
-                      onChange={() => void handleToggleEnabled(server)}
-                    />
-                    <span className="toggle-slider"></span>
-                  </label>
-                  {server.status === "pending" && (
-                    <>
-                      <button
-                        className="btn-approve"
-                        onClick={() => void handleApprove(server.id, "approved")}
-                      >
-                        {t("approve")}
-                      </button>
-                      <button
-                        className="btn-reject"
-                        onClick={() => void handleApprove(server.id, "rejected")}
-                      >
-                        {t("reject")}
-                      </button>
-                    </>
-                  )}
-                  {deletingId === server.id ? (
-                    <div className="list-card-confirm-delete">
-                      <span>{tc("confirm")}?</span>
-                      <button
-                        className="gateway-button-secondary"
-                        onClick={() => void handleDelete(server.id)}
-                      >
-                        {tc("delete")}
-                      </button>
-                      <button
-                        className="gateway-button-secondary"
-                        onClick={() => setDeletingId(null)}
-                      >
-                        {tc("cancel")}
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      className="gateway-button-secondary"
-                      onClick={() => setDeletingId(server.id)}
-                    >
-                      {tc("delete")}
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
+      {servers.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <Server size={48} aria-hidden="true" />
           </div>
-        )}
-      </div>
+          <h3 className="empty-state-title">{t("noServers")}</h3>
+          <p className="empty-state-description">
+            Register an MCP server to enable AI agent tool integration.
+          </p>
+          <div className="empty-state-action" style={{ marginTop: 16 }}>
+            <button className="btn btn-primary" onClick={() => setShowCreateForm(true)}>
+              <Plus size={16} aria-hidden="true" />
+              {t("newServer")}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="panel">
+          <div className="gateway-table-wrapper">
+            <table className="gateway-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 200 }}>Name</th>
+                  <th>Transport</th>
+                  <th>Connection</th>
+                  <th style={{ width: 100 }}>Status</th>
+                  <th style={{ width: 80 }}>Enabled</th>
+                  <th style={{ width: 200 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {servers.map((server) => {
+                  const status = STATUS_CONFIG[server.status] || STATUS_CONFIG.disabled;
+                  const isPending = server.status === "pending";
+                  const isDeleting = deletingId === server.id;
+                  const isApproving = approvingId === server.id;
+
+                  return (
+                    <tr key={server.id}>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <Server size={16} aria-hidden="true" style={{ color: "var(--muted)", flexShrink: 0 }} />
+                          <div>
+                            <div style={{ fontWeight: 600, color: "var(--ink-strong)", fontSize: "var(--text-sm)" }}>
+                              {server.name}
+                            </div>
+                            {server.description && (
+                              <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: 2 }}>
+                                {server.description}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {server.transport_type === "stdio" ? (
+                            <Terminal size={14} aria-hidden="true" style={{ color: "var(--muted)" }} />
+                          ) : (
+                            <Globe size={14} aria-hidden="true" style={{ color: "var(--muted)" }} />
+                          )}
+                          <code style={{ fontSize: "var(--text-xs)", fontFamily: "inherit" }}>
+                            {server.transport_type}
+                          </code>
+                        </div>
+                      </td>
+                      <td>
+                        <code style={{ fontSize: "var(--text-xs)", fontFamily: "'IBM Plex Mono', monospace", color: "var(--ink)" }}>
+                          {connectionString(server)}
+                        </code>
+                      </td>
+                      <td>
+                        <span className={status.badgeClass} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          {status.icon}
+                          {status.label}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className={`mcp-toggle-btn ${server.is_enabled ? "mcp-toggle-btn-on" : "mcp-toggle-btn-off"}`}
+                          onClick={() => void handleToggleEnabled(server)}
+                          title={server.is_enabled ? tc("disable") || "Disable" : tc("enable") || "Enable"}
+                          aria-label={server.is_enabled ? "Disable server" : "Enable server"}
+                        >
+                          {server.is_enabled ? <Power size={14} aria-hidden="true" /> : <PowerOff size={14} aria-hidden="true" />}
+                        </button>
+                      </td>
+                      <td>
+                        {isDeleting ? (
+                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            <span style={{ fontSize: "var(--text-xs)", color: "var(--danger)" }}>Confirm?</span>
+                            <button
+                              className="btn btn-sm"
+                              style={{ background: "var(--danger)", color: "#fff", border: "none" }}
+                              onClick={() => void handleDelete(server.id)}
+                            >
+                              {tc("delete")}
+                            </button>
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => setDeletingId(null)}
+                            >
+                              {tc("cancel")}
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            {isPending && (
+                              <>
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ background: "var(--success)", color: "#fff", border: "none" }}
+                                  disabled={isApproving}
+                                  onClick={() => void handleApprove(server.id, "approved")}
+                                >
+                                  {isApproving ? "..." : t("approve")}
+                                </button>
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ background: "var(--danger)", color: "#fff", border: "none" }}
+                                  disabled={isApproving}
+                                  onClick={() => void handleApprove(server.id, "rejected")}
+                                >
+                                  {isApproving ? "..." : t("reject")}
+                                </button>
+                              </>
+                            )}
+                            <button
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => setDeletingId(server.id)}
+                              aria-label={`Delete ${server.name}`}
+                            >
+                              <Trash2 size={14} aria-hidden="true" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

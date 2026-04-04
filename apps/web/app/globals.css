@@ -2781,6 +2781,40 @@ body {
   font-size: var(--text-sm);
 }
 
+/* ===== MCP Toggle Button ===== */
+.mcp-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--bg-deep);
+  color: var(--muted);
+}
+
+.mcp-toggle-btn:hover {
+  border-color: var(--line-strong);
+}
+
+.mcp-toggle-btn-on {
+  background: rgba(22, 101, 52, 0.1);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.mcp-toggle-btn-on:hover {
+  background: rgba(22, 101, 52, 0.15);
+}
+
+.mcp-toggle-btn-off {
+  background: rgba(107, 114, 128, 0.08);
+  color: var(--neutral);
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 1024px) {
   .panel-grid {
