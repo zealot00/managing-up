@@ -618,8 +618,8 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.Handle("/api/v1/gateway/usage/users", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayUsageByUsers)))
 
 	mux.HandleFunc("/api/v1/mcp-servers", srv.handleMCPServers)
-	mux.HandleFunc("/api/v1/mcp-servers/", srv.handleMCPServerByID)
-	mux.Handle("/api/v1/mcp-servers/", http.HandlerFunc(srv.handleApproveMCPServer))
+	mux.HandleFunc("/api/v1/mcp-servers/{id}", srv.handleMCPServerByID)
+	mux.HandleFunc("/api/v1/mcp-servers/{id}/approve", srv.handleApproveMCPServer)
 
 	mux.HandleFunc("/api/v1/capabilities", srv.handleCapabilities)
 	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)
