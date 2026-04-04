@@ -85,3 +85,43 @@ func containsMiddle(s, substr string) bool {
 	}
 	return false
 }
+
+func GenerateWithRouterRetry(ctx context.Context, router LLMRouter, messages []llm.Message, opts []llm.Option, config RetryConfig) (*llm.Response, error) {
+	var lastErr error
+
+	for attempt := 0; attempt <= config.MaxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := config.InitialBackoff * time.Duration(1<<(attempt-1))
+			if backoff > config.MaxBackoff {
+				backoff = config.MaxBackoff
+			}
+
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+
+		client, err := router.Route(ctx)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		resp, err := client.Generate(ctx, messages, opts...)
+		if err == nil {
+			router.RecordSuccess(client.Provider())
+			return resp, nil
+		}
+
+		lastErr = err
+		router.RecordFailure(client.Provider())
+
+		if isNonRetryableError(err) {
+			return nil, err
+		}
+	}
+
+	return nil, fmt.Errorf("max retries exceeded: %w", lastErr)
+}

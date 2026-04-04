@@ -179,6 +179,27 @@ export async function getSEHDataset(datasetId: string): Promise<DatasetDetail> {
   return readEnvelope<DatasetDetail>(`${SEH_BASE_URL}/datasets/${datasetId}`);
 }
 
+export type DatasetCasesResponse = {
+  manifest: Record<string, unknown>;
+  cases: EvaluationCase[];
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+    has_more: boolean;
+  };
+};
+
+export async function getSEHDatasetCases(
+  datasetId: string,
+  limit = 20,
+  offset = 0
+): Promise<DatasetCasesResponse> {
+  return readEnvelope<DatasetCasesResponse>(
+    `${SEH_BASE_URL}/datasets/${datasetId}/cases?limit=${limit}&offset=${offset}`
+  );
+}
+
 export async function createSEHDataset(data: {
   name: string;
   version: string;

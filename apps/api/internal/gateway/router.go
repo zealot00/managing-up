@@ -33,6 +33,8 @@ type Server struct {
 	apiKeyValidator     APIKeyValidator
 	usageRecorder       UsageRecorder
 	providerKeyResolver ProviderKeyResolver
+	router              LLMRouter
+	budgetChecker       BudgetChecker
 }
 
 func New(addr string, opts ...Option) *Server {

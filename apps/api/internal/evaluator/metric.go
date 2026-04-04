@@ -2,10 +2,21 @@ package evaluator
 
 import (
 	"context"
+	"errors"
 	"math"
 
 	"github.com/zealot/managing-up/apps/api/internal/llm"
 )
+
+var ErrInvalidJudgeType = errors.New("invalid judge type")
+
+func BuiltInJudgeModels() []string {
+	types := make([]string, 0, len(JudgePrompts))
+	for jt := range JudgePrompts {
+		types = append(types, string(jt))
+	}
+	return types
+}
 
 type Score struct {
 	Value   float64

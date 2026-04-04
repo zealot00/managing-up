@@ -73,6 +73,13 @@ func NewEvaluationRunner(
 	embeddingClient, _ := llm.NewClient(llm.ProviderOpenAI, "text-embedding-3-small", os.Getenv("LLM_API_KEY"))
 	registry.Register(NewEmbeddingSimilarityEvaluator(embeddingClient, 0.85))
 
+	if agentLLM != nil {
+		builtInJudges := BuiltInJudgeFunctions(agentLLM)
+		for judgeType, judgeFn := range builtInJudges {
+			registry.evaluators[string(judgeType)] = NewJudgeModelEvaluator(judgeFn)
+		}
+	}
+
 	return &EvaluationRunner{
 		taskRepo:     taskRepo,
 		metricRepo:   metricRepo,

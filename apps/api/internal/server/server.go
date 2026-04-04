@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/zealot/managing-up/apps/api/internal/config"
 	"github.com/zealot/managing-up/apps/api/internal/gateway"
 	"github.com/zealot/managing-up/apps/api/internal/orchestrator"
@@ -512,7 +513,7 @@ type Server struct {
 	taskSvc        *service.TaskService
 	experimentSvc  *service.ExperimentService
 	gatewayServer  *gateway.Server
-	gatewayLimiter *gateway.RateLimiter
+	gatewayLimiter gateway.RateLimiter
 	orchestrator   *orchestrator.Server
 	sehServer      *seh.Server
 	authHandler    *handlers.AuthHandler
@@ -541,7 +542,25 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	gatewayValidator := gatewayAPIKeyValidator{repo: repo}
 	gatewayRecorder := gatewayUsageRecorder{repo: repo}
 	gatewayProviderKeyResolver := buildProviderKeyResolverFromEnv()
-	gatewayLimiter := gateway.NewRateLimiter(60)
+	var gatewayLimiterFactory gateway.RateLimiterFactory
+	if os.Getenv("REDIS_URL") != "" {
+		redisClient := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_URL")})
+		gatewayLimiterFactory = &gateway.RedisRateLimiterFactory{Client: redisClient}
+	} else {
+		gatewayLimiterFactory = &gateway.InMemoryRateLimiterFactory{}
+	}
+	gatewayLimiter := gatewayLimiterFactory.Create("gateway", 60, time.Minute)
+	var budgetChecker gateway.BudgetChecker
+	if os.Getenv("REDIS_URL") != "" && os.Getenv("ENABLE_BUDGET") == "true" {
+		redisClient := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_URL")})
+		budgetChecker = gateway.NewRedisBudgetChecker(redisClient, gateway.BudgetConfig{
+			MonthlyLimit:   1000000,
+			DailyLimit:     50000,
+			AlertThreshold: 0.8,
+		})
+	} else {
+		budgetChecker = &gateway.NoOpBudgetChecker{}
+	}
 	srv := &Server{
 		repo:          repo,
 		closeFn:       closeFn,
@@ -606,9 +625,9 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)
 	mux.HandleFunc("/api/v1/capabilities/{name}/diff", srv.handleCapabilityDiff)
 
-	mux.Handle("/v1/chat/completions", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleOpenAIChat))))
-	mux.Handle("/v1/messages", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleAnthropicMessages))))
-	mux.Handle("/v1/embeddings", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleEmbeddings))))
+	mux.Handle("/v1/chat/completions", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.BudgetMiddleware(budgetChecker, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleOpenAIChat)))))
+	mux.Handle("/v1/messages", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.BudgetMiddleware(budgetChecker, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleAnthropicMessages)))))
+	mux.Handle("/v1/embeddings", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.BudgetMiddleware(budgetChecker, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleEmbeddings)))))
 	mux.Handle("/v1/models", gateway.AuthMiddlewareWithValidator(gatewayValidator, http.HandlerFunc(srv.gatewayServer.HandleModels)))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK); fmt.Fprintln(w, "ok") })
 

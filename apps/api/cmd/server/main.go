@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/config"
 	"github.com/zealot/managing-up/apps/api/internal/engine"
 	"github.com/zealot/managing-up/apps/api/internal/engine/agents"
+	"github.com/zealot/managing-up/apps/api/internal/engine/executors"
 	"github.com/zealot/managing-up/apps/api/internal/engine/tool/builtin"
 	"github.com/zealot/managing-up/apps/api/internal/evaluator"
 	"github.com/zealot/managing-up/apps/api/internal/llm"
@@ -39,8 +41,12 @@ func main() {
 		log.Fatalf("failed to connect to PostgreSQL: %v", err)
 	}
 
+	mcpRegistry := createMCPRegistry(cfg, repo)
+	executors.SetGlobalRegistry(mcpRegistry)
+	defer mcpRegistry.Close()
+
 	llmClient := createLLMClient()
-	agent := createLLMAgent(llmClient)
+	agent := createLLMAgentWithMCP(llmClient, mcpRegistry)
 	evalRunner := createEvaluationRunner(repo, agent, llmClient)
 	taskRunnerAdapter := newTaskRunnerAdapter(evalRunner)
 	experimentSvc := createExperimentService(repo, taskRunnerAdapter)
@@ -113,6 +119,92 @@ func createLLMAgent(client llm.Client) engine.Agent {
 		toolRegistry.Register(t)
 	}
 
+	return agents.NewLLMAgent(client, toolRegistry)
+}
+
+func createMCPRegistry(cfg config.Config, repo server.Repository) *executors.MCPRegistry {
+	registry := executors.NewMCPRegistry()
+
+	if !cfg.MCP.Enabled {
+		return registry
+	}
+
+	ctx := context.Background()
+
+	for _, serverConfig := range cfg.MCP.Servers {
+		registerMCPServerFromConfig(ctx, registry, serverConfig)
+	}
+
+	if repo != nil {
+		for _, dbServer := range repo.ListMCPServers() {
+			if dbServer.Status == server.MCPServerStatusApproved && dbServer.IsEnabled {
+				log.Printf("Registering MCP server from DB: %s", dbServer.Name)
+				registerMCPServerFromDB(ctx, registry, dbServer)
+			}
+		}
+	}
+
+	return registry
+}
+
+func registerMCPServerFromConfig(ctx context.Context, registry *executors.MCPRegistry, serverConfig config.MCPServerConfig) {
+	if serverConfig.URL != "" {
+		log.Printf("Registering MCP HTTP server: %s", serverConfig.Name)
+		if err := registry.RegisterHTTP(ctx, serverConfig.Name, serverConfig.URL, nil); err != nil {
+			log.Printf("Failed to register MCP HTTP server %s: %v", serverConfig.Name, err)
+		}
+	} else if serverConfig.Command != "" {
+		log.Printf("Registering MCP stdio server: %s", serverConfig.Name)
+		mcpConfig := executors.MCPClientConfig{
+			Command: serverConfig.Command,
+			Args:    serverConfig.Args,
+			Env:     serverConfig.Env,
+		}
+		if err := registry.RegisterStdio(ctx, serverConfig.Name, mcpConfig); err != nil {
+			log.Printf("Failed to register MCP stdio server %s: %v", serverConfig.Name, err)
+		}
+	}
+}
+
+func registerMCPServerFromDB(ctx context.Context, registry *executors.MCPRegistry, dbServer server.MCPServer) {
+	if dbServer.URL != "" {
+		log.Printf("Registering MCP HTTP server from DB: %s", dbServer.Name)
+		headers := make(map[string]string)
+		for _, h := range dbServer.Headers {
+			parts := strings.SplitN(h, "=", 2)
+			if len(parts) == 2 {
+				headers[parts[0]] = parts[1]
+			}
+		}
+		if err := registry.RegisterHTTP(ctx, dbServer.Name, dbServer.URL, headers); err != nil {
+			log.Printf("Failed to register MCP HTTP server %s: %v", dbServer.Name, err)
+		}
+	} else if dbServer.Command != "" {
+		log.Printf("Registering MCP stdio server from DB: %s", dbServer.Name)
+		mcpConfig := executors.MCPClientConfig{
+			Command: dbServer.Command,
+			Args:    dbServer.Args,
+			Env:     dbServer.Env,
+		}
+		if err := registry.RegisterStdio(ctx, dbServer.Name, mcpConfig); err != nil {
+			log.Printf("Failed to register MCP stdio server %s: %v", dbServer.Name, err)
+		}
+	}
+}
+
+func createLLMAgentWithMCP(client llm.Client, mcpRegistry *executors.MCPRegistry) engine.Agent {
+	allTools := []engine.Tool{}
+
+	builtinRegistry := builtin.NewRegistry()
+	for _, t := range builtinRegistry.List() {
+		allTools = append(allTools, t)
+	}
+
+	for _, t := range mcpRegistry.ListTools() {
+		allTools = append(allTools, t)
+	}
+
+	toolRegistry := engine.NewToolRegistryWithTools(allTools)
 	return agents.NewLLMAgent(client, toolRegistry)
 }
 

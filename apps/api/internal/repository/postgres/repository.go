@@ -1396,6 +1396,7 @@ func (r *Repository) ListMCPServers() []server.MCPServer {
 		       status, rejection_reason, approved_by, approved_at, is_enabled,
 		       created_at, updated_at
 		FROM mcp_servers
+		WHERE status IN ('pending', 'approved', 'disabled')
 		ORDER BY created_at DESC
 	`
 	rows, err := r.db.Query(query)
