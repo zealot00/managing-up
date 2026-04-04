@@ -15,6 +15,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/zealot/managing-up/apps/api/internal/config"
+	"github.com/zealot/managing-up/apps/api/internal/engine/executors"
 	"github.com/zealot/managing-up/apps/api/internal/gateway"
 	"github.com/zealot/managing-up/apps/api/internal/orchestrator"
 	"github.com/zealot/managing-up/apps/api/internal/seh"
@@ -1911,6 +1912,22 @@ func (s *Server) handleApproveMCPServer(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "MCP server not found.")
 		return
+	}
+
+	if req.Decision == "approved" {
+		validationResult := executors.ValidateMCPServer(r.Context(), executors.MCPServerConfig{
+			TransportType: server.TransportType,
+			Command:       server.Command,
+			Args:          server.Args,
+			Env:           server.Env,
+			URL:           server.URL,
+			Headers:       server.Headers,
+		})
+		if !validationResult.Valid {
+			writeError(w, http.StatusBadRequest, "VALIDATION_FAILED",
+				fmt.Sprintf("MCP server validation failed: %s", validationResult.Error))
+			return
+		}
 	}
 
 	now := time.Now()

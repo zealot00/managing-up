@@ -11,8 +11,17 @@ import (
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 	tool "github.com/zealot/managing-up/apps/api/internal/engine/tool"
-	"github.com/zealot/managing-up/apps/api/internal/server"
 )
+
+// MCPServerConfig is the configuration for an MCP server (used for validation).
+type MCPServerConfig struct {
+	TransportType string
+	Command       string
+	Args          []string
+	Env           []string
+	URL           string
+	Headers       []string
+}
 
 // MCPServerValidationResult represents the result of validating an MCP server.
 type MCPServerValidationResult struct {
@@ -164,7 +173,7 @@ func (r *MCPRegistry) Close() error {
 	return nil
 }
 
-func ValidateMCPServer(ctx context.Context, srv server.MCPServer) MCPServerValidationResult {
+func ValidateMCPServer(ctx context.Context, srv MCPServerConfig) MCPServerValidationResult {
 	if srv.TransportType == "stdio" {
 		return validateStdioServer(ctx, srv)
 	}
@@ -177,7 +186,7 @@ func ValidateMCPServer(ctx context.Context, srv server.MCPServer) MCPServerValid
 	}
 }
 
-func validateStdioServer(ctx context.Context, srv server.MCPServer) MCPServerValidationResult {
+func validateStdioServer(ctx context.Context, srv MCPServerConfig) MCPServerValidationResult {
 	config := MCPClientConfig{
 		Command: srv.Command,
 		Args:    srv.Args,
@@ -250,7 +259,7 @@ func validateStdioServer(ctx context.Context, srv server.MCPServer) MCPServerVal
 	}
 }
 
-func validateHTTPServer(ctx context.Context, srv server.MCPServer) MCPServerValidationResult {
+func validateHTTPServer(ctx context.Context, srv MCPServerConfig) MCPServerValidationResult {
 	headers := make(map[string]string)
 	for _, h := range srv.Headers {
 		parts := strings.SplitN(h, ":", 2)
