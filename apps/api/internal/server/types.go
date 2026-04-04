@@ -362,3 +362,64 @@ type Tip struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+type MCPServer struct {
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	Description     string     `json:"description,omitempty"`
+	TransportType   string     `json:"transport_type"`
+	Command         string     `json:"command,omitempty"`
+	Args            []string   `json:"args,omitempty"`
+	Env             []string   `json:"env,omitempty"`
+	URL             string     `json:"url,omitempty"`
+	Headers         []string   `json:"headers,omitempty"`
+	Status          string     `json:"status"`
+	RejectionReason string     `json:"rejection_reason,omitempty"`
+	ApprovedBy      string     `json:"approved_by,omitempty"`
+	ApprovedAt      *time.Time `json:"approved_at,omitempty"`
+	IsEnabled       bool       `json:"is_enabled"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+const (
+	MCPServerStatusPending  = "pending"
+	MCPServerStatusApproved = "approved"
+	MCPServerStatusRejected = "rejected"
+	MCPServerStatusDisabled = "disabled"
+)
+
+type CreateMCPServerRequest struct {
+	Name          string   `json:"name"`
+	Description   string   `json:"description,omitempty"`
+	TransportType string   `json:"transport_type"`
+	Command       string   `json:"command,omitempty"`
+	Args          []string `json:"args,omitempty"`
+	Env           []string `json:"env,omitempty"`
+	URL           string   `json:"url,omitempty"`
+	Headers       []string `json:"headers,omitempty"`
+}
+
+type UpdateMCPServerRequest struct {
+	Name          string   `json:"name,omitempty"`
+	Description   string   `json:"description,omitempty"`
+	TransportType string   `json:"transport_type,omitempty"`
+	Command       string   `json:"command,omitempty"`
+	Args          []string `json:"args,omitempty"`
+	Env           []string `json:"env,omitempty"`
+	URL           string   `json:"url,omitempty"`
+	Headers       []string `json:"headers,omitempty"`
+	Status        string   `json:"status,omitempty"`
+	IsEnabled     *bool    `json:"is_enabled,omitempty"`
+}
+
+type ApproveMCPServerRequest struct {
+	Decision string `json:"decision"`
+	Approver string `json:"approver"`
+	Note     string `json:"note,omitempty"`
+}
+
+type MCPServerWithTools struct {
+	MCPServer
+	Tools []map[string]any `json:"tools,omitempty"`
+}

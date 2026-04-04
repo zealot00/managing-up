@@ -41,12 +41,22 @@ export default function Sidebar() {
         { href: "/approvals", labelKey: "approvals", icon: "◐" },
         { href: "/replays", labelKey: "replays", icon: "↻" },
         { href: "/gateway", labelKey: "gateway", icon: "⬡" },
+        { href: "/mcp", labelKey: "mcp", icon: "⧉" },
       ],
     },
     {
       titleKey: "system",
       items: [
-        { href: "/seh", labelKey: "sehModule", icon: "▣" },
+        {
+          href: "/seh",
+          labelKey: "sehModule",
+          icon: "▣",
+          children: [
+            { href: "/seh/datasets", labelKey: "sehDatasets" },
+            { href: "/seh/runs", labelKey: "sehRuns" },
+            { href: "/seh/policies", labelKey: "sehPolicies" },
+          ],
+        },
       ],
     },
   ];
