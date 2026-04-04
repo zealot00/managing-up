@@ -3,11 +3,23 @@ package executors
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
+	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 	tool "github.com/zealot/managing-up/apps/api/internal/engine/tool"
+	"github.com/zealot/managing-up/apps/api/internal/server"
 )
+
+// MCPServerValidationResult represents the result of validating an MCP server.
+type MCPServerValidationResult struct {
+	Valid bool
+	Tools []mcp.Tool
+	Error string
+}
 
 var globalMCPRegistry *MCPRegistry
 
@@ -150,4 +162,168 @@ func (r *MCPRegistry) Close() error {
 	r.tools = make(map[string]tool.Tool)
 	r.clients.Close()
 	return nil
+}
+
+func ValidateMCPServer(ctx context.Context, srv server.MCPServer) MCPServerValidationResult {
+	if srv.TransportType == "stdio" {
+		return validateStdioServer(ctx, srv)
+	}
+	if srv.TransportType == "http" || srv.TransportType == "https" {
+		return validateHTTPServer(ctx, srv)
+	}
+	return MCPServerValidationResult{
+		Valid: false,
+		Error: fmt.Sprintf("unsupported transport type: %s", srv.TransportType),
+	}
+}
+
+func validateStdioServer(ctx context.Context, srv server.MCPServer) MCPServerValidationResult {
+	config := MCPClientConfig{
+		Command: srv.Command,
+		Args:    srv.Args,
+		Env:     srv.Env,
+		Timeout: 30 * time.Second,
+	}
+
+	if err := validateStdioConfig(config); err != nil {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("invalid stdio config: %s", err.Error()),
+		}
+	}
+
+	if config.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, config.Timeout)
+		defer cancel()
+	}
+
+	t := transport.NewStdio(config.Command, config.Args, config.Env...)
+	mcpClient := client.NewClient(t)
+
+	if err := mcpClient.Start(ctx); err != nil {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("failed to start MCP client: %s", err.Error()),
+		}
+	}
+
+	cleanup := func() {
+		mcpClient.Close()
+	}
+	defer cleanup()
+
+	initialized, err := mcpClient.Initialize(ctx, mcp.InitializeRequest{
+		Params: mcp.InitializeParams{
+			ProtocolVersion: mcp.LATEST_PROTOCOL_VERSION,
+			ClientInfo: mcp.Implementation{
+				Name:    "enterprise-gateway",
+				Version: "1.0.0",
+			},
+		},
+	})
+	if err != nil {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("failed to initialize MCP client: %s", err.Error()),
+		}
+	}
+
+	if initialized.ProtocolVersion != mcp.LATEST_PROTOCOL_VERSION {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("protocol version mismatch: got %s, want %s", initialized.ProtocolVersion, mcp.LATEST_PROTOCOL_VERSION),
+		}
+	}
+
+	listTools, err := mcpClient.ListTools(ctx, mcp.ListToolsRequest{})
+	if err != nil {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("failed to list tools: %s", err.Error()),
+		}
+	}
+
+	return MCPServerValidationResult{
+		Valid: true,
+		Tools: listTools.Tools,
+	}
+}
+
+func validateHTTPServer(ctx context.Context, srv server.MCPServer) MCPServerValidationResult {
+	headers := make(map[string]string)
+	for _, h := range srv.Headers {
+		parts := strings.SplitN(h, ":", 2)
+		if len(parts) == 2 {
+			headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+
+	if err := validateHTTPHeaders(headers); err != nil {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("invalid HTTP headers: %s", err.Error()),
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	t, err := transport.NewStreamableHTTP(srv.URL, transport.WithHTTPHeaders(headers))
+	if err != nil {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("failed to create HTTP transport: %s", err.Error()),
+		}
+	}
+
+	mcpClient := client.NewClient(t)
+
+	if err := mcpClient.Start(ctx); err != nil {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("failed to start MCP client: %s", err.Error()),
+		}
+	}
+
+	cleanup := func() {
+		mcpClient.Close()
+	}
+	defer cleanup()
+
+	initialized, err := mcpClient.Initialize(ctx, mcp.InitializeRequest{
+		Params: mcp.InitializeParams{
+			ProtocolVersion: mcp.LATEST_PROTOCOL_VERSION,
+			ClientInfo: mcp.Implementation{
+				Name:    "enterprise-gateway",
+				Version: "1.0.0",
+			},
+		},
+	})
+	if err != nil {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("failed to initialize MCP client: %s", err.Error()),
+		}
+	}
+
+	if initialized.ProtocolVersion != mcp.LATEST_PROTOCOL_VERSION {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("protocol version mismatch: got %s, want %s", initialized.ProtocolVersion, mcp.LATEST_PROTOCOL_VERSION),
+		}
+	}
+
+	listTools, err := mcpClient.ListTools(ctx, mcp.ListToolsRequest{})
+	if err != nil {
+		return MCPServerValidationResult{
+			Valid: false,
+			Error: fmt.Sprintf("failed to list tools: %s", err.Error()),
+		}
+	}
+
+	return MCPServerValidationResult{
+		Valid: true,
+		Tools: listTools.Tools,
+	}
 }
