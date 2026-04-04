@@ -22,6 +22,7 @@ type store struct {
 	users           map[string]models.User
 	gatewayAPIKeys  map[string]GatewayAPIKey
 	gatewayUsage    []GatewayUsageEvent
+	mcpServers      map[string]MCPServer
 }
 
 var _ Repository = (*store)(nil)
@@ -152,6 +153,7 @@ func NewStore() *store {
 		users:          make(map[string]models.User),
 		gatewayAPIKeys: make(map[string]GatewayAPIKey),
 		gatewayUsage:   make([]GatewayUsageEvent, 0),
+		mcpServers:     make(map[string]MCPServer),
 	}
 }
 
@@ -808,5 +810,54 @@ func (s *store) GetRandomTip() (Tip, bool) {
 }
 
 func (s *store) ListMCPServers() []MCPServer {
-	return []MCPServer{}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	items := make([]MCPServer, 0, len(s.mcpServers))
+	for _, server := range s.mcpServers {
+		items = append(items, server)
+	}
+	return items
+}
+
+func (s *store) GetMCPServer(id string) (MCPServer, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	server, found := s.mcpServers[id]
+	return server, found
+}
+
+func (s *store) CreateMCPServer(server MCPServer) (MCPServer, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	if server.ID == "" {
+		server.ID = fmt.Sprintf("mcp_%d", now.UnixNano())
+	}
+	server.CreatedAt = now
+	server.UpdatedAt = now
+	s.mcpServers[server.ID] = server
+	return server, nil
+}
+
+func (s *store) UpdateMCPServer(server MCPServer) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, found := s.mcpServers[server.ID]; !found {
+		return fmt.Errorf("mcp server not found: %s", server.ID)
+	}
+	server.UpdatedAt = time.Now().UTC()
+	s.mcpServers[server.ID] = server
+	return nil
+}
+
+func (s *store) DeleteMCPServer(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.mcpServers, id)
+	return nil
 }

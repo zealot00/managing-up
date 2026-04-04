@@ -617,6 +617,10 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.Handle("/api/v1/gateway/usage", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayUsage)))
 	mux.Handle("/api/v1/gateway/usage/users", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayUsageByUsers)))
 
+	mux.HandleFunc("/api/v1/mcp-servers", srv.handleMCPServers)
+	mux.HandleFunc("/api/v1/mcp-servers/", srv.handleMCPServerByID)
+	mux.Handle("/api/v1/mcp-servers/", http.HandlerFunc(srv.handleApproveMCPServer))
+
 	mux.HandleFunc("/api/v1/capabilities", srv.handleCapabilities)
 	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)
 	mux.HandleFunc("/api/v1/capabilities/{name}/diff", srv.handleCapabilityDiff)
@@ -1732,4 +1736,196 @@ func (s *Server) handleTaskFromTrace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeEnvelope(w, http.StatusCreated, generateRequestID(), task)
+}
+
+func (s *Server) handleMCPServers(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		items := s.repo.ListMCPServers()
+		writeEnvelope(w, http.StatusOK, generateRequestID(), map[string]any{
+			"items": items,
+		})
+	case http.MethodPost:
+		if !isJSONRequest(r) {
+			writeError(w, http.StatusUnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json.")
+			return
+		}
+
+		var req CreateMCPServerRequest
+		if err := decodeJSON(r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+			return
+		}
+
+		if req.Name == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "name is required.")
+			return
+		}
+		if req.TransportType == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "transport_type is required.")
+			return
+		}
+
+		server := MCPServer{
+			Name:          req.Name,
+			Description:   req.Description,
+			TransportType: req.TransportType,
+			Command:       req.Command,
+			Args:          req.Args,
+			Env:           req.Env,
+			URL:           req.URL,
+			Headers:       req.Headers,
+			Status:        MCPServerStatusPending,
+			IsEnabled:     true,
+		}
+
+		created, err := s.repo.CreateMCPServer(server)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to create MCP server.")
+			return
+		}
+
+		writeEnvelope(w, http.StatusCreated, generateRequestID(), created)
+	default:
+		writeMethodNotAllowed(w, r.Method)
+	}
+}
+
+func (s *Server) handleMCPServerByID(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/mcp-servers/")
+	if path == "" || strings.Contains(path, "/") {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "MCP server not found.")
+		return
+	}
+
+	id := path
+
+	switch r.Method {
+	case http.MethodGet:
+		server, ok := s.repo.GetMCPServer(id)
+		if !ok {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "MCP server not found.")
+			return
+		}
+		writeEnvelope(w, http.StatusOK, generateRequestID(), server)
+
+	case http.MethodPut:
+		if !isJSONRequest(r) {
+			writeError(w, http.StatusUnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json.")
+			return
+		}
+
+		var req UpdateMCPServerRequest
+		if err := decodeJSON(r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+			return
+		}
+
+		server, ok := s.repo.GetMCPServer(id)
+		if !ok {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "MCP server not found.")
+			return
+		}
+
+		if req.Name != "" {
+			server.Name = req.Name
+		}
+		if req.Description != "" {
+			server.Description = req.Description
+		}
+		if req.TransportType != "" {
+			server.TransportType = req.TransportType
+		}
+		if req.Command != "" {
+			server.Command = req.Command
+		}
+		if req.Args != nil {
+			server.Args = req.Args
+		}
+		if req.Env != nil {
+			server.Env = req.Env
+		}
+		if req.URL != "" {
+			server.URL = req.URL
+		}
+		if req.Headers != nil {
+			server.Headers = req.Headers
+		}
+		if req.Status != "" {
+			server.Status = req.Status
+		}
+		if req.IsEnabled != nil {
+			server.IsEnabled = *req.IsEnabled
+		}
+
+		if err := s.repo.UpdateMCPServer(server); err != nil {
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to update MCP server.")
+			return
+		}
+
+		writeEnvelope(w, http.StatusOK, generateRequestID(), server)
+
+	case http.MethodDelete:
+		if err := s.repo.DeleteMCPServer(id); err != nil {
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to delete MCP server.")
+			return
+		}
+		writeEnvelope(w, http.StatusOK, generateRequestID(), map[string]any{"deleted": true})
+
+	default:
+		writeMethodNotAllowed(w, r.Method)
+	}
+}
+
+func (s *Server) handleApproveMCPServer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w, r.Method)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/mcp-servers/")
+	// path format: {id}/approve
+	id := strings.TrimSuffix(path, "/approve")
+	if id == "" || id == path {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "MCP server ID is required.")
+		return
+	}
+
+	if !isJSONRequest(r) {
+		writeError(w, http.StatusUnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json.")
+		return
+	}
+
+	var req ApproveMCPServerRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
+		return
+	}
+
+	if req.Decision != "approved" && req.Decision != "rejected" {
+		writeError(w, http.StatusBadRequest, "BAD_REQUEST", "decision must be 'approved' or 'rejected'.")
+		return
+	}
+
+	server, ok := s.repo.GetMCPServer(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "MCP server not found.")
+		return
+	}
+
+	now := time.Now()
+	server.Status = req.Decision
+	server.ApprovedBy = req.Approver
+	server.ApprovedAt = &now
+
+	if req.Decision == "rejected" && req.Note != "" {
+		server.RejectionReason = req.Note
+	}
+
+	if err := s.repo.UpdateMCPServer(server); err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to update MCP server.")
+		return
+	}
+
+	writeEnvelope(w, http.StatusOK, generateRequestID(), server)
 }

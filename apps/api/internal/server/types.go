@@ -400,6 +400,19 @@ type CreateMCPServerRequest struct {
 	Headers       []string `json:"headers,omitempty"`
 }
 
+type UpdateMCPServerRequest struct {
+	Name          string   `json:"name,omitempty"`
+	Description   string   `json:"description,omitempty"`
+	TransportType string   `json:"transport_type,omitempty"`
+	Command       string   `json:"command,omitempty"`
+	Args          []string `json:"args,omitempty"`
+	Env           []string `json:"env,omitempty"`
+	URL           string   `json:"url,omitempty"`
+	Headers       []string `json:"headers,omitempty"`
+	Status        string   `json:"status,omitempty"`
+	IsEnabled     *bool    `json:"is_enabled,omitempty"`
+}
+
 type ApproveMCPServerRequest struct {
 	Decision string `json:"decision"`
 	Approver string `json:"approver"`

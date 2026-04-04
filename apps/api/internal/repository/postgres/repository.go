@@ -1405,6 +1405,150 @@ func (r *Repository) ListMCPServers() []server.MCPServer {
 	}
 	defer rows.Close()
 
+	return scanMCPServers(rows)
+}
+
+func (r *Repository) GetMCPServer(id string) (server.MCPServer, bool) {
+	query := `
+		SELECT id, name, description, transport_type, command, args, env, url, headers,
+		       status, rejection_reason, approved_by, approved_at, is_enabled,
+		       created_at, updated_at
+		FROM mcp_servers
+		WHERE id = $1
+	`
+	var s server.MCPServer
+	var desc, cmd, url, rejectionReason, approvedBy sql.NullString
+	var args, env, headers []byte
+	var approvedAt sql.NullTime
+
+	err := r.db.QueryRow(query, id).Scan(
+		&s.ID,
+		&s.Name,
+		&desc,
+		&s.TransportType,
+		&cmd,
+		&args,
+		&env,
+		&url,
+		&headers,
+		&s.Status,
+		&rejectionReason,
+		&approvedBy,
+		&approvedAt,
+		&s.IsEnabled,
+		&s.CreatedAt,
+		&s.UpdatedAt,
+	)
+	if err != nil {
+		return server.MCPServer{}, false
+	}
+
+	if desc.Valid {
+		s.Description = desc.String
+	}
+	if cmd.Valid {
+		s.Command = cmd.String
+	}
+	if url.Valid {
+		s.URL = url.String
+	}
+	if rejectionReason.Valid {
+		s.RejectionReason = rejectionReason.String
+	}
+	if approvedBy.Valid {
+		s.ApprovedBy = approvedBy.String
+	}
+	if approvedAt.Valid {
+		s.ApprovedAt = &approvedAt.Time
+	}
+	if args != nil {
+		_ = json.Unmarshal(args, &s.Args)
+	}
+	if env != nil {
+		_ = json.Unmarshal(env, &s.Env)
+	}
+	if headers != nil {
+		_ = json.Unmarshal(headers, &s.Headers)
+	}
+
+	return s, true
+}
+
+func (r *Repository) CreateMCPServer(s server.MCPServer) (server.MCPServer, error) {
+	id := s.ID
+	if id == "" {
+		id = fmt.Sprintf("mcp_%d", time.Now().UnixNano())
+	}
+
+	argsJSON, _ := json.Marshal(s.Args)
+	envJSON, _ := json.Marshal(s.Env)
+	headersJSON, _ := json.Marshal(s.Headers)
+
+	query := `
+		INSERT INTO mcp_servers (id, name, description, transport_type, command, args, env, url, headers, status, is_enabled, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+		RETURNING created_at, updated_at
+	`
+
+	err := r.db.QueryRow(
+		query,
+		id,
+		s.Name,
+		s.Description,
+		s.TransportType,
+		s.Command,
+		argsJSON,
+		envJSON,
+		s.URL,
+		headersJSON,
+		s.Status,
+		s.IsEnabled,
+	).Scan(&s.CreatedAt, &s.UpdatedAt)
+
+	if err != nil {
+		return server.MCPServer{}, fmt.Errorf("create mcp server: %w", err)
+	}
+
+	s.ID = id
+	return s, nil
+}
+
+func (r *Repository) UpdateMCPServer(s server.MCPServer) error {
+	argsJSON, _ := json.Marshal(s.Args)
+	envJSON, _ := json.Marshal(s.Env)
+	headersJSON, _ := json.Marshal(s.Headers)
+
+	query := `
+		UPDATE mcp_servers
+		SET name = $2, description = $3, transport_type = $4, command = $5,
+		    args = $6, env = $7, url = $8, headers = $9, status = $10,
+		    is_enabled = $11, updated_at = NOW()
+		WHERE id = $1
+	`
+
+	_, err := r.db.Exec(
+		query,
+		s.ID,
+		s.Name,
+		s.Description,
+		s.TransportType,
+		s.Command,
+		argsJSON,
+		envJSON,
+		s.URL,
+		headersJSON,
+		s.Status,
+		s.IsEnabled,
+	)
+	return err
+}
+
+func (r *Repository) DeleteMCPServer(id string) error {
+	_, err := r.db.Exec("DELETE FROM mcp_servers WHERE id = $1", id)
+	return err
+}
+
+func scanMCPServers(rows *sql.Rows) []server.MCPServer {
 	servers := make([]server.MCPServer, 0)
 	for rows.Next() {
 		var s server.MCPServer
