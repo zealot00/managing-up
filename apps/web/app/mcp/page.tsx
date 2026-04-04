@@ -152,8 +152,10 @@ export default function MCPPage() {
       )}
 
       {showCreateForm && (
-        <div className="dashboard-section">
-          <h2 className="dashboard-section-title">{t("createServer")}</h2>
+        <div className="form-panel">
+          <div className="form-header">
+            <h2 className="form-title">{t("createServer")}</h2>
+          </div>
           <form className="form-fields" onSubmit={handleCreate}>
             <div>
               <label className="form-label" htmlFor="mcp-name">{t("serverName")}</label>
@@ -213,7 +215,7 @@ export default function MCPPage() {
               </div>
             )}
             <div className="form-actions">
-              <button type="button" className="form-cancel" onClick={resetForm}>
+              <button type="button" className="gateway-button-secondary" onClick={resetForm}>
                 {tc("cancel")}
               </button>
               <button type="submit" className="form-submit" disabled={isSubmitting}>
@@ -238,7 +240,7 @@ export default function MCPPage() {
                       server.status === "approved" ? "badge-completed" :
                       server.status === "pending" ? "badge-pending" :
                       server.status === "rejected" ? "badge-failed" :
-                      "badge-disabled"
+                      "badge-muted"
                     }`}>
                       {server.status}
                     </span>
@@ -254,7 +256,7 @@ export default function MCPPage() {
                   </p>
                 </div>
                 <div className="list-card-actions">
-                  <label className="toggle">
+                  <label className="toggle" title={server.is_enabled ? tc("disable") : tc("enable")}>
                     <input
                       type="checkbox"
                       checked={server.is_enabled}
@@ -265,13 +267,13 @@ export default function MCPPage() {
                   {server.status === "pending" && (
                     <>
                       <button
-                        className="gateway-button-secondary"
+                        className="btn-approve"
                         onClick={() => void handleApprove(server.id, "approved")}
                       >
                         {t("approve")}
                       </button>
                       <button
-                        className="gateway-button-secondary"
+                        className="btn-reject"
                         onClick={() => void handleApprove(server.id, "rejected")}
                       >
                         {t("reject")}
