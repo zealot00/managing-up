@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Package,
   Play,
+  ListChecks,
   Target,
   FlaskConical,
   ClipboardCheck,
@@ -46,7 +47,7 @@ export default function Sidebar() {
       items: [
         { href: "/skills", labelKey: "skills", icon: <Package size={18} aria-hidden="true" /> },
         { href: "/executions", labelKey: "executions", icon: <Play size={18} aria-hidden="true" /> },
-        { href: "/tasks", labelKey: "tasks", icon: <LayoutDashboard size={18} aria-hidden="true" />, children: [{ href: "/tasks/from-trace", labelKey: "taskBuilder" }] },
+        { href: "/tasks", labelKey: "tasks", icon: <ListChecks size={18} aria-hidden="true" />, children: [{ href: "/tasks/from-trace", labelKey: "taskBuilder" }] },
         { href: "/evaluations", labelKey: "evaluations", icon: <Target size={18} aria-hidden="true" /> },
         { href: "/experiments", labelKey: "experiments", icon: <FlaskConical size={18} aria-hidden="true" /> },
       ],
