@@ -336,15 +336,27 @@ function CreateProviderForm({
 }) {
   const t = useTranslations("providers");
   const tc = useTranslations("common");
+  const toast = useToast();
   const [provider, setProvider] = useState("openai");
   const [apiKey, setApiKey] = useState("");
   const [modelPattern, setModelPattern] = useState("");
   const [monthlyLimit, setMonthlyLimit] = useState(0);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!apiKey.trim()) return;
-    void onSuccess();
+    try {
+      await createProviderKey({
+        provider,
+        api_key: apiKey.trim(),
+        model: modelPattern.trim() || undefined,
+        monthly_limit: monthlyLimit,
+      });
+      toast.success(tc("success") + ": " + t("createProvider"));
+      onSuccess();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create provider");
+    }
   }
 
   return (
@@ -491,23 +503,9 @@ export default function ProvidersPage() {
     }
   }, [isAuthLoading]);
 
-  async function handleCreate() {
-    setIsSubmitting(true);
-    try {
-      await createProviderKey({
-        provider: (document.getElementById("provider-select") as HTMLSelectElement)?.value || "openai",
-        api_key: (document.getElementById("api-key") as HTMLInputElement)?.value?.trim() || "",
-        model: (document.getElementById("model-pattern") as HTMLInputElement)?.value?.trim() || undefined,
-        monthly_limit: 0,
-      });
-      toast.success(tc("success") + ": Provider key created");
-      setShowCreateForm(false);
-      await loadData();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create provider");
-    } finally {
-      setIsSubmitting(false);
-    }
+  async function handleCreateSuccess() {
+    setShowCreateForm(false);
+    await loadData();
   }
 
   async function handleToggle(id: string, currentEnabled: boolean) {
@@ -598,7 +596,7 @@ export default function ProvidersPage() {
       {showCreateForm && (
         <CreateProviderForm
           onClose={() => setShowCreateForm(false)}
-          onSuccess={handleCreate}
+          onSuccess={handleCreateSuccess}
           isSubmitting={isSubmitting}
         />
       )}
