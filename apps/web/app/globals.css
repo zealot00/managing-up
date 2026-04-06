@@ -319,6 +319,16 @@ body {
 .sidebar-child-link {
   font-size: var(--text-xs);
   padding: 4px 12px;
+  color: var(--sidebar-text);
+}
+
+.sidebar-child-link:hover {
+  color: #ffffff;
+}
+
+.sidebar-child-link.sidebar-link-active {
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .lang-switcher {
