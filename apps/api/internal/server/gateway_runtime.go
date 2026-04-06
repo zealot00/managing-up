@@ -61,11 +61,26 @@ type staticProviderKeyResolver struct {
 	defaultKey   string
 }
 
-func (r staticProviderKeyResolver) KeyFor(provider llm.Provider) string {
+func (r staticProviderKeyResolver) KeyFor(userID string, provider llm.Provider) string {
 	if key := r.providerKeys[provider]; key != "" {
 		return key
 	}
 	return r.defaultKey
+}
+
+type DBProviderKeyResolver struct {
+	repo        Repository
+	envResolver gateway.ProviderKeyResolver
+}
+
+func (r *DBProviderKeyResolver) KeyFor(userID string, provider llm.Provider) string {
+	keys := r.repo.ListGatewayProviderKeys(userID)
+	for _, k := range keys {
+		if k.Provider == string(provider) && k.IsEnabled {
+			return k.EncryptedKey
+		}
+	}
+	return r.envResolver.KeyFor(userID, provider)
 }
 
 func buildProviderKeyResolverFromEnv() gateway.ProviderKeyResolver {
@@ -85,5 +100,13 @@ func buildProviderKeyResolverFromEnv() gateway.ProviderKeyResolver {
 	return staticProviderKeyResolver{
 		providerKeys: providerKeys,
 		defaultKey:   os.Getenv("GATEWAY_DEFAULT_UPSTREAM_API_KEY"),
+	}
+}
+
+func buildDBProviderKeyResolver(repo Repository) gateway.ProviderKeyResolver {
+	envResolver := buildProviderKeyResolverFromEnv()
+	return &DBProviderKeyResolver{
+		repo:        repo,
+		envResolver: envResolver,
 	}
 }

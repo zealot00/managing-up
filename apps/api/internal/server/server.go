@@ -542,7 +542,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	authHandler := handlers.NewAuthHandler(service.NewAuthService(repo), authMW)
 	gatewayValidator := gatewayAPIKeyValidator{repo: repo}
 	gatewayRecorder := gatewayUsageRecorder{repo: repo}
-	gatewayProviderKeyResolver := buildProviderKeyResolverFromEnv()
+	gatewayProviderKeyResolver := buildDBProviderKeyResolver(repo)
 	var gatewayLimiterFactory gateway.RateLimiterFactory
 	if os.Getenv("REDIS_URL") != "" {
 		redisClient := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_URL")})
@@ -615,8 +615,11 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/replay-snapshots/", srv.handleReplaySnapshotByID)
 	mux.Handle("/api/v1/gateway/keys", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayKeys)))
 	mux.Handle("/api/v1/gateway/keys/", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayKeyByID)))
+	mux.Handle("/api/v1/gateway/providers", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayProviders)))
+	mux.Handle("/api/v1/gateway/providers/", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayProviderByID)))
 	mux.Handle("/api/v1/gateway/usage", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayUsage)))
 	mux.Handle("/api/v1/gateway/usage/users", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayUsageByUsers)))
+	mux.Handle("/api/v1/gateway/budget", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayBudget)))
 
 	mux.HandleFunc("/api/v1/mcp-servers", srv.handleMCPServers)
 	mux.HandleFunc("/api/v1/mcp-servers/{id}", srv.handleMCPServerByID)

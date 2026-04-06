@@ -35,7 +35,7 @@ type UsageRecorder interface {
 }
 
 type ProviderKeyResolver interface {
-	KeyFor(provider llm.Provider) string
+	KeyFor(userID string, provider llm.Provider) string
 }
 
 type BudgetChecker interface {

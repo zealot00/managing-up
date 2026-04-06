@@ -10,19 +10,21 @@ import (
 )
 
 type store struct {
-	mu              sync.RWMutex
-	skills          []Skill
-	skillVersions   []SkillVersion
-	procedureDrafts []ProcedureDraft
-	executions      []Execution
-	approvals       []Approval
-	tasks           map[string]Task
-	experiments     map[string]Experiment
-	experimentRuns  map[string]ExperimentRun
-	users           map[string]models.User
-	gatewayAPIKeys  map[string]GatewayAPIKey
-	gatewayUsage    []GatewayUsageEvent
-	mcpServers      map[string]MCPServer
+	mu                  sync.RWMutex
+	skills              []Skill
+	skillVersions       []SkillVersion
+	procedureDrafts     []ProcedureDraft
+	executions          []Execution
+	approvals           []Approval
+	tasks               map[string]Task
+	experiments         map[string]Experiment
+	experimentRuns      map[string]ExperimentRun
+	users               map[string]models.User
+	gatewayAPIKeys      map[string]GatewayAPIKey
+	gatewayUsage        []GatewayUsageEvent
+	gatewayProviderKeys map[string]GatewayProviderKey
+	userBudgets         map[string]UserBudget
+	mcpServers          map[string]MCPServer
 }
 
 var _ Repository = (*store)(nil)
@@ -147,13 +149,15 @@ func NewStore() *store {
 				RequestedAt:   now.Add(-30 * time.Minute),
 			},
 		},
-		tasks:          make(map[string]Task),
-		experiments:    make(map[string]Experiment),
-		experimentRuns: make(map[string]ExperimentRun),
-		users:          make(map[string]models.User),
-		gatewayAPIKeys: make(map[string]GatewayAPIKey),
-		gatewayUsage:   make([]GatewayUsageEvent, 0),
-		mcpServers:     make(map[string]MCPServer),
+		tasks:               make(map[string]Task),
+		experiments:         make(map[string]Experiment),
+		experimentRuns:      make(map[string]ExperimentRun),
+		users:               make(map[string]models.User),
+		gatewayAPIKeys:      make(map[string]GatewayAPIKey),
+		gatewayUsage:        make([]GatewayUsageEvent, 0),
+		gatewayProviderKeys: make(map[string]GatewayProviderKey),
+		userBudgets:         make(map[string]UserBudget),
+		mcpServers:          make(map[string]MCPServer),
 	}
 }
 
@@ -860,4 +864,114 @@ func (s *store) DeleteMCPServer(id string) error {
 
 	delete(s.mcpServers, id)
 	return nil
+}
+
+func (s *store) CreateGatewayProviderKey(key GatewayProviderKey) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.gatewayProviderKeys[key.ID] = key
+	return nil
+}
+
+func (s *store) ListGatewayProviderKeys(userID string) []GatewayProviderKey {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	items := make([]GatewayProviderKey, 0)
+	for _, item := range s.gatewayProviderKeys {
+		if userID == "" || item.UserID == userID {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
+func (s *store) GetGatewayProviderKey(id string) (GatewayProviderKey, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	key, found := s.gatewayProviderKeys[id]
+	return key, found
+}
+
+func (s *store) GetGatewayProviderKeyByHash(keyHash string) (GatewayProviderKey, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, item := range s.gatewayProviderKeys {
+		if item.KeyHash == keyHash {
+			return item, true
+		}
+	}
+	return GatewayProviderKey{}, false
+}
+
+func (s *store) UpdateGatewayProviderKey(key GatewayProviderKey) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, found := s.gatewayProviderKeys[key.ID]; !found {
+		return fmt.Errorf("provider key not found: %s", key.ID)
+	}
+	key.UpdatedAt = time.Now().UTC()
+	s.gatewayProviderKeys[key.ID] = key
+	return nil
+}
+
+func (s *store) DeleteGatewayProviderKey(id string, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, found := s.gatewayProviderKeys[id]
+	if !found {
+		return fmt.Errorf("provider key not found: %s", id)
+	}
+	if userID != "" && key.UserID != userID {
+		return fmt.Errorf("provider key does not belong to user: %s", userID)
+	}
+	delete(s.gatewayProviderKeys, id)
+	return nil
+}
+
+func (s *store) ToggleGatewayProviderKey(id string, userID string, enabled bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, found := s.gatewayProviderKeys[id]
+	if !found {
+		return fmt.Errorf("provider key not found: %s", id)
+	}
+	if userID != "" && key.UserID != userID {
+		return fmt.Errorf("provider key does not belong to user: %s", userID)
+	}
+	key.IsEnabled = enabled
+	key.UpdatedAt = time.Now().UTC()
+	s.gatewayProviderKeys[id] = key
+	return nil
+}
+
+func (s *store) GetUserBudget(userID string) (UserBudget, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	budget, found := s.userBudgets[userID]
+	return budget, found
+}
+
+func (s *store) CreateOrUpdateUserBudget(budget UserBudget) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	if budget.ID == "" {
+		budget.ID = fmt.Sprintf("budget_%s_%d", budget.UserID, now.UnixNano())
+	}
+	budget.UpdatedAt = now
+	s.userBudgets[budget.UserID] = budget
+	return nil
+}
+
+func (s *store) DecrementUserBudget(userID string, tokens int) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	budget, found := s.userBudgets[userID]
+	if !found {
+		return 0, fmt.Errorf("user budget not found: %s", userID)
+	}
+	budget.UsedThisMonth += tokens
+	budget.UpdatedAt = time.Now().UTC()
+	s.userBudgets[userID] = budget
+	return budget.UsedThisMonth, nil
 }

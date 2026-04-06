@@ -35,6 +35,7 @@ export default function Breadcrumb() {
       approvals: t("approvals"),
       replays: t("replays"),
       gateway: t("gateway"),
+      providers: t("providers"),
       mcp: t("mcp"),
       seh: t("sehModule"),
       datasets: t("sehDatasets"),

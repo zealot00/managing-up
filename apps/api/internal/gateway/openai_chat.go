@@ -126,7 +126,12 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	} else {
 		upstreamAPIKey := apiKey
 		if s.providerKeyResolver != nil {
-			if resolved := s.providerKeyResolver.KeyFor(provider); resolved != "" {
+			principal := GetPrincipalFromContext(r.Context())
+			userID := ""
+			if principal != nil {
+				userID = principal.UserID
+			}
+			if resolved := s.providerKeyResolver.KeyFor(userID, provider); resolved != "" {
 				upstreamAPIKey = resolved
 			}
 		}
@@ -210,7 +215,12 @@ func generateID() string {
 func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, apiKey string, provider llm.Provider, model llm.Model, messages []llm.Message, opts []llm.Option) {
 	upstreamAPIKey := apiKey
 	if s.providerKeyResolver != nil {
-		if resolved := s.providerKeyResolver.KeyFor(provider); resolved != "" {
+		principal := GetPrincipalFromContext(r.Context())
+		userID := ""
+		if principal != nil {
+			userID = principal.UserID
+		}
+		if resolved := s.providerKeyResolver.KeyFor(userID, provider); resolved != "" {
 			upstreamAPIKey = resolved
 		}
 	}

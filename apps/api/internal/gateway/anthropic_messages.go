@@ -108,7 +108,12 @@ func (s *Server) HandleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 
 	upstreamAPIKey := apiKey
 	if s.providerKeyResolver != nil {
-		if resolved := s.providerKeyResolver.KeyFor(provider); resolved != "" {
+		principal := GetPrincipalFromContext(r.Context())
+		userID := ""
+		if principal != nil {
+			userID = principal.UserID
+		}
+		if resolved := s.providerKeyResolver.KeyFor(userID, provider); resolved != "" {
 			upstreamAPIKey = resolved
 		}
 	}

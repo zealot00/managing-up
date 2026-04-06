@@ -56,6 +56,16 @@ type Repository interface {
 	CreateGatewayUsageEvent(event GatewayUsageEvent) error
 	ListGatewayUsageByUser(userID string, from, to *time.Time) []GatewayUsageAggregate
 	ListGatewayUsageByUsers(from, to *time.Time) []GatewayUserUsageAggregate
+	CreateGatewayProviderKey(key GatewayProviderKey) error
+	ListGatewayProviderKeys(userID string) []GatewayProviderKey
+	GetGatewayProviderKey(id string) (GatewayProviderKey, bool)
+	GetGatewayProviderKeyByHash(keyHash string) (GatewayProviderKey, bool)
+	UpdateGatewayProviderKey(key GatewayProviderKey) error
+	DeleteGatewayProviderKey(id string, userID string) error
+	ToggleGatewayProviderKey(id string, userID string, enabled bool) error
+	GetUserBudget(userID string) (UserBudget, bool)
+	CreateOrUpdateUserBudget(budget UserBudget) error
+	DecrementUserBudget(userID string, tokens int) (int, error)
 	GetRandomTip() (Tip, bool)
 	ListMCPServers() []MCPServer
 	GetMCPServer(id string) (MCPServer, bool)

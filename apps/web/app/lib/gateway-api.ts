@@ -93,3 +93,90 @@ export async function getGatewayUsageByUsers(params?: {
   const qs = query.toString();
   return request<{ items: GatewayUserUsageRow[] }>(`/api/v1/gateway/usage/users${qs ? `?${qs}` : ""}`);
 }
+
+export type GatewayProviderKey = {
+  id: string;
+  user_id: string;
+  provider: string;
+  model: string;
+  key_prefix: string;
+  is_enabled: boolean;
+  monthly_limit: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UserBudget = {
+  id: string;
+  user_id: string;
+  monthly_limit: number;
+  daily_limit: number;
+  used_this_month: number;
+  used_today: number;
+  reset_at: string;
+  updated_at: string;
+};
+
+export async function listProviderKeys(): Promise<{ items: GatewayProviderKey[] }> {
+  return request<{ items: GatewayProviderKey[] }>("/api/v1/gateway/providers");
+}
+
+export async function createProviderKey(data: {
+  provider: string;
+  api_key: string;
+  model?: string;
+  monthly_limit?: number;
+}): Promise<{ item: GatewayProviderKey }> {
+  return request<{ item: GatewayProviderKey }>("/api/v1/gateway/providers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getProviderKey(id: string): Promise<{ item: GatewayProviderKey }> {
+  return request<{ item: GatewayProviderKey }>(`/api/v1/gateway/providers/${id}`);
+}
+
+export async function updateProviderKey(id: string, data: {
+  provider?: string;
+  api_key?: string;
+  model?: string;
+  monthly_limit?: number;
+  is_enabled?: boolean;
+}): Promise<{ item: GatewayProviderKey }> {
+  return request<{ item: GatewayProviderKey }>(`/api/v1/gateway/providers/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteProviderKey(id: string): Promise<void> {
+  await request<{ status: string }>(`/api/v1/gateway/providers/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function toggleProviderKey(id: string, enabled: boolean): Promise<{ item: GatewayProviderKey }> {
+  return request<{ item: GatewayProviderKey }>(`/api/v1/gateway/providers/${id}/toggle`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export async function getBudget(): Promise<{ item: UserBudget }> {
+  return request<{ item: UserBudget }>("/api/v1/gateway/budget");
+}
+
+export async function updateBudget(data: {
+  monthly_limit?: number;
+  daily_limit?: number;
+}): Promise<{ item: UserBudget }> {
+  return request<{ item: UserBudget }>("/api/v1/gateway/budget", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}

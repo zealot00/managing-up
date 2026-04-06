@@ -57,7 +57,7 @@ export default function Sidebar() {
       items: [
         { href: "/approvals", labelKey: "approvals", icon: <ClipboardCheck size={18} aria-hidden="true" /> },
         { href: "/replays", labelKey: "replays", icon: <RotateCcw size={18} aria-hidden="true" /> },
-        { href: "/gateway", labelKey: "gateway", icon: <Network size={18} aria-hidden="true" /> },
+        { href: "/gateway", labelKey: "gateway", icon: <Network size={18} aria-hidden="true" />, children: [{ href: "/gateway/providers", labelKey: "providers" }] },
         { href: "/mcp", labelKey: "mcp", icon: <Shield size={18} aria-hidden="true" /> },
       ],
     },

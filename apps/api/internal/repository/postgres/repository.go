@@ -1548,6 +1548,46 @@ func (r *Repository) DeleteMCPServer(id string) error {
 	return err
 }
 
+func (r *Repository) CreateGatewayProviderKey(key server.GatewayProviderKey) error {
+	return fmt.Errorf("not implemented: CreateGatewayProviderKey")
+}
+
+func (r *Repository) ListGatewayProviderKeys(userID string) []server.GatewayProviderKey {
+	return []server.GatewayProviderKey{}
+}
+
+func (r *Repository) GetGatewayProviderKey(id string) (server.GatewayProviderKey, bool) {
+	return server.GatewayProviderKey{}, false
+}
+
+func (r *Repository) GetGatewayProviderKeyByHash(keyHash string) (server.GatewayProviderKey, bool) {
+	return server.GatewayProviderKey{}, false
+}
+
+func (r *Repository) UpdateGatewayProviderKey(key server.GatewayProviderKey) error {
+	return fmt.Errorf("not implemented: UpdateGatewayProviderKey")
+}
+
+func (r *Repository) DeleteGatewayProviderKey(id string, userID string) error {
+	return fmt.Errorf("not implemented: DeleteGatewayProviderKey")
+}
+
+func (r *Repository) ToggleGatewayProviderKey(id string, userID string, enabled bool) error {
+	return fmt.Errorf("not implemented: ToggleGatewayProviderKey")
+}
+
+func (r *Repository) GetUserBudget(userID string) (server.UserBudget, bool) {
+	return server.UserBudget{}, false
+}
+
+func (r *Repository) CreateOrUpdateUserBudget(budget server.UserBudget) error {
+	return fmt.Errorf("not implemented: CreateOrUpdateUserBudget")
+}
+
+func (r *Repository) DecrementUserBudget(userID string, tokens int) (int, error) {
+	return 0, fmt.Errorf("not implemented: DecrementUserBudget")
+}
+
 func scanMCPServers(rows *sql.Rows) []server.MCPServer {
 	servers := make([]server.MCPServer, 0)
 	for rows.Next() {
