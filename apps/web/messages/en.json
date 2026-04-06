@@ -337,6 +337,7 @@
     "modelPatternPlaceholder": "e.g. gpt-4* (leave empty for all models)",
     "monthlyLimit": "Monthly token limit",
     "monthlyLimitPlaceholder": "0 = unlimited",
+    "unlimited": "Unlimited",
     "enable": "Enable",
     "disable": "Disable",
     "noProviders": "No provider keys configured",

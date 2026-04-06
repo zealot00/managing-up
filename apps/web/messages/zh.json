@@ -337,6 +337,7 @@
     "modelPatternPlaceholder": "例如：gpt-4*（留空则匹配所有模型）",
     "monthlyLimit": "每月 Token 限额",
     "monthlyLimitPlaceholder": "0 = 无限制",
+    "unlimited": "无限制",
     "enable": "启用",
     "disable": "禁用",
     "noProviders": "暂无供应商密钥配置",
