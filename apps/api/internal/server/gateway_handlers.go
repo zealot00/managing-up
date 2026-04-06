@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -234,7 +235,8 @@ func (s *Server) handleGatewayProviders(w http.ResponseWriter, r *http.Request) 
 			UpdatedAt:    now,
 		}
 		if err := s.repo.CreateGatewayProviderKey(key); err != nil {
-			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create provider key.")
+			log.Printf("[handleGatewayProviders] CreateGatewayProviderKey error: %v (keyID=%s, userID=%s)", err, key.ID, user.ID)
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", fmt.Sprintf("Failed to create provider key: %v", err))
 			return
 		}
 		writeEnvelope(w, http.StatusCreated, generateRequestID(), map[string]any{"item": key})

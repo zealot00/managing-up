@@ -43,6 +43,43 @@ func New(dsn string) (*Repository, error) {
 		return nil, fmt.Errorf("migrate experiments variants: %w", err)
 	}
 
+	// Gateway provider keys table
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS gateway_provider_keys (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			provider TEXT NOT NULL,
+			model TEXT DEFAULT '',
+			key_hash TEXT NOT NULL,
+			key_prefix TEXT NOT NULL,
+			encrypted_key TEXT NOT NULL,
+			is_enabled BOOLEAN DEFAULT true,
+			monthly_limit INTEGER DEFAULT 0,
+			created_at TIMESTAMPTZ NOT NULL,
+			updated_at TIMESTAMPTZ NOT NULL
+		)
+	`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrate gateway_provider_keys: %w", err)
+	}
+
+	// User budgets table
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS user_budgets (
+			id TEXT PRIMARY KEY,
+			user_id TEXT UNIQUE NOT NULL,
+			monthly_limit INTEGER DEFAULT 0,
+			daily_limit INTEGER DEFAULT 0,
+			used_this_month INTEGER DEFAULT 0,
+			used_today INTEGER DEFAULT 0,
+			reset_at TIMESTAMPTZ NOT NULL,
+			updated_at TIMESTAMPTZ NOT NULL
+		)
+	`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrate user_budgets: %w", err)
+	}
+
 	return &Repository{db: db}, nil
 }
 
@@ -1548,46 +1585,6 @@ func (r *Repository) DeleteMCPServer(id string) error {
 	return err
 }
 
-func (r *Repository) CreateGatewayProviderKey(key server.GatewayProviderKey) error {
-	return fmt.Errorf("not implemented: CreateGatewayProviderKey")
-}
-
-func (r *Repository) ListGatewayProviderKeys(userID string) []server.GatewayProviderKey {
-	return []server.GatewayProviderKey{}
-}
-
-func (r *Repository) GetGatewayProviderKey(id string) (server.GatewayProviderKey, bool) {
-	return server.GatewayProviderKey{}, false
-}
-
-func (r *Repository) GetGatewayProviderKeyByHash(keyHash string) (server.GatewayProviderKey, bool) {
-	return server.GatewayProviderKey{}, false
-}
-
-func (r *Repository) UpdateGatewayProviderKey(key server.GatewayProviderKey) error {
-	return fmt.Errorf("not implemented: UpdateGatewayProviderKey")
-}
-
-func (r *Repository) DeleteGatewayProviderKey(id string, userID string) error {
-	return fmt.Errorf("not implemented: DeleteGatewayProviderKey")
-}
-
-func (r *Repository) ToggleGatewayProviderKey(id string, userID string, enabled bool) error {
-	return fmt.Errorf("not implemented: ToggleGatewayProviderKey")
-}
-
-func (r *Repository) GetUserBudget(userID string) (server.UserBudget, bool) {
-	return server.UserBudget{}, false
-}
-
-func (r *Repository) CreateOrUpdateUserBudget(budget server.UserBudget) error {
-	return fmt.Errorf("not implemented: CreateOrUpdateUserBudget")
-}
-
-func (r *Repository) DecrementUserBudget(userID string, tokens int) (int, error) {
-	return 0, fmt.Errorf("not implemented: DecrementUserBudget")
-}
-
 func scanMCPServers(rows *sql.Rows) []server.MCPServer {
 	servers := make([]server.MCPServer, 0)
 	for rows.Next() {
@@ -1648,4 +1645,129 @@ func scanMCPServers(rows *sql.Rows) []server.MCPServer {
 		servers = append(servers, s)
 	}
 	return servers
+}
+
+func (r *Repository) CreateGatewayProviderKey(key server.GatewayProviderKey) error {
+	query := `
+		INSERT INTO gateway_provider_keys (id, user_id, provider, model, key_hash, key_prefix, encrypted_key, is_enabled, monthly_limit, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`
+	_, err := r.db.Exec(query, key.ID, key.UserID, key.Provider, key.Model, key.KeyHash, key.KeyPrefix, key.EncryptedKey, key.IsEnabled, key.MonthlyLimit, key.CreatedAt, key.UpdatedAt)
+	return err
+}
+
+func (r *Repository) ListGatewayProviderKeys(userID string) []server.GatewayProviderKey {
+	query := `
+		SELECT id, user_id, provider, model, key_prefix, is_enabled, monthly_limit, created_at, updated_at
+		FROM gateway_provider_keys
+		WHERE $1 = '' OR user_id = $1
+		ORDER BY created_at DESC
+	`
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return []server.GatewayProviderKey{}
+	}
+	defer rows.Close()
+
+	items := make([]server.GatewayProviderKey, 0)
+	for rows.Next() {
+		var item server.GatewayProviderKey
+		var model sql.NullString
+		if err := rows.Scan(&item.ID, &item.UserID, &item.Provider, &model, &item.KeyPrefix, &item.IsEnabled, &item.MonthlyLimit, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			continue
+		}
+		if model.Valid {
+			item.Model = model.String
+		}
+		items = append(items, item)
+	}
+	return items
+}
+
+func (r *Repository) GetGatewayProviderKey(id string) (server.GatewayProviderKey, bool) {
+	query := `
+		SELECT id, user_id, provider, model, key_prefix, is_enabled, monthly_limit, created_at, updated_at
+		FROM gateway_provider_keys
+		WHERE id = $1
+	`
+	var item server.GatewayProviderKey
+	var model sql.NullString
+	if err := r.db.QueryRow(query, id).Scan(&item.ID, &item.UserID, &item.Provider, &model, &item.KeyPrefix, &item.IsEnabled, &item.MonthlyLimit, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		return server.GatewayProviderKey{}, false
+	}
+	if model.Valid {
+		item.Model = model.String
+	}
+	return item, true
+}
+
+func (r *Repository) GetGatewayProviderKeyByHash(keyHash string) (server.GatewayProviderKey, bool) {
+	query := `
+		SELECT id, user_id, provider, model, key_prefix, is_enabled, monthly_limit, created_at, updated_at
+		FROM gateway_provider_keys
+		WHERE key_hash = $1
+	`
+	var item server.GatewayProviderKey
+	var model sql.NullString
+	if err := r.db.QueryRow(query, keyHash).Scan(&item.ID, &item.UserID, &item.Provider, &model, &item.KeyPrefix, &item.IsEnabled, &item.MonthlyLimit, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		return server.GatewayProviderKey{}, false
+	}
+	if model.Valid {
+		item.Model = model.String
+	}
+	return item, true
+}
+
+func (r *Repository) UpdateGatewayProviderKey(key server.GatewayProviderKey) error {
+	query := `
+		UPDATE gateway_provider_keys
+		SET provider = $2, model = $3, key_hash = $4, key_prefix = $5, encrypted_key = $6, is_enabled = $7, monthly_limit = $8, updated_at = $9
+		WHERE id = $1
+	`
+	_, err := r.db.Exec(query, key.ID, key.Provider, key.Model, key.KeyHash, key.KeyPrefix, key.EncryptedKey, key.IsEnabled, key.MonthlyLimit, key.UpdatedAt)
+	return err
+}
+
+func (r *Repository) DeleteGatewayProviderKey(id, userID string) error {
+	query := `DELETE FROM gateway_provider_keys WHERE id = $1 AND user_id = $2`
+	_, err := r.db.Exec(query, id, userID)
+	return err
+}
+
+func (r *Repository) ToggleGatewayProviderKey(id, userID string, enabled bool) error {
+	query := `UPDATE gateway_provider_keys SET is_enabled = $3, updated_at = NOW() WHERE id = $1 AND user_id = $2`
+	_, err := r.db.Exec(query, id, userID, enabled)
+	return err
+}
+
+func (r *Repository) GetUserBudget(userID string) (server.UserBudget, bool) {
+	query := `
+		SELECT id, user_id, monthly_limit, daily_limit, used_this_month, used_today, reset_at, updated_at
+		FROM user_budgets
+		WHERE user_id = $1
+	`
+	var item server.UserBudget
+	if err := r.db.QueryRow(query, userID).Scan(&item.ID, &item.UserID, &item.MonthlyLimit, &item.DailyLimit, &item.UsedThisMonth, &item.UsedToday, &item.ResetAt, &item.UpdatedAt); err != nil {
+		return server.UserBudget{}, false
+	}
+	return item, true
+}
+
+func (r *Repository) CreateOrUpdateUserBudget(budget server.UserBudget) error {
+	query := `
+		INSERT INTO user_budgets (id, user_id, monthly_limit, daily_limit, used_this_month, used_today, reset_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (user_id) DO UPDATE SET
+			monthly_limit = EXCLUDED.monthly_limit,
+			daily_limit = EXCLUDED.daily_limit,
+			updated_at = EXCLUDED.updated_at
+	`
+	_, err := r.db.Exec(query, budget.ID, budget.UserID, budget.MonthlyLimit, budget.DailyLimit, budget.UsedThisMonth, budget.UsedToday, budget.ResetAt, budget.UpdatedAt)
+	return err
+}
+
+func (r *Repository) DecrementUserBudget(userID string, tokens int) (int, error) {
+	query := `UPDATE user_budgets SET used_this_month = used_this_month + $2, used_today = used_today + $2, updated_at = NOW() WHERE user_id = $1`
+	_, err := r.db.Exec(query, userID, tokens)
+	return 0, err
 }
