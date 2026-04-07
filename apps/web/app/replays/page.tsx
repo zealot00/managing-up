@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { getReplaySnapshots } from "../lib/api";
 import ReplayManager from "../components/ReplayManager";
+import { PageHeader } from "../components/layout/PageHeader";
 
 async function ReplaysContent() {
   const t = await getTranslations("replays");
@@ -10,13 +11,11 @@ async function ReplaysContent() {
 
   return (
     <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">{t("eyebrow")}</p>
-        <h1>{t("title")}</h1>
-        <p className="lede">
-          {t("lede")}
-        </p>
-      </header>
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        description={t("lede")}
+      />
 
       <ReplayManager snapshots={snapshots} />
     </main>

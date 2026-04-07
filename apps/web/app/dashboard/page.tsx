@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { getDashboard } from "../lib/api";
 import { Package, Play, ClipboardCheck, CheckCircle } from "lucide-react";
+import { EmptyState } from "../components/layout/EmptyState";
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) {
@@ -67,7 +68,7 @@ async function DashboardContent() {
         </div>
         <div className="dashboard-list">
           {recentExecutions.length === 0 ? (
-            <p className="empty-note">{t("noExecutions", { namespace: "executions" })}</p>
+            <EmptyState title={t("noExecutions", { namespace: "executions" })} />
           ) : (
             recentExecutions.map((execution) => (
               <article className="dashboard-list-item" key={execution.id}>

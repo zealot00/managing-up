@@ -6,6 +6,9 @@ import { TaskExecution, Task, Metric, runTaskEvaluation, createMetric } from "..
 import { useTranslations } from "next-intl";
 import RunEvaluationForm from "./RunEvaluationForm";
 import CreateMetricForm from "./CreateMetricForm";
+import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
+import { Badge } from "./ui/Badge";
 
 type Props = {
   executions: TaskExecution[];
@@ -20,21 +23,20 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
 
   return (
     <>
-      <div className="page-header" style={{ marginBottom: "var(--space-6)", marginTop: "var(--space-4)", paddingBottom: 0, borderBottom: "none" }}>
-        <div className="page-header-content">
-          <p className="section-kicker" style={{ margin: 0 }}>
-            {t("taskExecutions", { count: executions.length })}
-          </p>
-        </div>
-        <div className="page-header-actions">
-          <button className="btn btn-secondary" onClick={() => { setShowCreateMetric(!showCreateMetric); setShowRunEval(false); }}>
-            {showCreateMetric ? "Cancel" : t("newMetric")}
-          </button>
-          <button className="btn btn-primary" onClick={() => { setShowRunEval(!showRunEval); setShowCreateMetric(false); }}>
-            {showRunEval ? "Cancel" : t("runEvaluation")}
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow={t("taskExecutions", { count: executions.length })}
+        title=""
+        actions={
+          <>
+            <button className="btn btn-secondary" onClick={() => { setShowCreateMetric(!showCreateMetric); setShowRunEval(false); }}>
+              {showCreateMetric ? "Cancel" : t("newMetric")}
+            </button>
+            <button className="btn btn-primary" onClick={() => { setShowRunEval(!showRunEval); setShowCreateMetric(false); }}>
+              {showRunEval ? "Cancel" : t("runEvaluation")}
+            </button>
+          </>
+        }
+      />
 
       {showCreateMetric && <CreateMetricForm onCreated={() => setShowCreateMetric(false)} />}
       {showRunEval && <RunEvaluationForm tasks={tasks} onCreated={() => setShowRunEval(false)} />}
@@ -72,11 +74,11 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
               ))}
             </div>
           ) : (
-            <div className="empty-state">
-              <div className="empty-state-icon">◎</div>
-              <h3 className="empty-state-title">{t("noExecutions")}</h3>
-              <p className="empty-state-description">{t("noExecutionsDesc")}</p>
-            </div>
+            <EmptyState
+              icon="◎"
+              title={t("noExecutions")}
+              description={t("noExecutionsDesc")}
+            />
           )}
         </div>
       </section>
@@ -97,9 +99,9 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
                       {task.test_cases.length} test cases · {task.difficulty} difficulty
                     </p>
                   </div>
-                  <span className={`badge badge-${task.difficulty}`}>
+                  <Badge variant={task.difficulty as "easy" | "medium" | "hard"}>
                     {task.difficulty}
-                  </span>
+                  </Badge>
                 </article>
               ))}
             </div>
@@ -124,9 +126,9 @@ function ExecutionCard({ exec, tasks }: { exec: TaskExecution; tasks: Task[] }) 
           <h3 className="eval-card-title">{taskName}</h3>
           <p className="eval-card-meta">{t("agent")}: {exec.agent_id}</p>
         </div>
-        <span className={`badge badge-${exec.status}`}>
+        <Badge variant={exec.status as "running" | "pending" | "completed" | "failed" | "muted"}>
           {exec.status}
-        </span>
+        </Badge>
       </div>
       {exec.duration_ms && (
         <p className="eval-card-body" style={{ marginTop: "var(--space-3)" }}>

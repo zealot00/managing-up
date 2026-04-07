@@ -10,6 +10,8 @@ import { useTranslations } from "next-intl";
 import { deleteSEHDataset, createSEHRelease } from "../lib/seh-api";
 import { useToast } from "../../components/ToastProvider";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
+import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
 import { Database, Play, Target, LayoutDashboard } from "lucide-react";
 
 type Dataset = { dataset_id: string; name: string; version: string; owner: string; case_count: number };
@@ -117,8 +119,8 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
         ))}
       </div>
 
-      <div className="page-header">
-        <div className="page-header-content">
+      <PageHeader
+        eyebrow={
           <div className="tabs">
             {tabs.map((tab) => (
               <button
@@ -136,20 +138,23 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
               </button>
             ))}
           </div>
-        </div>
-        <div className="page-header-actions">
-          {activeTab === "datasets" && (
-            <button className="btn btn-primary" onClick={() => { setShowCreateDataset(!showCreateDataset); setShowCreatePolicy(false); setEditingPolicy(null); }}>
-              {showCreateDataset ? tc("cancel") : t("newDataset")}
-            </button>
-          )}
-          {activeTab === "policies" && !editingPolicy && (
-            <button className="btn btn-primary" onClick={() => { setShowCreatePolicy(!showCreatePolicy); setShowCreateDataset(false); }}>
-              {showCreatePolicy ? tc("cancel") : t("newPolicy")}
-            </button>
-          )}
-        </div>
-      </div>
+        }
+        title=""
+        actions={
+          <>
+            {activeTab === "datasets" && (
+              <button className="btn btn-primary" onClick={() => { setShowCreateDataset(!showCreateDataset); setShowCreatePolicy(false); setEditingPolicy(null); }}>
+                {showCreateDataset ? tc("cancel") : t("newDataset")}
+              </button>
+            )}
+            {activeTab === "policies" && !editingPolicy && (
+              <button className="btn btn-primary" onClick={() => { setShowCreatePolicy(!showCreatePolicy); setShowCreateDataset(false); }}>
+                {showCreatePolicy ? tc("cancel") : t("newPolicy")}
+              </button>
+            )}
+          </>
+        }
+      />
 
       {activeTab === "datasets" && showCreateDataset && (
         <CreateDatasetForm onCreated={() => { setShowCreateDataset(false); router.refresh(); }} />
@@ -190,7 +195,9 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
             </div>
             <div className="table-wrapper">
               {filteredDatasets.length === 0 ? (
-                <p className="empty-note">{searchQuery ? "No matching datasets" : t("noDatasets")}</p>
+                <EmptyState
+                  title={searchQuery ? "No matching datasets" : t("noDatasets")}
+                />
               ) : (
                 <table className="table">
                   <thead>

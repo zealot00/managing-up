@@ -5,6 +5,8 @@ import { ReplaySnapshot } from "../lib/api";
 import ReplayFilter from "./ReplayFilter";
 import ReplayDetail from "./ReplayDetail";
 import { useTranslations } from "next-intl";
+import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
 
 type Props = {
   snapshots: ReplaySnapshot[];
@@ -25,13 +27,10 @@ export default function ReplayManager({ snapshots }: Props) {
 
   return (
     <>
-      <div className="page-header" style={{ marginBottom: "var(--space-6)", marginTop: "var(--space-4)", paddingBottom: 0, borderBottom: "none" }}>
-        <div className="page-header-content">
-          <p className="section-kicker" style={{ margin: 0 }}>
-            {t("count", { count: filteredSnapshots.length, execCount: Object.keys(groupedByExecution).length })}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow={t("count", { count: filteredSnapshots.length, execCount: Object.keys(groupedByExecution).length })}
+        title=""
+      />
 
       <section aria-label="Filter" style={{ marginTop: "var(--space-4)" }}>
         <ReplayFilter
@@ -101,13 +100,11 @@ export default function ReplayManager({ snapshots }: Props) {
             </div>
           ))
         ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon">◎</div>
-            <h3 className="empty-state-title">{t("noSnapshots")}</h3>
-            <p className="empty-state-description">
-              {t("noSnapshotsDesc")}
-            </p>
-          </div>
+          <EmptyState
+            icon="◎"
+            title={t("noSnapshots")}
+            description={t("noSnapshotsDesc")}
+          />
         )}
       </section>
     </>

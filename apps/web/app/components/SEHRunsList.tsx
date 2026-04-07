@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
+import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
 
 type Run = { run_id: string; skill: string; dataset_id: string; metrics: { score: number; success_rate: number } };
 
@@ -40,11 +42,11 @@ export default function SEHRunsList({ runs, total, hasMore }: Props) {
         <Link href="/seh" className="toprail-link">← {tc("back")} to SEH</Link>
       </section>
 
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">SEH</p>
-        <h1>{t("runs")}</h1>
-        <p className="lede">{t("runsPageLede")}</p>
-      </header>
+      <PageHeader
+        eyebrow="SEH"
+        title={t("runs")}
+        description={t("runsPageLede")}
+      />
 
       <section className="panel">
         <div className="panel-header">
@@ -64,7 +66,9 @@ export default function SEHRunsList({ runs, total, hasMore }: Props) {
 
           <div className="table-wrapper">
             {paged.length === 0 ? (
-              <p className="empty-note">{searchQuery ? "No matching runs" : t("noRuns")}</p>
+              <EmptyState
+                title={searchQuery ? "No matching runs" : t("noRuns")}
+              />
             ) : (
               <table className="table">
                 <thead>

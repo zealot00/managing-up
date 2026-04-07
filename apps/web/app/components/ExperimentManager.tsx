@@ -6,6 +6,8 @@ import CreateExperimentForm from "./CreateExperimentForm";
 import CompareExperimentsForm from "./CompareExperimentsForm";
 import ExperimentCardWithActions from "./ExperimentCardWithActions";
 import { useTranslations } from "next-intl";
+import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
 
 type Props = {
   experiments: Experiment[];
@@ -20,21 +22,20 @@ export default function ExperimentManager({ experiments, tasks }: Props) {
 
   return (
     <>
-      <div className="page-header" style={{ marginBottom: "var(--space-6)", marginTop: "var(--space-4)", paddingBottom: 0, borderBottom: "none" }}>
-        <div className="page-header-content">
-          <p className="section-kicker" style={{ margin: 0 }}>
-            {t("count", { count: experiments.length })}
-          </p>
-        </div>
-        <div className="page-header-actions">
-          <button className="btn btn-secondary" onClick={() => { setShowCompare(!showCompare); setShowCreate(false); }}>
-            {showCompare ? tc("cancel") : t("compare")}
-          </button>
-          <button className="btn btn-primary" onClick={() => { setShowCreate(!showCreate); setShowCompare(false); }}>
-            {showCreate ? tc("cancel") : t("newExperiment")}
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow={t("count", { count: experiments.length })}
+        title=""
+        actions={
+          <>
+            <button className="btn btn-secondary" onClick={() => { setShowCompare(!showCompare); setShowCreate(false); }}>
+              {showCompare ? tc("cancel") : t("compare")}
+            </button>
+            <button className="btn btn-primary" onClick={() => { setShowCreate(!showCreate); setShowCompare(false); }}>
+              {showCreate ? tc("cancel") : t("newExperiment")}
+            </button>
+          </>
+        }
+      />
 
       {showCreate && (
         <CreateExperimentForm
@@ -55,18 +56,16 @@ export default function ExperimentManager({ experiments, tasks }: Props) {
             ))}
           </div>
         ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon">◎</div>
-            <h3 className="empty-state-title">{t("noExperiments")}</h3>
-            <p className="empty-state-description">
-              {t("noExperimentsDesc")}
-            </p>
-            <div style={{ marginTop: "var(--space-5)" }}>
+          <EmptyState
+            icon="◎"
+            title={t("noExperiments")}
+            description={t("noExperimentsDesc")}
+            action={
               <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
                 {t("createExperiment")}
               </button>
-            </div>
-          </div>
+            }
+          />
         )}
       </section>
     </>

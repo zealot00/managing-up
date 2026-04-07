@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { getSEHDashboardSummary, getSEHDatasets, getSEHRuns, getSEHPolicies } from "../lib/seh-api";
 import SEHManager from "../components/SEHManager";
+import { PageHeader } from "../components/layout/PageHeader";
 
 async function SEHDashboardContent() {
   const t = await getTranslations("seh");
@@ -35,13 +36,11 @@ async function SEHDashboardContent() {
 
   return (
     <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">{t("eyebrow")}</p>
-        <h1>{t("title")}</h1>
-        <p className="lede">
-          {t("lede")}
-        </p>
-      </header>
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        description={t("lede")}
+      />
 
       {hasError && (
         <div className="alert-bar alert-bar-warning">

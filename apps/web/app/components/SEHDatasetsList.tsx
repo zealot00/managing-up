@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
+import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
 
 type Dataset = { dataset_id: string; name: string; version: string; owner: string; case_count: number };
 
@@ -40,11 +42,11 @@ export default function SEHDatasetsList({ datasets, total, hasMore }: Props) {
         <Link href="/seh" className="toprail-link">← {tc("back")} to SEH</Link>
       </section>
 
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">SEH</p>
-        <h1>{t("datasets")}</h1>
-        <p className="lede">{t("datasetsPageLede")}</p>
-      </header>
+      <PageHeader
+        eyebrow="SEH"
+        title={t("datasets")}
+        description={t("datasetsPageLede")}
+      />
 
       <section className="panel">
         <div className="panel-header">
@@ -64,7 +66,9 @@ export default function SEHDatasetsList({ datasets, total, hasMore }: Props) {
 
           <div className="table-wrapper">
             {paged.length === 0 ? (
-              <p className="empty-note">{searchQuery ? "No matching datasets" : t("noDatasets")}</p>
+              <EmptyState
+                title={searchQuery ? "No matching datasets" : t("noDatasets")}
+              />
             ) : (
               <table className="table">
                 <thead>

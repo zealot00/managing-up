@@ -15,6 +15,8 @@ import {
 } from "../../lib/gateway-api";
 import { useToast } from "../../../components/ToastProvider";
 import Breadcrumb from "../../../components/Breadcrumb";
+import { EmptyState } from "../../components/layout/EmptyState";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import {
   Server,
   Plus,
@@ -204,97 +206,86 @@ function ProviderTable({
   items,
   onToggle,
   onDelete,
-  deletingId,
 }: {
   items: GatewayProviderKey[];
   onToggle: (id: string, current: boolean) => void;
   onDelete: (id: string) => void;
-  deletingId: string | null;
 }) {
   const t = useTranslations("providers");
   const tc = useTranslations("common");
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const confirmingProvider = items.find(p => p.id === confirmingId) || null;
 
   if (items.length === 0) {
     return (
-      <div className="empty-state">
-        <div className="empty-state-icon">
-          <Server size={48} aria-hidden="true" />
-        </div>
-        <h3 className="empty-state-title">{t("noProviders")}</h3>
-        <p className="empty-state-description">{t("noProvidersDesc")}</p>
-      </div>
+      <EmptyState
+        icon={<Server size={48} aria-hidden="true" />}
+        title={t("noProviders")}
+        description={t("noProvidersDesc")}
+      />
     );
   }
 
   return (
-    <div className="gateway-table-wrapper">
-      <table className="gateway-table">
-        <thead>
-          <tr>
-            <th style={{ width: 140 }}>{t("provider")}</th>
-            <th>{t("modelPattern")}</th>
-            <th style={{ width: 120 }}>{t("monthlyLimit")}</th>
-            <th style={{ width: 90 }}>{tc("status")}</th>
-            <th style={{ width: 100 }}>{tc("createdAt")}</th>
-            <th style={{ width: 160 }}>{tc("actions")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((p) => (
-            <tr key={p.id}>
-              <td>
-                <span style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>{p.provider}</span>
-              </td>
-              <td>
-                <code
-                  style={{
-                    fontSize: "var(--text-xs)",
-                    fontFamily: "'IBM Plex Mono', monospace",
-                    color: "var(--ink)",
-                  }}
-                >
-                  {p.model || "*"}
-                </code>
-              </td>
-              <td>
-                <span style={{ fontSize: "var(--text-sm)", color: "var(--muted)" }}>
-                  {p.monthly_limit > 0 ? p.monthly_limit.toLocaleString() : "—"}
-                </span>
-              </td>
-              <td>
-                <span
-                  className={`badge ${p.is_enabled ? "badge-completed" : "badge-muted"}`}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
-                >
-                  {p.is_enabled ? t("enabled") : t("disabled")}
-                </span>
-              </td>
-              <td>
-                <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
-                  {new Date(p.created_at).toLocaleDateString()}
-                </span>
-              </td>
-              <td>
-                {deletingId === p.id ? (
-                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    <span style={{ fontSize: "var(--text-xs)", color: "var(--danger)" }}>
-                      {t("confirmDelete")}
-                    </span>
-                    <button
-                      className="btn btn-sm"
-                      style={{ background: "var(--danger)", color: "#fff", border: "none" }}
-                      onClick={() => onDelete(p.id)}
-                    >
-                      {tc("confirm")}
-                    </button>
-                    <button
-                      className="btn btn-sm btn-secondary"
-                      onClick={() => onDelete("")}
-                    >
-                      {tc("cancel")}
-                    </button>
-                  </div>
-                ) : (
+    <>
+      <ConfirmDialog
+        isOpen={confirmingId !== null}
+        onClose={() => setConfirmingId(null)}
+        onConfirm={() => { onDelete(confirmingId!); setConfirmingId(null); }}
+        title={tc("deleteConfirmTitle", { name: confirmingProvider?.provider || "" })}
+        description={tc("deleteConfirmDescription")}
+        confirmText={tc("confirm")}
+        cancelText={tc("cancel")}
+        variant="danger"
+      />
+      <div className="gateway-table-wrapper">
+        <table className="gateway-table">
+          <thead>
+            <tr>
+              <th style={{ width: 140 }}>{t("provider")}</th>
+              <th>{t("modelPattern")}</th>
+              <th style={{ width: 120 }}>{t("monthlyLimit")}</th>
+              <th style={{ width: 90 }}>{tc("status")}</th>
+              <th style={{ width: 100 }}>{tc("createdAt")}</th>
+              <th style={{ width: 160 }}>{tc("actions")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((p) => (
+              <tr key={p.id}>
+                <td>
+                  <span style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>{p.provider}</span>
+                </td>
+                <td>
+                  <code
+                    style={{
+                      fontSize: "var(--text-xs)",
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      color: "var(--ink)",
+                    }}
+                  >
+                    {p.model || "*"}
+                  </code>
+                </td>
+                <td>
+                  <span style={{ fontSize: "var(--text-sm)", color: "var(--muted)" }}>
+                    {p.monthly_limit > 0 ? p.monthly_limit.toLocaleString() : "—"}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    className={`badge ${p.is_enabled ? "badge-completed" : "badge-muted"}`}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                  >
+                    {p.is_enabled ? t("enabled") : t("disabled")}
+                  </span>
+                </td>
+                <td>
+                  <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                    {new Date(p.created_at).toLocaleDateString()}
+                  </span>
+                </td>
+                <td>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                     <button
                       className={`mcp-toggle-btn ${p.is_enabled ? "mcp-toggle-btn-on" : "mcp-toggle-btn-off"}`}
@@ -310,19 +301,19 @@ function ProviderTable({
                     </button>
                     <button
                       className="btn btn-sm btn-ghost"
-                      onClick={() => onDelete(p.id)}
+                      onClick={() => setConfirmingId(p.id)}
                       aria-label={`Delete ${p.provider} key`}
                     >
                       <Trash2 size={14} aria-hidden="true" />
                     </button>
                   </div>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
@@ -479,7 +470,6 @@ export default function ProvidersPage() {
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [budgetExpanded, setBudgetExpanded] = useState(true);
   const [budgetEditing, setBudgetEditing] = useState(false);
@@ -520,14 +510,9 @@ export default function ProvidersPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!id) {
-      setDeletingId(null);
-      return;
-    }
     try {
       await deleteProviderKey(id);
       toast.success(tc("success") + ": Provider key deleted");
-      setDeletingId(null);
       await loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete provider");
@@ -607,7 +592,6 @@ export default function ProvidersPage() {
           items={providers}
           onToggle={handleToggle}
           onDelete={handleDelete}
-          deletingId={deletingId}
         />
       </div>
     </div>

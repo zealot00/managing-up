@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { runExperiment, checkRegression, Experiment } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { Badge } from "./ui/Badge";
 
 type Props = {
   exp: Experiment;
@@ -38,9 +39,9 @@ export default function ExperimentCardWithActions({ exp, onRun }: Props) {
           <h3 className="eval-card-title">{exp.name}</h3>
           <p className="eval-card-meta">{exp.description || tc("noData")}</p>
         </div>
-        <span className={`badge badge-${exp.status === "completed" ? "succeeded" : exp.status === "running" ? "running" : "muted"}`}>
+        <Badge variant={exp.status as "running" | "completed" | "pending" | "failed" | "muted"}>
           {exp.status}
-        </span>
+        </Badge>
       </div>
       <div className="tags">
         <span className="tag">{t("tasksCount", { count: exp.task_ids.length })}</span>
