@@ -242,8 +242,13 @@ func DecrementBudgetFromContext(ctx context.Context, key string) error {
 }
 
 func estimateRequestTokens(r *http.Request) int {
+	const maxTokens = 1_000_000
 	if r.ContentLength > 0 {
-		return int(r.ContentLength) / 4
+		estimated := int(r.ContentLength) / 4
+		if estimated > maxTokens {
+			return maxTokens
+		}
+		return estimated
 	}
 	return 100
 }

@@ -100,7 +100,14 @@ func (r *DBProviderKeyResolver) KeyFor(userID string, provider llm.Provider) str
 	keys := r.repo.ListGatewayProviderKeys(userID)
 	for _, k := range keys {
 		if k.Provider == string(provider) && k.IsEnabled {
-			return k.EncryptedKey
+			decrypted, err := DecryptAPIKey(k.EncryptedKey)
+			if err != nil {
+				slog.Error("DBProviderKeyResolver: failed to decrypt key",
+					"provider", provider,
+					"error", err)
+				continue
+			}
+			return decrypted
 		}
 	}
 	return r.envResolver.KeyFor(userID, provider)

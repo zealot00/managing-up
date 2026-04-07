@@ -113,12 +113,22 @@ func (gw *ToolGateway) Invoke(ctx context.Context, inv GatewayToolInvocation) (*
 	// Find the tool by reference
 	// If no registry is configured, return mock result (backward compatibility)
 	if gw.toolReg == nil {
-		return &GatewayToolResult{
-			Status:    "succeeded",
-			Output:    map[string]any{"mock": true, "tool_ref": inv.ToolRef},
-			StartedAt: start,
-			EndedAt:   time.Now(),
-		}, nil
+		select {
+		case <-ctx.Done():
+			return &GatewayToolResult{
+				Status:    "failed",
+				Error:     "context cancelled",
+				StartedAt: start,
+				EndedAt:   time.Now(),
+			}, ctx.Err()
+		default:
+			return &GatewayToolResult{
+				Status:    "succeeded",
+				Output:    map[string]any{"mock": true, "tool_ref": inv.ToolRef, "execution_id": inv.ExecutionID},
+				StartedAt: start,
+				EndedAt:   time.Now(),
+			}, nil
+		}
 	}
 
 	t, exists := gw.toolReg.Get(inv.ToolRef)

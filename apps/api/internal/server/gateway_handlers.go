@@ -229,6 +229,12 @@ func (s *Server) handleGatewayProviders(w http.ResponseWriter, r *http.Request) 
 		}
 
 		now := time.Now().UTC()
+		encryptedKey, err := EncryptAPIKey(req.APIKey)
+		if err != nil {
+			log.Printf("[handleGatewayProviders] encryption error: %v", err)
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to encrypt API key")
+			return
+		}
 		key := GatewayProviderKey{
 			ID:           fmt.Sprintf("provkey_%d", now.UnixNano()),
 			UserID:       user.ID,
@@ -236,7 +242,7 @@ func (s *Server) handleGatewayProviders(w http.ResponseWriter, r *http.Request) 
 			Model:        strings.TrimSpace(req.Model),
 			KeyHash:      HashGatewayAPIKey(req.APIKey),
 			KeyPrefix:    GatewayKeyPrefix(req.APIKey),
-			EncryptedKey: req.APIKey,
+			EncryptedKey: encryptedKey,
 			IsEnabled:    true,
 			MonthlyLimit: req.MonthlyLimit,
 			CreatedAt:    now,

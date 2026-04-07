@@ -36,6 +36,9 @@ func TestToolGateway_Invoke_Success(t *testing.T) {
 }
 
 func TestToolGateway_Invoke_Timeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping timeout test in short mode")
+	}
 	gw := NewToolGateway()
 	inv := GatewayToolInvocation{
 		ExecutionID:    "exec-123",
