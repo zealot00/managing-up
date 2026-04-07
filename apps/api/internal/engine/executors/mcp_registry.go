@@ -201,16 +201,13 @@ func validateStdioServer(ctx context.Context, srv MCPServerConfig) MCPServerVali
 		}
 	}
 
-	if config.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, config.Timeout)
-		defer cancel()
-	}
+	initCtx, initCancel := context.WithTimeout(ctx, config.Timeout)
+	defer initCancel()
 
 	t := transport.NewStdio(config.Command, config.Args, config.Env...)
 	mcpClient := client.NewClient(t)
 
-	if err := mcpClient.Start(ctx); err != nil {
+	if err := mcpClient.Start(initCtx); err != nil {
 		return MCPServerValidationResult{
 			Valid: false,
 			Error: fmt.Sprintf("failed to start MCP client: %s", err.Error()),
@@ -222,7 +219,7 @@ func validateStdioServer(ctx context.Context, srv MCPServerConfig) MCPServerVali
 	}
 	defer cleanup()
 
-	initialized, err := mcpClient.Initialize(ctx, mcp.InitializeRequest{
+	initialized, err := mcpClient.Initialize(initCtx, mcp.InitializeRequest{
 		Params: mcp.InitializeParams{
 			ProtocolVersion: mcp.LATEST_PROTOCOL_VERSION,
 			ClientInfo: mcp.Implementation{
@@ -245,7 +242,7 @@ func validateStdioServer(ctx context.Context, srv MCPServerConfig) MCPServerVali
 		}
 	}
 
-	listTools, err := mcpClient.ListTools(ctx, mcp.ListToolsRequest{})
+	listTools, err := mcpClient.ListTools(initCtx, mcp.ListToolsRequest{})
 	if err != nil {
 		return MCPServerValidationResult{
 			Valid: false,

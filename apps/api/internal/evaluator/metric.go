@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"math"
-
-	"github.com/zealot/managing-up/apps/api/internal/llm"
 )
 
 var ErrInvalidJudgeType = errors.New("invalid judge type")
@@ -83,16 +81,21 @@ func (e *SemanticSimilarityEvaluator) Evaluate(ctx context.Context, input any, e
 
 // EmbeddingSimilarityEvaluator uses real embedding vectors for semantic similarity.
 type EmbeddingSimilarityEvaluator struct {
-	client    llm.Client
+	client    EmbeddingClient
 	threshold float64
-	model     string // embedding model, e.g. "text-embedding-3-small"
+	model     string
 }
 
-func NewEmbeddingSimilarityEvaluator(client llm.Client, threshold float64) *EmbeddingSimilarityEvaluator {
+func NewEmbeddingSimilarityEvaluator(client EmbeddingClient, threshold float64) *EmbeddingSimilarityEvaluator {
+	cfg := getEmbeddingConfig()
+	model := cfg.model
+	if model == "" {
+		model = "text-embedding-3-small"
+	}
 	return &EmbeddingSimilarityEvaluator{
 		client:    client,
 		threshold: threshold,
-		model:     "text-embedding-3-small",
+		model:     model,
 	}
 }
 
@@ -142,8 +145,15 @@ func (e *EmbeddingSimilarityEvaluator) Evaluate(ctx context.Context, input any, 
 }
 
 func (e *EmbeddingSimilarityEvaluator) getEmbedding(ctx context.Context, text string) ([]float64, error) {
-	// Fallback to word-set similarity when no embedding API available
-	return nil, nil
+	if e.client == nil {
+		return nil, nil
+	}
+
+	vectors, err := e.client.CreateEmbeddings(ctx, []string{text})
+	if err != nil || len(vectors) == 0 {
+		return nil, err
+	}
+	return vectors[0], nil
 }
 
 type JudgeModelEvaluator struct {

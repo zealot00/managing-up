@@ -82,6 +82,10 @@ func (r *FallbackRouter) RecordFailure(provider llm.Provider) {
 
 	key := string(provider)
 	_ = r.circuitBreaker.RecordFailure(context.Background(), key)
+
+	if r.currentIndex < len(r.providers)-1 {
+		r.currentIndex++
+	}
 }
 
 // RecordSuccess records a success for the provider and updates circuit breaker

@@ -3,16 +3,21 @@ package engine
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/server"
 )
+
+const maxConcurrentExecutions = 50
 
 type Worker struct {
 	engine   *ExecutionEngine
 	repo     WorkerRepository
 	interval time.Duration
 	logger   *slog.Logger
+	sem      chan struct{}
+	wg       sync.WaitGroup
 }
 
 type WorkerRepository interface {
@@ -26,6 +31,7 @@ func NewWorker(engine *ExecutionEngine, repo WorkerRepository, interval time.Dur
 		repo:     repo,
 		interval: interval,
 		logger:   slog.Default(),
+		sem:      make(chan struct{}, maxConcurrentExecutions),
 	}
 }
 
@@ -38,6 +44,7 @@ func (w *Worker) Start(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			w.logger.Info("execution worker stopped")
+			w.wg.Wait()
 			return
 		case <-ticker.C:
 			w.processPending()
@@ -49,9 +56,21 @@ func (w *Worker) Start(ctx context.Context) {
 func (w *Worker) processPending() {
 	executions := w.repo.ListPendingExecutions()
 	for _, exec := range executions {
-		w.logger.Info("processing pending execution", "execution_id", exec.ID)
-		if err := w.engine.Run(context.Background(), exec.ID); err != nil {
-			w.logger.Error("failed to run execution", "execution_id", exec.ID, "error", err)
+		select {
+		case w.sem <- struct{}{}:
+			w.wg.Add(1)
+			go func(exec server.Execution) {
+				defer func() {
+					<-w.sem
+					w.wg.Done()
+				}()
+				w.logger.Info("processing pending execution", "execution_id", exec.ID)
+				if err := w.engine.Run(context.Background(), exec.ID); err != nil {
+					w.logger.Error("failed to run execution", "execution_id", exec.ID, "error", err)
+				}
+			}(exec)
+		default:
+			w.logger.Warn("worker pool full, dropping execution", "execution_id", exec.ID)
 		}
 	}
 }
