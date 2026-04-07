@@ -345,6 +345,7 @@
     "noProvidersDesc": "Add your own LLM provider keys to route requests independently.",
     "budget": "Usage Budget",
     "usedThisMonth": "Used this month",
+    "usedThisMonthTooltip": "Based on actual token usage from LLM responses",
     "dailyLimit": "Daily limit",
     "monthlyLimit": "Monthly limit",
     "createProvider": "Create Provider",

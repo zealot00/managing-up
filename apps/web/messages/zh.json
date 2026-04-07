@@ -345,6 +345,7 @@
     "noProvidersDesc": "添加您自己的 LLM 供应商密钥以独立路由请求。",
     "budget": "使用配额",
     "usedThisMonth": "本月已用",
+    "usedThisMonthTooltip": "基于 LLM 响应的实际 token 消耗",
     "dailyLimit": "每日限额",
     "monthlyLimit": "每月限额",
     "createProvider": "创建供应商",

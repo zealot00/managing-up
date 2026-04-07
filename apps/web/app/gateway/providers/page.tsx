@@ -97,8 +97,9 @@ function BudgetInline({
             }}
           >
             <div>
-              <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginBottom: 4 }}>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
                 {t("usedThisMonth")}
+                <span title={t("usedThisMonthTooltip")} style={{ cursor: "help" }}>?</span>
               </div>
               <div style={{ fontWeight: 700, fontSize: "var(--text-base)", color: "var(--ink)" }}>
                 {budget?.used_this_month.toLocaleString() || 0}

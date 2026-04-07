@@ -252,6 +252,8 @@ func getMaxTokenEstimate() int {
 	return 1_000_000
 }
 
+// estimateRequestTokens uses ContentLength as a conservative over-estimate
+// for strict budget pre-check. Actual usage is recorded after request completes.
 func estimateRequestTokens(r *http.Request) int {
 	maxTokens := getMaxTokenEstimate()
 	if r.ContentLength > 0 {
