@@ -255,7 +255,7 @@ func getMaxTokenEstimate() int {
 func estimateRequestTokens(r *http.Request) int {
 	maxTokens := getMaxTokenEstimate()
 	if r.ContentLength > 0 {
-		estimated := int(r.ContentLength) / 4
+		estimated := int(r.ContentLength)
 		if estimated > maxTokens {
 			return maxTokens
 		}
