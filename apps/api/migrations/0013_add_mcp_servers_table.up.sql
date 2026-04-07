@@ -19,6 +19,6 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
     CONSTRAINT chk_mcp_server_status CHECK (status IN ('pending', 'approved', 'rejected', 'disabled'))
 );
 
-CREATE INDEX idx_mcp_servers_name ON mcp_servers(name);
-CREATE INDEX idx_mcp_servers_status ON mcp_servers(status);
-CREATE INDEX idx_mcp_servers_enabled ON mcp_servers(is_enabled);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_name ON mcp_servers(name);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_status ON mcp_servers(status);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_enabled ON mcp_servers(is_enabled);

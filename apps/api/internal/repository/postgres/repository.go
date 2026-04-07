@@ -63,6 +63,14 @@ func New(dsn string) (*Repository, error) {
 		return nil, fmt.Errorf("migrate gateway_provider_keys: %w", err)
 	}
 
+	// Add unique index on key_hash to prevent duplicate API keys
+	if _, err := db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_gateway_provider_keys_key_hash ON gateway_provider_keys(key_hash)
+	`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrate gateway_provider_keys key_hash unique index: %w", err)
+	}
+
 	// User budgets table
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS user_budgets (
@@ -1283,6 +1291,8 @@ func (r *Repository) CreateGatewayUsageEvent(event server.GatewayUsageEvent) err
 			id,
 			api_key_id,
 			user_id,
+			username,
+			client_name,
 			provider,
 			model,
 			endpoint,
@@ -1292,13 +1302,15 @@ func (r *Repository) CreateGatewayUsageEvent(event server.GatewayUsageEvent) err
 			cost,
 			created_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 	_, err := r.db.Exec(
 		query,
 		event.ID,
 		event.APIKeyID,
 		event.UserID,
+		event.Username,
+		event.ClientName,
 		event.Provider,
 		event.Model,
 		event.Endpoint,
@@ -1316,6 +1328,7 @@ func (r *Repository) ListGatewayUsageByUser(userID string, from, to *time.Time) 
 		SELECT
 			e.user_id,
 			COALESCE(u.username, ''),
+			e.client_name,
 			e.provider,
 			e.model,
 			COUNT(*) AS request_count,
@@ -1328,7 +1341,7 @@ func (r *Repository) ListGatewayUsageByUser(userID string, from, to *time.Time) 
 		WHERE e.user_id = $1
 		  AND ($2::timestamptz IS NULL OR e.created_at >= $2::timestamptz)
 		  AND ($3::timestamptz IS NULL OR e.created_at <= $3::timestamptz)
-		GROUP BY e.user_id, u.username, e.provider, e.model
+		GROUP BY e.user_id, u.username, e.client_name, e.provider, e.model
 		ORDER BY total_tokens DESC
 	`
 	rows, err := r.db.Query(query, userID, from, to)
@@ -1343,6 +1356,7 @@ func (r *Repository) ListGatewayUsageByUser(userID string, from, to *time.Time) 
 		if err := rows.Scan(
 			&item.UserID,
 			&item.Username,
+			&item.ClientName,
 			&item.Provider,
 			&item.Model,
 			&item.RequestCount,
@@ -1656,9 +1670,33 @@ func (r *Repository) CreateGatewayProviderKey(key server.GatewayProviderKey) err
 	return err
 }
 
+func (r *Repository) GetGatewayProviderKeyByUserAndProvider(userID, provider string) (server.GatewayProviderKey, bool) {
+	query := `
+		SELECT id, user_id, provider, model, key_prefix, encrypted_key, is_enabled, monthly_limit, created_at, updated_at
+		FROM gateway_provider_keys
+		WHERE user_id = $1 AND provider = $2
+		LIMIT 1
+	`
+	var item server.GatewayProviderKey
+	var model, encryptedKey sql.NullString
+	if err := r.db.QueryRow(query, userID, provider).Scan(
+		&item.ID, &item.UserID, &item.Provider, &model, &item.KeyPrefix, &encryptedKey,
+		&item.IsEnabled, &item.MonthlyLimit, &item.CreatedAt, &item.UpdatedAt,
+	); err != nil {
+		return server.GatewayProviderKey{}, false
+	}
+	if model.Valid {
+		item.Model = model.String
+	}
+	if encryptedKey.Valid {
+		item.EncryptedKey = encryptedKey.String
+	}
+	return item, true
+}
+
 func (r *Repository) ListGatewayProviderKeys(userID string) []server.GatewayProviderKey {
 	query := `
-		SELECT id, user_id, provider, model, key_prefix, is_enabled, monthly_limit, created_at, updated_at
+		SELECT id, user_id, provider, model, key_prefix, encrypted_key, is_enabled, monthly_limit, created_at, updated_at
 		FROM gateway_provider_keys
 		WHERE $1 = '' OR user_id = $1
 		ORDER BY created_at DESC
@@ -1672,12 +1710,15 @@ func (r *Repository) ListGatewayProviderKeys(userID string) []server.GatewayProv
 	items := make([]server.GatewayProviderKey, 0)
 	for rows.Next() {
 		var item server.GatewayProviderKey
-		var model sql.NullString
-		if err := rows.Scan(&item.ID, &item.UserID, &item.Provider, &model, &item.KeyPrefix, &item.IsEnabled, &item.MonthlyLimit, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		var model, encryptedKey sql.NullString
+		if err := rows.Scan(&item.ID, &item.UserID, &item.Provider, &model, &item.KeyPrefix, &encryptedKey, &item.IsEnabled, &item.MonthlyLimit, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			continue
 		}
 		if model.Valid {
 			item.Model = model.String
+		}
+		if encryptedKey.Valid {
+			item.EncryptedKey = encryptedKey.String
 		}
 		items = append(items, item)
 	}
@@ -1686,34 +1727,40 @@ func (r *Repository) ListGatewayProviderKeys(userID string) []server.GatewayProv
 
 func (r *Repository) GetGatewayProviderKey(id string) (server.GatewayProviderKey, bool) {
 	query := `
-		SELECT id, user_id, provider, model, key_prefix, is_enabled, monthly_limit, created_at, updated_at
+		SELECT id, user_id, provider, model, key_prefix, encrypted_key, is_enabled, monthly_limit, created_at, updated_at
 		FROM gateway_provider_keys
 		WHERE id = $1
 	`
 	var item server.GatewayProviderKey
-	var model sql.NullString
-	if err := r.db.QueryRow(query, id).Scan(&item.ID, &item.UserID, &item.Provider, &model, &item.KeyPrefix, &item.IsEnabled, &item.MonthlyLimit, &item.CreatedAt, &item.UpdatedAt); err != nil {
+	var model, encryptedKey sql.NullString
+	if err := r.db.QueryRow(query, id).Scan(&item.ID, &item.UserID, &item.Provider, &model, &item.KeyPrefix, &encryptedKey, &item.IsEnabled, &item.MonthlyLimit, &item.CreatedAt, &item.UpdatedAt); err != nil {
 		return server.GatewayProviderKey{}, false
 	}
 	if model.Valid {
 		item.Model = model.String
+	}
+	if encryptedKey.Valid {
+		item.EncryptedKey = encryptedKey.String
 	}
 	return item, true
 }
 
 func (r *Repository) GetGatewayProviderKeyByHash(keyHash string) (server.GatewayProviderKey, bool) {
 	query := `
-		SELECT id, user_id, provider, model, key_prefix, is_enabled, monthly_limit, created_at, updated_at
+		SELECT id, user_id, provider, model, key_prefix, encrypted_key, is_enabled, monthly_limit, created_at, updated_at
 		FROM gateway_provider_keys
 		WHERE key_hash = $1
 	`
 	var item server.GatewayProviderKey
-	var model sql.NullString
-	if err := r.db.QueryRow(query, keyHash).Scan(&item.ID, &item.UserID, &item.Provider, &model, &item.KeyPrefix, &item.IsEnabled, &item.MonthlyLimit, &item.CreatedAt, &item.UpdatedAt); err != nil {
+	var model, encryptedKey sql.NullString
+	if err := r.db.QueryRow(query, keyHash).Scan(&item.ID, &item.UserID, &item.Provider, &model, &item.KeyPrefix, &encryptedKey, &item.IsEnabled, &item.MonthlyLimit, &item.CreatedAt, &item.UpdatedAt); err != nil {
 		return server.GatewayProviderKey{}, false
 	}
 	if model.Valid {
 		item.Model = model.String
+	}
+	if encryptedKey.Valid {
+		item.EncryptedKey = encryptedKey.String
 	}
 	return item, true
 }

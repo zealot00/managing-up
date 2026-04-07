@@ -236,8 +236,7 @@ export default function GatewayPage() {
         </div>
       )}
 
-      <div className="dashboard-section">
-        <form className="form-fields form-row gateway-filter" onSubmit={handleApplyFilter}>
+      <form className="form-fields form-row gateway-filter" onSubmit={handleApplyFilter}>
           <div>
             <label className="form-label" htmlFor="gateway-from">{t("startDate")}</label>
             <input
@@ -274,7 +273,6 @@ export default function GatewayPage() {
             <button className="form-submit" type="submit">{t("apply")}</button>
           </div>
         </form>
-      </div>
 
       {isAdmin && tokenRankingData.length > 0 && (
         <div className="chart-grid">
@@ -306,6 +304,7 @@ export default function GatewayPage() {
             <table className="gateway-table">
               <thead>
                 <tr>
+                  <th>{t("client")}</th>
                   <th>{t("provider")}</th>
                   <th>{t("model")}</th>
                   <th>{t("requests")}</th>
@@ -317,7 +316,8 @@ export default function GatewayPage() {
               </thead>
               <tbody>
                 {usage.map((row) => (
-                  <tr key={`${row.provider}:${row.model}`}>
+                  <tr key={`${row.client_name}:${row.provider}:${row.model}`}>
+                    <td>{row.client_name || '-'}</td>
                     <td>{row.provider}</td>
                     <td>{row.model}</td>
                     <td>{row.request_count.toLocaleString()}</td>

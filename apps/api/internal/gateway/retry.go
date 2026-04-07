@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/llm"
@@ -32,6 +33,13 @@ func GenerateWithRetry(ctx context.Context, client llm.Client, messages []llm.Me
 				backoff = config.MaxBackoff
 			}
 
+			slog.Warn("gateway: retrying LLM request",
+				"attempt", attempt,
+				"provider", client.Provider(),
+				"model", client.Model(),
+				"backoff", backoff,
+				"last_error", lastErr)
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -45,12 +53,25 @@ func GenerateWithRetry(ctx context.Context, client llm.Client, messages []llm.Me
 		}
 
 		lastErr = err
+		slog.Warn("gateway: LLM Generate failed",
+			"attempt", attempt,
+			"provider", client.Provider(),
+			"model", client.Model(),
+			"error", err)
 
 		if isNonRetryableError(err) {
+			slog.Info("gateway: non-retryable error, returning",
+				"provider", client.Provider(),
+				"model", client.Model(),
+				"error", err)
 			return nil, err
 		}
 	}
 
+	slog.Error("gateway: max retries exceeded",
+		"provider", client.Provider(),
+		"model", client.Model(),
+		"last_error", lastErr)
 	return nil, fmt.Errorf("max retries exceeded: %w", lastErr)
 }
 
@@ -96,6 +117,11 @@ func GenerateWithRouterRetry(ctx context.Context, router LLMRouter, messages []l
 				backoff = config.MaxBackoff
 			}
 
+			slog.Warn("gateway: retrying LLM request via router",
+				"attempt", attempt,
+				"backoff", backoff,
+				"last_error", lastErr)
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -106,6 +132,9 @@ func GenerateWithRouterRetry(ctx context.Context, router LLMRouter, messages []l
 		client, err := router.Route(ctx)
 		if err != nil {
 			lastErr = err
+			slog.Warn("gateway: router.Route failed",
+				"attempt", attempt,
+				"error", err)
 			continue
 		}
 
@@ -117,6 +146,11 @@ func GenerateWithRouterRetry(ctx context.Context, router LLMRouter, messages []l
 
 		lastErr = err
 		router.RecordFailure(client.Provider())
+		slog.Warn("gateway: LLM Generate via router failed",
+			"attempt", attempt,
+			"provider", client.Provider(),
+			"model", client.Model(),
+			"error", err)
 
 		if isNonRetryableError(err) {
 			return nil, err

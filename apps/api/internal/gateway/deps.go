@@ -21,6 +21,7 @@ type UsageRecord struct {
 	APIKeyID         string
 	UserID           string
 	Username         string
+	ClientName       string
 	Provider         llm.Provider
 	Model            llm.Model
 	Endpoint         string

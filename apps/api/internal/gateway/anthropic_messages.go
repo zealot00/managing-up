@@ -161,6 +161,7 @@ func (s *Server) HandleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 				APIKeyID:         principal.APIKeyID,
 				UserID:           principal.UserID,
 				Username:         principal.Username,
+				ClientName:       r.Header.Get("User-Agent"),
 				Provider:         provider,
 				Model:            model,
 				Endpoint:         "/v1/messages",

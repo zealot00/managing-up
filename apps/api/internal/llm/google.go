@@ -247,7 +247,7 @@ func (c *GoogleClient) GenerateStream(ctx context.Context, messages []Message, o
 
 	return &googleStreamReader{
 		body:     resp.Body,
-		scanner:  bufio.NewScanner(resp.Body),
+		scanner:  newLargeBufferScanner(resp.Body),
 		model:    c.model,
 		provider: c.Provider(),
 	}, nil

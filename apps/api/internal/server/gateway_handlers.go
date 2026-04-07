@@ -220,6 +220,14 @@ func (s *Server) handleGatewayProviders(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
+		apiKey := strings.TrimSpace(req.APIKey)
+		keyHash := HashGatewayAPIKey(apiKey)
+		if existing, found := s.repo.GetGatewayProviderKeyByHash(keyHash); found {
+			writeError(w, http.StatusConflict, "DUPLICATE_API_KEY",
+				fmt.Sprintf("This API key already exists (ID: %s). Each API key can only be registered once.", existing.ID))
+			return
+		}
+
 		now := time.Now().UTC()
 		key := GatewayProviderKey{
 			ID:           fmt.Sprintf("provkey_%d", now.UnixNano()),

@@ -19,6 +19,7 @@ export type GatewayKeyMeta = {
 export type GatewayUsageRow = {
   user_id: string;
   username: string;
+  client_name: string;
   provider: string;
   model: string;
   request_count: number;

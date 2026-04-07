@@ -229,7 +229,7 @@ func (c *DeepSeekClient) GenerateStream(ctx context.Context, messages []Message,
 
 	return &deepSeekStreamReader{
 		body:     resp.Body,
-		scanner:  bufio.NewScanner(resp.Body),
+		scanner:  newLargeBufferScanner(resp.Body),
 		model:    c.model,
 		provider: c.Provider(),
 	}, nil

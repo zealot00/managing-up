@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -250,17 +251,48 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 
 	id := fmt.Sprintf("chatcmpl-%s", generateID())
 	var totalPromptTokens, totalCompletionTokens int
+	var totalContentLen int
 
 	for {
 		chunk, err := streamReader.Recv()
 		if err != nil {
+			slog.Warn("handleOpenAIChatStream: streamReader.Recv error",
+				"error", err)
 			break
 		}
 
+		slog.Debug("handleOpenAIChatStream: received chunk",
+			"content_len", len(chunk.Content),
+			"done", chunk.Done,
+			"finish_reason", chunk.FinishReason,
+			"total_content_len_so_far", totalContentLen)
+
 		if chunk.Done {
+			totalContentLen += len(chunk.Content)
+
 			if chunk.Usage != nil {
 				totalPromptTokens = chunk.Usage.InputTokens
 				totalCompletionTokens = chunk.Usage.OutputTokens
+			}
+
+			if len(chunk.Content) > 0 {
+				finalChunk := map[string]any{
+					"id":      id,
+					"object":  "chat.completion.chunk",
+					"created": time.Now().Unix(),
+					"model":   string(model),
+					"choices": []map[string]any{
+						{
+							"index": 0,
+							"delta": map[string]any{
+								"content": chunk.Content,
+							},
+							"finish_reason": chunk.FinishReason,
+						},
+					},
+				}
+				finalJSON, _ := json.Marshal(finalChunk)
+				fmt.Fprintf(w, "data: %s\n\n", finalJSON)
 			}
 
 			doneData := map[string]any{
@@ -280,8 +312,15 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 			fmt.Fprintf(w, "data: %s\n\n", doneJSON)
 			fmt.Fprintf(w, "data: [DONE]\n\n")
 			flusher.Flush()
+
+			slog.Info("handleOpenAIChatStream: stream completed",
+				"total_content_len", totalContentLen,
+				"prompt_tokens", totalPromptTokens,
+				"completion_tokens", totalCompletionTokens)
 			break
 		}
+
+		totalContentLen += len(chunk.Content)
 
 		streamChunk := map[string]any{
 			"id":      id,

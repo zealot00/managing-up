@@ -873,6 +873,17 @@ func (s *store) CreateGatewayProviderKey(key GatewayProviderKey) error {
 	return nil
 }
 
+func (s *store) GetGatewayProviderKeyByUserAndProvider(userID, provider string) (GatewayProviderKey, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, item := range s.gatewayProviderKeys {
+		if item.UserID == userID && item.Provider == provider {
+			return item, true
+		}
+	}
+	return GatewayProviderKey{}, false
+}
+
 func (s *store) ListGatewayProviderKeys(userID string) []GatewayProviderKey {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

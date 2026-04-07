@@ -57,6 +57,7 @@ type Repository interface {
 	ListGatewayUsageByUser(userID string, from, to *time.Time) []GatewayUsageAggregate
 	ListGatewayUsageByUsers(from, to *time.Time) []GatewayUserUsageAggregate
 	CreateGatewayProviderKey(key GatewayProviderKey) error
+	GetGatewayProviderKeyByUserAndProvider(userID, provider string) (GatewayProviderKey, bool)
 	ListGatewayProviderKeys(userID string) []GatewayProviderKey
 	GetGatewayProviderKey(id string) (GatewayProviderKey, bool)
 	GetGatewayProviderKeyByHash(keyHash string) (GatewayProviderKey, bool)

@@ -1,8 +1,10 @@
 package llm
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -119,4 +121,11 @@ func ConfigFromEnv() Config {
 		APIKey:   os.Getenv("LLM_API_KEY"),
 		BaseURL:  os.Getenv("LLM_BASE_URL"),
 	}
+}
+
+func newLargeBufferScanner(body io.Reader) *bufio.Scanner {
+	scanner := bufio.NewScanner(body)
+	buf := make([]byte, 10*1024*1024)
+	scanner.Buffer(buf, 50*1024*1024)
+	return scanner
 }

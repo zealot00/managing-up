@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS seh_releases (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_seh_cases_dataset_id ON seh_cases(dataset_id);
-CREATE INDEX idx_seh_cases_skill ON seh_cases(skill);
-CREATE INDEX idx_seh_runs_dataset_id ON seh_runs(dataset_id);
-CREATE INDEX idx_seh_runs_created_at ON seh_runs(created_at);
+CREATE INDEX IF NOT EXISTS idx_seh_cases_dataset_id ON seh_cases(dataset_id);
+CREATE INDEX IF NOT EXISTS idx_seh_cases_skill ON seh_cases(skill);
+CREATE INDEX IF NOT EXISTS idx_seh_runs_dataset_id ON seh_runs(dataset_id);
+CREATE INDEX IF NOT EXISTS idx_seh_runs_created_at ON seh_runs(created_at);

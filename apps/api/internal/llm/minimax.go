@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 
 		data := strings.TrimPrefix(line, "data: ")
 		if data == "[DONE]" {
+			slog.Info("minimax stream: received [DONE]")
 			return &StreamChunk{
 				Done:         true,
 				FinishReason: "stop",
@@ -55,12 +57,25 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 		}
 
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			slog.Error("minimax stream: failed to unmarshal chunk",
+				"error", err,
+				"data_len", len(data),
+				"data_prefix", func() string {
+					if len(data) > 100 {
+						return data[:100]
+					}
+					return data
+				}())
 			continue
 		}
 
 		if len(chunk.Choices) > 0 {
 			content := chunk.Choices[0].Delta.Content
 			finishReason := chunk.Choices[0].FinishReason
+
+			slog.Debug("minimax stream: chunk",
+				"content_len", len(content),
+				"finish_reason", finishReason)
 
 			if chunk.Usage != nil {
 				r.usage = Usage{
@@ -90,9 +105,12 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 	}
 
 	if err := r.scanner.Err(); err != nil {
+		slog.Error("minimax stream: scanner error",
+			"error", err)
 		return nil, err
 	}
 
+	slog.Warn("minimax stream: ended without [DONE]")
 	return nil, fmt.Errorf("stream ended without [DONE]")
 }
 
@@ -229,7 +247,7 @@ func (c *MinimaxClient) GenerateStream(ctx context.Context, messages []Message, 
 
 	return &minimaxStreamReader{
 		body:     resp.Body,
-		scanner:  bufio.NewScanner(resp.Body),
+		scanner:  newLargeBufferScanner(resp.Body),
 		model:    c.model,
 		provider: c.Provider(),
 	}, nil

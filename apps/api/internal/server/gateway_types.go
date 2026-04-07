@@ -26,7 +26,8 @@ type GatewayUsageEvent struct {
 	ID               string    `json:"id"`
 	APIKeyID         string    `json:"api_key_id"`
 	UserID           string    `json:"user_id"`
-	Username         string    `json:"username,omitempty"`
+	Username         string    `json:"username"`
+	ClientName       string    `json:"client_name"`
 	Provider         string    `json:"provider"`
 	Model            string    `json:"model"`
 	Endpoint         string    `json:"endpoint"`
@@ -39,7 +40,8 @@ type GatewayUsageEvent struct {
 
 type GatewayUsageAggregate struct {
 	UserID           string  `json:"user_id"`
-	Username         string  `json:"username,omitempty"`
+	Username         string  `json:"username"`
+	ClientName       string  `json:"client_name"`
 	Provider         string  `json:"provider"`
 	Model            string  `json:"model"`
 	RequestCount     int64   `json:"request_count"`

@@ -77,9 +77,9 @@ async function DashboardContent() {
                     {execution.current_step_id} · started {new Date(execution.started_at).toLocaleString()}
                   </p>
                 </div>
-                <div className="dashboard-list-actions">
+                  <div className="dashboard-list-actions">
                   <a href={`/executions/${execution.id}/traces`} className="dashboard-list-link">
-                    {t("viewTrace", { namespace: "executions" })}
+                    {t("executions:viewTrace")}
                   </a>
                   <span className={`badge badge-${execution.status}`}>{execution.status}</span>
                 </div>

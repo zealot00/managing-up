@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"time"
 
@@ -37,6 +38,16 @@ type gatewayUsageRecorder struct {
 }
 
 func (r gatewayUsageRecorder) RecordUsage(ctx context.Context, record gateway.UsageRecord) error {
+	slog.Info("RecordUsage: called",
+		"api_key_id", record.APIKeyID,
+		"user_id", record.UserID,
+		"username", record.Username,
+		"client_name", record.ClientName,
+		"provider", record.Provider,
+		"model", record.Model,
+		"prompt_tokens", record.PromptTokens,
+		"completion_tokens", record.CompletionTokens)
+
 	cost := gateway.CalculateCost(string(record.Model), record.PromptTokens, record.CompletionTokens)
 
 	event := GatewayUsageEvent{
@@ -44,6 +55,7 @@ func (r gatewayUsageRecorder) RecordUsage(ctx context.Context, record gateway.Us
 		APIKeyID:         record.APIKeyID,
 		UserID:           record.UserID,
 		Username:         record.Username,
+		ClientName:       record.ClientName,
 		Provider:         string(record.Provider),
 		Model:            string(record.Model),
 		Endpoint:         record.Endpoint,
@@ -53,7 +65,18 @@ func (r gatewayUsageRecorder) RecordUsage(ctx context.Context, record gateway.Us
 		Cost:             cost,
 		CreatedAt:        time.Now().UTC(),
 	}
-	return r.repo.CreateGatewayUsageEvent(event)
+
+	err := r.repo.CreateGatewayUsageEvent(event)
+	if err != nil {
+		slog.Error("RecordUsage: failed to insert event",
+			"error", err,
+			"event_id", event.ID)
+	} else {
+		slog.Info("RecordUsage: success",
+			"event_id", event.ID,
+			"cost", cost)
+	}
+	return err
 }
 
 type staticProviderKeyResolver struct {

@@ -315,6 +315,7 @@
     "requests": "请求数",
     "tokens": "Token 数",
     "cost": "费用",
+    "client": "客户端",
     "userUsage": "用户级使用情况",
     "user": "用户",
     "filterByUser": "按用户筛选",

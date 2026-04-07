@@ -8,5 +8,5 @@ CREATE TABLE IF NOT EXISTS tips (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_tips_active ON tips(is_active);
-CREATE INDEX idx_tips_category ON tips(category);
+CREATE INDEX IF NOT EXISTS idx_tips_active ON tips(is_active);
+CREATE INDEX IF NOT EXISTS idx_tips_category ON tips(category);

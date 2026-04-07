@@ -315,6 +315,7 @@
     "requests": "Requests",
     "tokens": "Tokens",
     "cost": "Cost",
+    "client": "Client",
     "userUsage": "User-Level Usage",
     "user": "User",
     "filterByUser": "Filter by user",

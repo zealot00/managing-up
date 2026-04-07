@@ -26,10 +26,13 @@ import (
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+		Level: slog.LevelDebug,
 	})))
 
+	slog.Info("=== SERVER STARTING ===", "pid", os.Getpid())
+
 	cfg := config.Load()
+	slog.Info("config loaded", "db_enabled", cfg.Database.Enabled())
 	server.SetLogger(slog.Default())
 
 	if !cfg.Database.Enabled() {

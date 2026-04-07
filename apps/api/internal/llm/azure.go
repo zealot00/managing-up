@@ -229,7 +229,7 @@ func (c *AzureClient) GenerateStream(ctx context.Context, messages []Message, op
 
 	return &azureStreamReader{
 		body:     resp.Body,
-		scanner:  bufio.NewScanner(resp.Body),
+		scanner:  newLargeBufferScanner(resp.Body),
 		model:    c.model,
 		provider: c.Provider(),
 	}, nil
