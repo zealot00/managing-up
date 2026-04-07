@@ -6,7 +6,22 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 )
+
+var (
+	scannerBufferSize    = getEnvInt("GATEWAY_SCANNER_BUFFER_SIZE", 10*1024*1024)
+	scannerMaxBufferSize = getEnvInt("GATEWAY_SCANNER_MAX_BUFFER_SIZE", 50*1024*1024)
+)
+
+func getEnvInt(key string, defaultVal int) int {
+	if val := os.Getenv(key); val != "" {
+		if intVal, err := strconv.Atoi(val); err == nil {
+			return intVal
+		}
+	}
+	return defaultVal
+}
 
 // Client 是统一接口
 type Client interface {
@@ -125,7 +140,7 @@ func ConfigFromEnv() Config {
 
 func newLargeBufferScanner(body io.Reader) *bufio.Scanner {
 	scanner := bufio.NewScanner(body)
-	buf := make([]byte, 10*1024*1024)
-	scanner.Buffer(buf, 50*1024*1024)
+	buf := make([]byte, scannerBufferSize)
+	scanner.Buffer(buf, scannerMaxBufferSize)
 	return scanner
 }

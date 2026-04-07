@@ -168,6 +168,8 @@ npm run dev
 | `ORCHESTRATOR_SKIP_AUTH` | 临时绕过 Orchestrator JWT 认证（开发模式） | `false` |
 | `ORCHESTRATOR_JWT_SECRET` | Orchestrator JWT 密钥 | - |
 | `ORCHESTRATOR_JWT_ISSUER` | Orchestrator JWT 签发者 | - |
+| `GATEWAY_SCANNER_BUFFER_SIZE` | SSE 流扫描器初始 buffer 大小 | `10485760` (10MB) |
+| `GATEWAY_SCANNER_MAX_BUFFER_SIZE` | SSE 流扫描器最大 buffer 大小 | `52428800` (50MB) |
 
 ---
 
