@@ -30,7 +30,6 @@ type FallbackRouter struct {
 	mu             sync.RWMutex
 	providers      []ProviderConfig
 	circuitBreaker CircuitBreaker
-	currentIndex   int
 }
 
 // NewFallbackRouter creates a new FallbackRouter with the given circuit breaker
@@ -38,7 +37,6 @@ func NewFallbackRouter(cb CircuitBreaker) *FallbackRouter {
 	return &FallbackRouter{
 		providers:      make([]ProviderConfig, 0),
 		circuitBreaker: cb,
-		currentIndex:   0,
 	}
 }
 
@@ -63,11 +61,10 @@ func (r *FallbackRouter) Route(ctx context.Context) (llm.Client, error) {
 		return nil, fmt.Errorf("no providers registered")
 	}
 
-	for i, p := range r.providers {
+	for _, p := range r.providers {
 		key := string(p.Provider)
 		allowed, err := r.circuitBreaker.Allow(ctx, key)
 		if err == nil && allowed {
-			r.currentIndex = i
 			return p.Client, nil
 		}
 	}
@@ -82,10 +79,6 @@ func (r *FallbackRouter) RecordFailure(provider llm.Provider) {
 
 	key := string(provider)
 	_ = r.circuitBreaker.RecordFailure(context.Background(), key)
-
-	if r.currentIndex < len(r.providers)-1 {
-		r.currentIndex++
-	}
 }
 
 // RecordSuccess records a success for the provider and updates circuit breaker
@@ -97,13 +90,6 @@ func (r *FallbackRouter) RecordSuccess(provider llm.Provider) {
 	_ = r.circuitBreaker.RecordSuccess(context.Background(), key)
 }
 
-// GetCurrentProvider returns the currently selected provider
 func (r *FallbackRouter) GetCurrentProvider() llm.Provider {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	if r.currentIndex < len(r.providers) {
-		return r.providers[r.currentIndex].Provider
-	}
 	return ""
 }

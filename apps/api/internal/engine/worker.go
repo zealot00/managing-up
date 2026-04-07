@@ -12,12 +12,13 @@ import (
 const maxConcurrentExecutions = 50
 
 type Worker struct {
-	engine   *ExecutionEngine
-	repo     WorkerRepository
-	interval time.Duration
-	logger   *slog.Logger
-	sem      chan struct{}
-	wg       sync.WaitGroup
+	engine      *ExecutionEngine
+	repo        WorkerRepository
+	interval    time.Duration
+	logger      *slog.Logger
+	sem         chan struct{}
+	wg          sync.WaitGroup
+	activeExecs sync.Map
 }
 
 type WorkerRepository interface {
@@ -56,6 +57,12 @@ func (w *Worker) Start(ctx context.Context) {
 func (w *Worker) processPending() {
 	executions := w.repo.ListPendingExecutions()
 	for _, exec := range executions {
+		execID := exec.ID
+		if _, loaded := w.activeExecs.LoadOrStore(execID, true); loaded {
+			w.logger.Debug("execution already in progress, skipping", "execution_id", execID)
+			continue
+		}
+
 		select {
 		case w.sem <- struct{}{}:
 			w.wg.Add(1)
@@ -63,6 +70,7 @@ func (w *Worker) processPending() {
 				defer func() {
 					<-w.sem
 					w.wg.Done()
+					w.activeExecs.Delete(exec.ID)
 				}()
 				w.logger.Info("processing pending execution", "execution_id", exec.ID)
 				if err := w.engine.Run(context.Background(), exec.ID); err != nil {
@@ -70,7 +78,7 @@ func (w *Worker) processPending() {
 				}
 			}(exec)
 		default:
-			w.logger.Warn("worker pool full, dropping execution", "execution_id", exec.ID)
+			w.logger.Warn("worker pool full, dropping execution", "execution_id", execID)
 		}
 	}
 }
