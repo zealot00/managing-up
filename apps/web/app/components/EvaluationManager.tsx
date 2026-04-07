@@ -97,7 +97,7 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
                       {task.test_cases.length} test cases · {task.difficulty} difficulty
                     </p>
                   </div>
-                  <span className={`badge badge-${task.difficulty === "easy" ? "succeeded" : task.difficulty === "medium" ? "running" : "failed"}`}>
+                  <span className={`badge badge-${task.difficulty}`}>
                     {task.difficulty}
                   </span>
                 </article>
@@ -124,7 +124,7 @@ function ExecutionCard({ exec, tasks }: { exec: TaskExecution; tasks: Task[] }) 
           <h3 className="eval-card-title">{taskName}</h3>
           <p className="eval-card-meta">{t("agent")}: {exec.agent_id}</p>
         </div>
-        <span className={`badge badge-${exec.status === "completed" ? "succeeded" : exec.status === "failed" ? "failed" : "running"}`}>
+        <span className={`badge badge-${exec.status}`}>
           {exec.status}
         </span>
       </div>

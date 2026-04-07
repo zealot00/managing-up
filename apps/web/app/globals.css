@@ -5,19 +5,23 @@
   color-scheme: light;
   --bg: #f5f5f5;
   --bg-deep: #e8e8e8;
-  --ink-strong: #111111;
-  --ink: #333333;
-  --muted: #6b7280;
+  --ink-strong: #1e293b;
+  --ink: #334155;
+  --muted: #64748b;
   --line: rgba(0, 0, 0, 0.08);
   --line-strong: rgba(0, 0, 0, 0.15);
   --surface: rgba(255, 255, 255, 0.85);
   --surface-raised: rgba(255, 255, 255, 0.95);
   --primary: #374151;
-  --primary-deep: #111827;
-  --success: #166534;
-  --warning: #92400e;
-  --neutral: #6b7280;
-  --danger: #991b1b;
+  --primary-deep: #1e293b;
+  --success: #15803d;
+  --success-bg: rgba(15, 118, 110, 0.08);
+  --warning: #b45309;
+  --warning-bg: rgba(180, 83, 9, 0.08);
+  --neutral: #64748b;
+  --neutral-bg: rgba(100, 116, 139, 0.08);
+  --danger: #b91c1c;
+  --danger-bg: rgba(185, 28, 28, 0.08);
   --sidebar-bg: #1a1a1a;
   --sidebar-bg-hover: #2a2a2a;
   --sidebar-bg-active: #3a3a3a;
@@ -159,6 +163,19 @@ body {
   width: var(--sidebar-collapsed-width);
 }
 
+.sidebar-collapsed .sidebar-header {
+  justify-content: center;
+  padding: var(--space-4) var(--space-2);
+}
+
+.sidebar-collapsed .sidebar-brand {
+  display: none;
+}
+
+.sidebar-collapsed .sidebar-toggle {
+  margin: 0 auto;
+}
+
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -256,6 +273,17 @@ body {
   to { opacity: 1; }
 }
 
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .sidebar-nav {
   flex: 1;
   overflow-y: auto;
@@ -348,6 +376,84 @@ body {
 .sidebar-child-link.sidebar-link-active {
   color: #ffffff;
   font-weight: 600;
+}
+
+/* Enhanced sidebar active state with left accent border */
+.sidebar-link-active {
+  background: var(--sidebar-bg-active);
+  color: #ffffff;
+  border-left: 3px solid var(--primary);
+  padding-left: calc(var(--space-3) - 3px);
+}
+
+.sidebar-link-active:hover {
+  background: var(--sidebar-bg-active);
+}
+
+/* Collapsed sidebar link */
+.sidebar-link-collapsed {
+  justify-content: center;
+  padding: var(--space-2);
+}
+
+/* Flyout styles for collapsed submenus */
+.sidebar-flyout-item {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.sidebar-flyout-item:hover {
+  background: var(--bg);
+  color: var(--ink-strong);
+}
+
+.sidebar-flyout-item.active {
+  background: rgba(55, 65, 81, 0.1);
+  color: var(--primary-deep);
+  font-weight: 600;
+}
+
+/* Sidebar chevron animation */
+.sidebar-link-chevron {
+  display: flex;
+  align-items: center;
+  color: var(--sidebar-text);
+  opacity: 0.6;
+}
+
+/* Admin header language switcher */
+.admin-header-lang {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+}
+
+/* Slide down animation for sidebar children */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .lang-switcher {
@@ -1894,39 +2000,88 @@ body {
   font-weight: 600;
   text-transform: capitalize;
   letter-spacing: 0.02em;
+  border: 1px solid transparent;
 }
 
-.badge-published,
+/* Status badges - Success/Completed */
 .badge-succeeded,
 .badge-approved,
-.badge-completed {
-  background: rgba(83, 107, 96, 0.12);
+.badge-completed,
+.badge-published {
+  background: var(--success-bg);
   color: var(--success);
+  border-color: rgba(15, 118, 110, 0.15);
 }
 
-.badge-running,
-.badge-pending {
-  background: rgba(116, 102, 85, 0.12);
+/* Status badges - Running/Processing */
+.badge-running {
+  background: var(--warning-bg);
   color: var(--warning);
+  border-color: rgba(180, 83, 9, 0.15);
 }
 
-.badge-waiting_approval,
+/* Status badges - Pending/Waiting */
+.badge-pending,
+.badge-waiting,
+.badge-waiting_approval {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: rgba(180, 83, 9, 0.15);
+}
+
+/* Status badges - Draft/Muted/Neutral */
 .badge-draft,
-.badge-muted,
-.badge-waiting {
-  background: rgba(105, 117, 134, 0.12);
+.badge-muted {
+  background: var(--neutral-bg);
   color: var(--neutral);
+  border-color: rgba(100, 116, 139, 0.15);
 }
 
+/* Status badges - Failed/Rejected */
 .badge-rejected,
 .badge-failed {
-  background: rgba(153, 27, 27, 0.12);
+  background: var(--danger-bg);
   color: var(--danger);
+  border-color: rgba(185, 28, 28, 0.15);
 }
 
+/* Status badges - Active */
 .badge-active {
-  background: rgba(94, 112, 131, 0.12);
+  background: rgba(55, 65, 81, 0.1);
   color: var(--primary-deep);
+  border-color: rgba(55, 65, 81, 0.15);
+}
+
+/* Categorical badges - Difficulty levels (not status, use neutral palette) */
+.badge-easy {
+  background: rgba(59, 130, 246, 0.08);
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+.badge-medium {
+  background: rgba(234, 179, 8, 0.08);
+  color: #b45309;
+  border-color: rgba(234, 179, 8, 0.15);
+}
+
+.badge-hard {
+  background: rgba(100, 116, 139, 0.1);
+  color: #475569;
+  border-color: rgba(100, 116, 139, 0.15);
+}
+
+/* Risk level badges */
+.badge-low {
+  background: rgba(34, 197, 94, 0.08);
+  color: #15803d;
+  border-color: rgba(34, 197, 94, 0.15);
+}
+
+.badge-high {
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.15);
 }
 
 /* ===== Buttons ===== */

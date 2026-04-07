@@ -36,7 +36,7 @@ export default function TaskCardWithActions({ task, onEdit, onDeleted }: Props) 
           <h3 className="eval-card-title">{task.name}</h3>
           <p className="eval-card-meta">{task.description || "No description"}</p>
         </div>
-        <span className={`badge badge-${task.difficulty === "easy" ? "succeeded" : task.difficulty === "medium" ? "running" : "failed"}`}>
+        <span className={`badge badge-${task.difficulty}`}>
           {task.difficulty}
         </span>
       </div>

@@ -4,27 +4,33 @@ import { useState } from "react";
 import { buildTaskFromTrace, type Task } from "../app/lib/api";
 import { useTranslations } from "next-intl";
 import { useToast } from "./ToastProvider";
+import { Badge } from "../app/components/ui/Badge";
+import { CheckCircle, ArrowRight, Sparkles } from "lucide-react";
 
 interface TaskFromTraceFormProps {
   onTaskCreated?: (task: Task) => void;
+  initialExecutionId?: string;
+  initialTraceId?: string;
 }
 
-export default function TaskFromTraceForm({ onTaskCreated }: TaskFromTraceFormProps) {
+type ImportMode = "execution" | "trace";
+
+export default function TaskFromTraceForm({ onTaskCreated, initialExecutionId, initialTraceId }: TaskFromTraceFormProps) {
   const t = useTranslations("tasks");
   const te = useTranslations("errors");
   const tc = useTranslations("common");
   const toast = useToast();
-  const [form, setForm] = useState({
-    execution_id: "",
-    trace_id: "",
-  });
+  const [importMode, setImportMode] = useState<ImportMode>(initialExecutionId ? "execution" : "trace");
+  const [executionId, setExecutionId] = useState(initialExecutionId || "");
+  const [traceId, setTraceId] = useState(initialTraceId || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdTask, setCreatedTask] = useState<Task | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.execution_id && !form.trace_id) {
+    const id = importMode === "execution" ? executionId : traceId;
+    if (!id.trim()) {
       setError(te("executionOrTraceRequired"));
       return;
     }
@@ -34,7 +40,10 @@ export default function TaskFromTraceForm({ onTaskCreated }: TaskFromTraceFormPr
     setCreatedTask(null);
 
     try {
-      const task = await buildTaskFromTrace(form);
+      const task = await buildTaskFromTrace({
+        execution_id: importMode === "execution" ? id : undefined,
+        trace_id: importMode === "trace" ? id : undefined,
+      });
       setCreatedTask(task);
       toast.success(tc("success") + ": Task built from trace");
       onTaskCreated?.(task);
@@ -55,50 +64,82 @@ export default function TaskFromTraceForm({ onTaskCreated }: TaskFromTraceFormPr
 
         {error && <p className="form-error">{error}</p>}
 
-        <div className="form-fields">
-          <label className="form-label">
-            {t("taskBuilder.executionId")}
-            <input
-              id="execution_id"
-              name="execution_id"
-              type="text"
-              placeholder={t("taskBuilder.executionIdPlaceholder")}
-              value={form.execution_id}
-              onChange={(e) => setForm({ ...form, execution_id: e.target.value })}
-              disabled={loading}
-              className="form-input"
-            />
-            <span className="form-hint">
-              {t("taskBuilder.executionIdHint")}
-            </span>
-          </label>
+        <div style={{ marginBottom: "var(--space-5)" }}>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", marginBottom: "var(--space-3)" }}>
+            {t("taskBuilder.importModeHint")}
+          </p>
+          <div className="tabs" style={{ display: "flex", gap: "var(--space-2)", borderBottom: "none" }}>
+            <button
+              type="button"
+              onClick={() => { setImportMode("execution"); setExecutionId(""); setTraceId(""); }}
+              className={`btn ${importMode === "execution" ? "btn-primary" : "btn-secondary"}`}
+              style={{ flex: 1 }}
+            >
+              {t("taskBuilder.byExecutionId")}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setImportMode("trace"); setExecutionId(""); setTraceId(""); }}
+              className={`btn ${importMode === "trace" ? "btn-primary" : "btn-secondary"}`}
+              style={{ flex: 1 }}
+            >
+              {t("taskBuilder.byTraceId")}
+            </button>
+          </div>
+        </div>
 
-          <label className="form-label">
-            {t("taskBuilder.traceId")}
-            <input
-              id="trace_id"
-              name="trace_id"
-              type="text"
-              placeholder={t("taskBuilder.traceIdPlaceholder")}
-              value={form.trace_id}
-              onChange={(e) => setForm({ ...form, trace_id: e.target.value })}
-              disabled={loading}
-              className="form-input"
-            />
-            <span className="form-hint">{t("taskBuilder.traceIdHint")}</span>
-          </label>
+        <div className="form-fields">
+          {importMode === "execution" ? (
+            <label className="form-label">
+              {t("taskBuilder.executionId")}
+              <input
+                id="execution_id"
+                name="execution_id"
+                type="text"
+                placeholder={t("taskBuilder.executionIdPlaceholder")}
+                value={executionId}
+                onChange={(e) => setExecutionId(e.target.value)}
+                disabled={loading}
+                className="form-input"
+                autoFocus
+              />
+              <span className="form-hint">{t("taskBuilder.executionIdHint")}</span>
+            </label>
+          ) : (
+            <label className="form-label">
+              {t("taskBuilder.traceId")}
+              <input
+                id="trace_id"
+                name="trace_id"
+                type="text"
+                placeholder={t("taskBuilder.traceIdPlaceholder")}
+                value={traceId}
+                onChange={(e) => setTraceId(e.target.value)}
+                disabled={loading}
+                className="form-input"
+                autoFocus
+              />
+              <span className="form-hint">{t("taskBuilder.traceIdHint")}</span>
+            </label>
+          )}
         </div>
 
         <button type="submit" disabled={loading} className="form-submit">
-          {loading ? t("taskBuilder.building") : t("taskBuilder.buildTask")}
+          {loading ? (
+            <>
+              <Sparkles size={16} className="animate-spin" style={{ animation: "spin 1s linear infinite" }} />
+              {t("taskBuilder.building")}
+            </>
+          ) : (
+            <>
+              <Sparkles size={16} />
+              {t("taskBuilder.buildTask")}
+            </>
+          )}
         </button>
       </form>
 
-      {createdTask && (
-        <div style={{ marginTop: "var(--space-6)" }}>
-          <TaskPreview task={createdTask} />
-        </div>
-      )}
+      {createdTask && <TaskPreview task={createdTask} />}
     </>
   );
 }
@@ -108,21 +149,23 @@ function TaskPreview({ task }: { task: Task }) {
   const tc = useTranslations("common");
 
   return (
-    <article className="form-panel">
-      <div className="panel-header">
-        <p className="section-kicker">{t("taskBuilder.preview")}</p>
+    <article className="form-panel" style={{ marginTop: "var(--space-6)", border: "1px solid var(--success)", background: "var(--success-bg)" }}>
+      <div className="panel-header" style={{ marginBottom: "var(--space-4)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <CheckCircle size={20} style={{ color: "var(--success)" }} />
+          <p className="section-kicker" style={{ margin: 0 }}>{t("taskBuilder.preview")}</p>
+        </div>
         <h2>{t("taskBuilder.generatedTask")}</h2>
-        <span className="badge badge-succeeded" style={{ marginLeft: "var(--space-3)" }}>{tc("success")}</span>
       </div>
 
       <div className="detail-grid">
         <div className="detail-row">
           <span className="detail-label">{tc("id")}</span>
-          <span className="detail-value"><code>{task.id}</code></span>
+          <span className="detail-value"><code style={{ fontSize: "var(--text-xs)", background: "var(--bg)", padding: "2px 6px", borderRadius: "var(--radius-xs)" }}>{task.id}</code></span>
         </div>
         <div className="detail-row">
           <span className="detail-label">{tc("name")}</span>
-          <span className="detail-value">{task.name}</span>
+          <span className="detail-value" style={{ fontWeight: 600 }}>{task.name}</span>
         </div>
         {task.description && (
           <div className="detail-row">
@@ -133,9 +176,7 @@ function TaskPreview({ task }: { task: Task }) {
         <div className="detail-row">
           <span className="detail-label">{t("difficulty")}</span>
           <span className="detail-value">
-            <span className={`badge badge-${task.difficulty === "easy" ? "succeeded" : task.difficulty === "medium" ? "running" : "failed"}`}>
-              {task.difficulty}
-            </span>
+            <Badge variant={task.difficulty}>{task.difficulty}</Badge>
           </span>
         </div>
       </div>
@@ -150,10 +191,59 @@ function TaskPreview({ task }: { task: Task }) {
 
       {task.test_cases && task.test_cases.length > 0 && (
         <div style={{ marginTop: "var(--space-5)" }}>
-          <h3 className="section-kicker" style={{ marginBottom: "var(--space-2)" }}>{t("taskBuilder.extractedTestCases")}</h3>
-          <pre className="json-block">
-            {JSON.stringify(task.test_cases, null, 2)}
-          </pre>
+          <h3 className="section-kicker" style={{ marginBottom: "var(--space-3)" }}>
+            {t("taskBuilder.extractedTestCases")} ({task.test_cases.length})
+          </h3>
+          <div className="table-wrapper" style={{ border: "1px solid var(--line)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+            <table className="table" style={{ margin: 0 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 40 }}>#</th>
+                  <th>Input / Prompt</th>
+                  <th>Expected Output</th>
+                </tr>
+              </thead>
+              <tbody>
+                {task.test_cases.map((tc, index) => (
+                  <tr key={index}>
+                    <td style={{ textAlign: "center", color: "var(--muted)", fontWeight: 600 }}>{index + 1}</td>
+                    <td>
+                      <div style={{
+                        maxWidth: 300,
+                        maxHeight: 100,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "pre-wrap",
+                        fontSize: "var(--text-sm)",
+                        fontFamily: "monospace",
+                        background: "var(--bg)",
+                        padding: "var(--space-2)",
+                        borderRadius: "var(--radius-sm)",
+                      }}>
+                        {typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input, null, 2)}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{
+                        maxWidth: 300,
+                        maxHeight: 100,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "pre-wrap",
+                        fontSize: "var(--text-sm)",
+                        fontFamily: "monospace",
+                        background: "var(--bg)",
+                        padding: "var(--space-2)",
+                        borderRadius: "var(--radius-sm)",
+                      }}>
+                        {typeof tc.expected === 'string' ? tc.expected : JSON.stringify(tc.expected, null, 2)}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </article>

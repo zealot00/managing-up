@@ -8,9 +8,10 @@ import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   approval: Approval;
+  onComplete?: () => void;
 };
 
-export default function ApprovalForm({ approval }: Props) {
+export default function ApprovalForm({ approval, onComplete }: Props) {
   const t = useTranslations("approvals");
   const tc = useTranslations("common");
   const router = useRouter();
@@ -36,6 +37,7 @@ export default function ApprovalForm({ approval }: Props) {
       });
       toast.success(tc("success") + ": Decision submitted");
       router.refresh();
+      if (onComplete) onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit decision");
     } finally {

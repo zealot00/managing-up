@@ -3,8 +3,9 @@
 import { usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { useTranslations } from "next-intl";
-import { Bell, CircleHelp, Search, Menu, Command } from "lucide-react";
+import { Bell, CircleHelp, Search, Menu, Command, Globe } from "lucide-react";
 import { useMobileSidebar } from "./MobileSidebarProvider";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 export default function AdminHeader() {
   const t = useTranslations("nav");
@@ -65,6 +66,9 @@ export default function AdminHeader() {
         <button className="admin-header-icon-btn" title="Help" aria-label="Help">
           <CircleHelp size={20} aria-hidden="true" />
         </button>
+        <div className="admin-header-lang" title="Switch language">
+          <LanguageSwitcher />
+        </div>
       </div>
     </header>
   );
