@@ -172,6 +172,13 @@ npm run dev
 | `GATEWAY_SCANNER_MAX_BUFFER_SIZE` | SSE 流扫描器最大 buffer 大小 | `52428800` (50MB) |
 | `GATEWAY_MAX_TOKEN_ESTIMATE` | 请求 token 估算上限（DoS防护） | `1000000` (1M) |
 | `GATEWAY_ENCRYPTION_KEY` | API Key 加密密钥（32-byte base64） | - |
+| `REDIS_ADDR` | Redis 地址（速率限制 & 熔断器） | `localhost:6379` |
+| `REDIS_PASSWORD` | Redis 密码 | - |
+| `REDIS_DB` | Redis 数据库编号 | `0` |
+| `EMBEDDING_PROVIDER` | Embedding 服务提供商 | `openai` |
+| `EMBEDDING_MODEL` | Embedding 模型 | `text-embedding-3-small` |
+| `EMBEDDING_API_KEY` | Embedding API Key | - |
+| `EMBEDDING_BASE_URL` | Embedding API 地址 | `https://api.openai.com/v1` |
 
 ---
 
@@ -332,11 +339,12 @@ curl http://localhost:8080/api/v1/gateway/usage/users
 
 ### Gateway 功能
 
-- **多提供商路由**: 自动根据模型名路由到对应提供商
-- **API Key 认证**: Bearer Token / x-api-key
+- **多提供商路由**: 自动根据模型名路由到对应提供商，支持 fallback 失败切换
+- **API Key 认证**: Bearer Token / x-api-key，AES-GCM 加密存储
 - **使用统计**: 按 Provider/Model/User 聚合
-- **费用追踪**: 基于模型定价自动计算成本
-- **限流**: 每 Key 每分钟请求限制
+- **费用追踪**: 基于模型定价自动计算成本，O(1) 查找
+- **限流**: Redis 分布式限流，每 Key 每分钟请求限制
+- **熔断器**: Redis 计数器的指数退避熔断机制
 - **重试机制**: 指数退避自动重试
 
 ---
@@ -418,6 +426,8 @@ curl -X POST http://localhost:8080/api/v1/mcp-servers/{id}/approve \
 - **参数验证**: 拒绝包含 shell 元字符的参数
 - **Header 验证**: HTTP 传输头不能包含 CRLF 注入
 - **连接验证**: 批准前自动验证 MCP 服务器可访问
+- **两阶段注册**: 验证与网络 I/O 分离，避免阻塞其他 MCP 操作
+- **上下文管理**: 正确处理 MCP 客户端生命周期，避免goroutine泄漏
 
 ---
 
@@ -568,7 +578,7 @@ managing-up/
 | LLM Gateway | ✅ | OpenAI/Anthropic compatible, streaming, cost tracking |
 | Task Definitions | ✅ | Structured test cases |
 | Experiment Tracking | ✅ | A/B comparison runs |
-| Evaluation Pipeline | ✅ | Multiple evaluator types |
+| Evaluation Pipeline | ✅ | Multiple evaluator types + embedding similarity (OpenAI/Ollama) |
 | Trace Replay | ✅ | Deterministic reproduction |
 | Python SDK | ✅ | PyPI package |
 | TypeScript SDK | ✅ | npm package |
