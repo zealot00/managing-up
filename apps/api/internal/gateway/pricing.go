@@ -34,16 +34,21 @@ var modelPricing = map[string]ModelPricing{
 	"MiniMax-Text-01":          {InputCostPerToken: 0.000001, OutputCostPerToken: 0.000001},
 }
 
+var modelPricingLower = make(map[string]ModelPricing, len(modelPricing))
+
+func init() {
+	for k, v := range modelPricing {
+		modelPricingLower[strings.ToLower(k)] = v
+	}
+}
+
 func GetModelPricing(model string) ModelPricing {
 	if pricing, ok := modelPricing[model]; ok {
 		return pricing
 	}
 
-	lowerModel := strings.ToLower(model)
-	for key, pricing := range modelPricing {
-		if strings.ToLower(key) == lowerModel {
-			return pricing
-		}
+	if pricing, ok := modelPricingLower[strings.ToLower(model)]; ok {
+		return pricing
 	}
 
 	return ModelPricing{

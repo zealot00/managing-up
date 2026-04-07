@@ -116,30 +116,34 @@ func NewMCPClients() *MCPClients {
 }
 
 func (m *MCPClients) Register(ctx context.Context, name string, config MCPClientConfig) error {
-	// Validate configuration BEFORE any operations
+	// Phase 1: Validate BEFORE acquiring lock
 	if err := validateStdioConfig(config); err != nil {
 		return fmt.Errorf("invalid stdio config: %w", err)
 	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
+	// Phase 2: Quick existence check WITHOUT write lock
+	m.mu.RLock()
 	if _, exists := m.clients[name]; exists {
+		m.mu.RUnlock()
 		return fmt.Errorf("MCP client already registered: %s", name)
 	}
+	m.mu.RUnlock()
 
-	// Apply timeout if configured
+	// Phase 3: Network I/O WITHOUT holding lock (prevents fat lock)
+	var initCtx context.Context
+	var initCancel context.CancelFunc
 	if config.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, config.Timeout)
-		defer cancel()
+		initCtx, initCancel = context.WithTimeout(ctx, config.Timeout)
+		defer initCancel()
+	} else {
+		initCtx = ctx
 	}
 
 	var t transport.Interface
 	t = transport.NewStdio(config.Command, config.Args, config.Env...)
 
 	mcpClient := client.NewClient(t)
-	if err := mcpClient.Start(ctx); err != nil {
+	if err := mcpClient.Start(initCtx); err != nil {
 		return fmt.Errorf("failed to start MCP client: %w", err)
 	}
 
@@ -150,7 +154,7 @@ func (m *MCPClients) Register(ctx context.Context, name string, config MCPClient
 		}
 	}
 
-	initialized, err := mcpClient.Initialize(ctx, mcp.InitializeRequest{
+	initialized, err := mcpClient.Initialize(initCtx, mcp.InitializeRequest{
 		Params: mcp.InitializeParams{
 			ProtocolVersion: mcp.LATEST_PROTOCOL_VERSION,
 			ClientInfo: mcp.Implementation{
@@ -170,7 +174,7 @@ func (m *MCPClients) Register(ctx context.Context, name string, config MCPClient
 		return fmt.Errorf("protocol version mismatch: got %s, want %s", initialized.ProtocolVersion, mcp.LATEST_PROTOCOL_VERSION)
 	}
 
-	listTools, err := mcpClient.ListTools(ctx, mcp.ListToolsRequest{})
+	listTools, err := mcpClient.ListTools(initCtx, mcp.ListToolsRequest{})
 	if err != nil {
 		cleanup()
 		return fmt.Errorf("failed to list tools: %w", err)
@@ -181,35 +185,41 @@ func (m *MCPClients) Register(ctx context.Context, name string, config MCPClient
 		tools[tool.Name] = tool
 	}
 
+	// Phase 4: Acquire lock ONLY for map insertion (nanoseconds)
+	m.mu.Lock()
+	if _, exists := m.clients[name]; exists {
+		m.mu.Unlock()
+		cleanup()
+		return fmt.Errorf("MCP client already registered: %s", name)
+	}
 	m.clients[name] = &MCPClient{
 		name:   name,
 		config: config,
 		client: mcpClient,
 		tools:  tools,
 	}
+	m.mu.Unlock()
 
 	return nil
 }
 
 func (m *MCPClients) RegisterHTTP(ctx context.Context, name string, baseURL string, headers map[string]string) error {
-	// Validate headers BEFORE any operations
+	// Phase 1: Validate headers BEFORE any operations
 	if err := validateHTTPHeaders(headers); err != nil {
 		return fmt.Errorf("invalid HTTP headers: %w", err)
 	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
+	// Phase 2: Quick existence check WITHOUT write lock
+	m.mu.RLock()
 	if _, exists := m.clients[name]; exists {
+		m.mu.RUnlock()
 		return fmt.Errorf("MCP client already registered: %s", name)
 	}
+	m.mu.RUnlock()
 
-	// Apply timeout if configured
-	if defaultTimeout := 30 * time.Second; true {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, defaultTimeout)
-		defer cancel()
-	}
+	// Phase 3: Network I/O WITHOUT holding lock (prevents fat lock)
+	initCtx, initCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer initCancel()
 
 	t, err := transport.NewStreamableHTTP(baseURL, transport.WithHTTPHeaders(headers))
 	if err != nil {
@@ -217,7 +227,7 @@ func (m *MCPClients) RegisterHTTP(ctx context.Context, name string, baseURL stri
 	}
 
 	mcpClient := client.NewClient(t)
-	if err := mcpClient.Start(ctx); err != nil {
+	if err := mcpClient.Start(initCtx); err != nil {
 		return fmt.Errorf("failed to start MCP client: %w", err)
 	}
 
@@ -228,7 +238,7 @@ func (m *MCPClients) RegisterHTTP(ctx context.Context, name string, baseURL stri
 		}
 	}
 
-	initialized, err := mcpClient.Initialize(ctx, mcp.InitializeRequest{
+	initialized, err := mcpClient.Initialize(initCtx, mcp.InitializeRequest{
 		Params: mcp.InitializeParams{
 			ProtocolVersion: mcp.LATEST_PROTOCOL_VERSION,
 			ClientInfo: mcp.Implementation{
@@ -248,7 +258,7 @@ func (m *MCPClients) RegisterHTTP(ctx context.Context, name string, baseURL stri
 		return fmt.Errorf("protocol version mismatch: got %s, want %s", initialized.ProtocolVersion, mcp.LATEST_PROTOCOL_VERSION)
 	}
 
-	listTools, err := mcpClient.ListTools(ctx, mcp.ListToolsRequest{})
+	listTools, err := mcpClient.ListTools(initCtx, mcp.ListToolsRequest{})
 	if err != nil {
 		cleanup()
 		return fmt.Errorf("failed to list tools: %w", err)
@@ -259,11 +269,19 @@ func (m *MCPClients) RegisterHTTP(ctx context.Context, name string, baseURL stri
 		tools[tool.Name] = tool
 	}
 
+	// Phase 4: Acquire lock ONLY for map insertion (nanoseconds)
+	m.mu.Lock()
+	if _, exists := m.clients[name]; exists {
+		m.mu.Unlock()
+		cleanup()
+		return fmt.Errorf("MCP client already registered: %s", name)
+	}
 	m.clients[name] = &MCPClient{
 		name:   name,
 		client: mcpClient,
 		tools:  tools,
 	}
+	m.mu.Unlock()
 
 	return nil
 }

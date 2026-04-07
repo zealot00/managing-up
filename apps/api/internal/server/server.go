@@ -26,6 +26,30 @@ import (
 
 var logger *slog.Logger
 
+func redisEnabled() bool {
+	return os.Getenv("REDIS_ADDR") != "" || os.Getenv("REDIS_URL") != ""
+}
+
+func newRedisClient() *redis.Client {
+	opts := &redis.Options{}
+	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
+		opts.Addr = addr
+	} else if url := os.Getenv("REDIS_URL"); url != "" {
+		opts.Addr = url
+	} else {
+		opts.Addr = "localhost:6379"
+	}
+	if password := os.Getenv("REDIS_PASSWORD"); password != "" {
+		opts.Password = password
+	}
+	if db := os.Getenv("REDIS_DB"); db != "" {
+		if d, err := strconv.Atoi(db); err == nil {
+			opts.DB = d
+		}
+	}
+	return redis.NewClient(opts)
+}
+
 // corsMiddleware wraps an http.Handler and adds CORS headers.
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -544,16 +568,16 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	gatewayRecorder := gatewayUsageRecorder{repo: repo}
 	gatewayProviderKeyResolver := buildDBProviderKeyResolver(repo)
 	var gatewayLimiterFactory gateway.RateLimiterFactory
-	if os.Getenv("REDIS_URL") != "" {
-		redisClient := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_URL")})
+	if redisEnabled() {
+		redisClient := newRedisClient()
 		gatewayLimiterFactory = &gateway.RedisRateLimiterFactory{Client: redisClient}
 	} else {
 		gatewayLimiterFactory = &gateway.InMemoryRateLimiterFactory{}
 	}
 	gatewayLimiter := gatewayLimiterFactory.Create("gateway", 60, time.Minute)
 	var budgetChecker gateway.BudgetChecker
-	if os.Getenv("REDIS_URL") != "" && os.Getenv("ENABLE_BUDGET") == "true" {
-		redisClient := redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_URL")})
+	if redisEnabled() && os.Getenv("ENABLE_BUDGET") == "true" {
+		redisClient := newRedisClient()
 		budgetChecker = gateway.NewRedisBudgetChecker(redisClient, gateway.BudgetConfig{
 			MonthlyLimit:   1000000,
 			DailyLimit:     50000,

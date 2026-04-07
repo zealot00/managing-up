@@ -216,7 +216,7 @@ func createEvaluationRunner(repo server.Repository, agent engine.Agent, llmClien
 	registry.Register(&evaluator.ExactMatchEvaluator{})
 	registry.Register(evaluator.NewSemanticSimilarityEvaluator(0.8))
 
-	embeddingClient, _ := llm.NewClient(llm.ProviderOpenAI, "text-embedding-3-small", os.Getenv("LLM_API_KEY"))
+	embeddingClient := evaluator.NewHTTPEmbeddingClientFromEnv()
 	registry.Register(evaluator.NewEmbeddingSimilarityEvaluator(embeddingClient, 0.85))
 
 	evalRunner := evaluator.NewEvaluationRunner(

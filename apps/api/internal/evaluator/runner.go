@@ -70,7 +70,7 @@ func NewEvaluationRunner(
 	registry.Register(&ExactMatchEvaluator{})
 	registry.Register(NewSemanticSimilarityEvaluator(0.8))
 
-	embeddingClient, _ := llm.NewClient(llm.ProviderOpenAI, "text-embedding-3-small", os.Getenv("LLM_API_KEY"))
+	embeddingClient := NewHTTPEmbeddingClientFromEnv()
 	registry.Register(NewEmbeddingSimilarityEvaluator(embeddingClient, 0.85))
 
 	if agentLLM != nil {

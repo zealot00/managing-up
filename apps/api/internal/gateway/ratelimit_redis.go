@@ -17,7 +17,7 @@ local now = tonumber(ARGV[3])
 local current = redis.call('GET', key)
 if current == false then
     redis.call('SET', key, 1, 'PX', window)
-    redis.call('SET', key .. ':reset', now + window)
+    redis.call('SET', key .. ':reset', now + window, 'PX', window)
     return 1
 end
 
@@ -29,7 +29,7 @@ end
 local new_count = redis.call('INCR', key)
 if new_count == 1 then
     redis.call('PEXPIRE', key, window)
-    redis.call('SET', key .. ':reset', now + window)
+    redis.call('SET', key .. ':reset', now + window, 'PX', window)
 end
 
 return 1
