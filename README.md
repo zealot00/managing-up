@@ -170,6 +170,8 @@ npm run dev
 | `ORCHESTRATOR_JWT_ISSUER` | Orchestrator JWT 签发者 | - |
 | `GATEWAY_SCANNER_BUFFER_SIZE` | SSE 流扫描器初始 buffer 大小 | `10485760` (10MB) |
 | `GATEWAY_SCANNER_MAX_BUFFER_SIZE` | SSE 流扫描器最大 buffer 大小 | `52428800` (50MB) |
+| `GATEWAY_MAX_TOKEN_ESTIMATE` | 请求 token 估算上限（DoS防护） | `1000000` (1M) |
+| `GATEWAY_ENCRYPTION_KEY` | API Key 加密密钥（32-byte base64） | - |
 
 ---
 

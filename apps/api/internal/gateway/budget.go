@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -241,8 +243,17 @@ func DecrementBudgetFromContext(ctx context.Context, key string) error {
 	return err
 }
 
+func getMaxTokenEstimate() int {
+	if val := os.Getenv("GATEWAY_MAX_TOKEN_ESTIMATE"); val != "" {
+		if intVal, err := strconv.Atoi(val); err == nil && intVal > 0 {
+			return intVal
+		}
+	}
+	return 1_000_000
+}
+
 func estimateRequestTokens(r *http.Request) int {
-	const maxTokens = 1_000_000
+	maxTokens := getMaxTokenEstimate()
 	if r.ContentLength > 0 {
 		estimated := int(r.ContentLength) / 4
 		if estimated > maxTokens {
