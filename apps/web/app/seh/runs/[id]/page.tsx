@@ -21,7 +21,7 @@ export default async function SEHRunDetailPage({ params }: Props) {
   return (
     <main className="shell">
       <section className="toprail">
-        <Link href="/seh/runs">{tc("back")} to {t("runs")}</Link>
+        <Link href="/seh/runs" className="toprail-link">← {tc("back")} to {t("runs")}</Link>
       </section>
 
       <section className="hero-page hero-compact">
@@ -99,31 +99,28 @@ export default async function SEHRunDetailPage({ params }: Props) {
           {run.results.length === 0 ? (
             <p className="empty-note">{t("noRunResults")}</p>
           ) : (
-            <div className="list">
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
               {run.results.map((result) => (
-                <article className="list-card" key={result.case_id} style={{ display: "block" }}>
-                  <div className="list-card-main">
-                    <h3 className="list-card-title">{result.case_id}</h3>
-                    <p className="list-card-meta">
-                      {result.classification} · {result.latency_ms}ms · {result.token_usage} tokens
-                    </p>
-                  </div>
-                  <div className="list-card-actions">
+                <div key={result.case_id} style={{ borderBottom: "1px solid var(--line)", paddingBottom: "var(--space-3)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
+                    <div>
+                      <span style={{ fontWeight: 600 }}>{result.case_id.slice(0, 16)}...</span>
+                      <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)", marginLeft: "var(--space-3)" }}>
+                        {result.classification} · {result.latency_ms}ms · {result.token_usage} tokens
+                      </span>
+                    </div>
                     <span className={`badge badge-${result.success ? "succeeded" : "failed"}`}>
                       {result.success ? tc("success") : tc("failed")}
                     </span>
                   </div>
-
-                  <div style={{ marginTop: "var(--space-2)" }}>
-                    <JsonFold title={`${t("drillDown")}: ${result.case_id.slice(0, 12)}...`} data={{
-                      classification: result.classification,
-                      latency_ms: result.latency_ms,
-                      token_usage: result.token_usage,
-                      output: result.output,
-                      error: result.error || null,
-                    }} />
-                  </div>
-                </article>
+                  <JsonFold title={`${t("drillDown")}: ${result.case_id.slice(0, 12)}...`} data={{
+                    classification: result.classification,
+                    latency_ms: result.latency_ms,
+                    token_usage: result.token_usage,
+                    output: result.output,
+                    error: result.error || null,
+                  }} />
+                </div>
               ))}
             </div>
           )}

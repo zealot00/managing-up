@@ -38,7 +38,7 @@ export default async function SEHDatasetDetailPage({ params }: Props) {
   return (
     <main className="shell">
       <section className="toprail">
-        <Link href="/seh/datasets">{tc("back")} to {t("datasets")}</Link>
+        <Link href="/seh/datasets" className="toprail-link">← {tc("back")} to {t("datasets")}</Link>
       </section>
 
       <section className="hero-page hero-compact">
@@ -108,31 +108,27 @@ export default async function SEHDatasetDetailPage({ params }: Props) {
           {casesResp.cases.length === 0 ? (
             <p className="empty-note">{t("noCases")}</p>
           ) : (
-            <div className="list">
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
               {casesResp.cases.map((testCase) => {
                 const caseLn = caseLineages.find(cl => cl.case_id === testCase.case_id);
                 return (
-                  <article className="list-card" key={testCase.case_id} style={{ display: "block" }}>
-                    <div className="list-card-main">
-                      <h3 className="list-card-title">
-                        {testCase.skill} · {testCase.source}
-                      </h3>
-                      <p className="list-card-meta">{testCase.tags.join(", ") || "-"}</p>
-                    </div>
-                    <div className="list-card-actions">
+                  <div key={testCase.case_id} style={{ borderBottom: "1px solid var(--line)", paddingBottom: "var(--space-3)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
+                      <div>
+                        <span style={{ fontWeight: 600 }}>{testCase.skill} · {testCase.source}</span>
+                        <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)", marginLeft: "var(--space-3)" }}>
+                          {testCase.tags.join(", ") || "-"}
+                        </span>
+                      </div>
                       <span className={`badge badge-${testCase.status}`}>{testCase.status}</span>
                     </div>
-
-                    {/* Case provenance fold */}
-                    <div style={{ marginTop: "var(--space-2)" }}>
-                      <JsonFold title={`${t("caseLineage")}: ${testCase.case_id.slice(0, 12)}...`} data={{
-                        provenance: testCase.provenance,
-                        input: testCase.input,
-                        expected: testCase.expected,
-                        lineage: caseLn?.lineage,
-                      }} />
-                    </div>
-                  </article>
+                    <JsonFold title={`${t("caseLineage")}: ${testCase.case_id.slice(0, 12)}...`} data={{
+                      provenance: testCase.provenance,
+                      input: testCase.input,
+                      expected: testCase.expected,
+                      lineage: caseLn?.lineage,
+                    }} />
+                  </div>
                 );
               })}
             </div>

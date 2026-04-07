@@ -236,8 +236,9 @@ export default function GatewayPage() {
         </div>
       )}
 
-      <form className="form-fields form-row gateway-filter" onSubmit={handleApplyFilter}>
-          <div>
+      <form className="gateway-filter-form" onSubmit={handleApplyFilter}>
+        <div className="gateway-filter-row">
+          <div className="gateway-filter-field">
             <label className="form-label" htmlFor="gateway-from">{t("startDate")}</label>
             <input
               id="gateway-from"
@@ -247,7 +248,7 @@ export default function GatewayPage() {
               onChange={(e) => setFrom(e.target.value)}
             />
           </div>
-          <div>
+          <div className="gateway-filter-field">
             <label className="form-label" htmlFor="gateway-to">{t("endDate")}</label>
             <input
               id="gateway-to"
@@ -258,7 +259,7 @@ export default function GatewayPage() {
             />
           </div>
           {isAdmin && (
-            <div>
+            <div className="gateway-filter-field">
               <label className="form-label" htmlFor="gateway-user-id">{t("user")} ID (admin)</label>
               <input
                 id="gateway-user-id"
@@ -272,7 +273,8 @@ export default function GatewayPage() {
           <div className="gateway-filter-submit">
             <button className="form-submit" type="submit">{t("apply")}</button>
           </div>
-        </form>
+        </div>
+      </form>
 
       {isAdmin && tokenRankingData.length > 0 && (
         <div className="chart-grid">
@@ -368,28 +370,41 @@ export default function GatewayPage() {
             {keys.length === 0 ? (
               <p className="empty-note">{t("noKeys")}</p>
             ) : (
-              <div className="list">
-                {keys.map((key) => (
-                  <article className="list-card" key={key.id}>
-                    <div className="list-card-main">
-                      <h3 className="list-card-title">{key.name}</h3>
-                      <p className="list-card-meta">
-                        {key.key_prefix}... · {tc("createdAt")} {new Date(key.created_at).toLocaleString()}
-                        {key.last_used_at ? ` · last used ${new Date(key.last_used_at).toLocaleString()}` : ""}
-                      </p>
-                    </div>
-                    <div className="list-card-actions">
-                      <span className={`badge ${key.revoked_at ? "badge-failed" : "badge-completed"}`}>
-                        {key.revoked_at ? t("revoke") : tc("status")}
-                      </span>
-                      {!key.revoked_at && (
-                        <button className="gateway-button-secondary" onClick={() => void handleRevokeKey(key.id)}>
-                          {t("revoke")}
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                ))}
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>{tc("name")}</th>
+                      <th>{tc("keyPrefix")}</th>
+                      <th>{tc("createdAt")}</th>
+                      <th>{tc("lastUsed")}</th>
+                      <th>{tc("status")}</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {keys.map((key) => (
+                      <tr key={key.id}>
+                        <td>{key.name}</td>
+                        <td>{key.key_prefix}...</td>
+                        <td>{new Date(key.created_at).toLocaleString()}</td>
+                        <td>{key.last_used_at ? new Date(key.last_used_at).toLocaleString() : "-"}</td>
+                        <td>
+                          <span className={`badge ${key.revoked_at ? "badge-failed" : "badge-completed"}`}>
+                            {key.revoked_at ? t("revoke") : tc("status")}
+                          </span>
+                        </td>
+                        <td>
+                          {!key.revoked_at && (
+                            <button className="gateway-button-secondary" onClick={() => void handleRevokeKey(key.id)}>
+                              {t("revoke")}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

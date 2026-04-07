@@ -65,26 +65,38 @@ async function SkillsContent() {
             <p className="section-kicker">{t("eyebrow")}</p>
             <h2 className="panel-title">{t("title")}</h2>
           </div>
-          <div className="list">
+          <div className="table-wrapper">
             {skills.items.length === 0 ? (
               <p className="empty-note">{t("noSkills")}</p>
             ) : (
-              skills.items.map((skill) => (
-                <Link
-                  href={`/skills/${skill.id}`}
-                  key={skill.id}
-                  className="list-card"
-                  style={{ textDecoration: "none" }}
-                >
-                  <div className="list-card-main">
-                    <h3 className="list-card-title">{skill.name}</h3>
-                    <p className="list-card-meta">
-                      {skill.owner_team} · {skill.risk_level} risk · {skill.current_version || t("noVersions")}
-                    </p>
-                  </div>
-                  <span className={`badge badge-${skill.status}`}>{skill.status}</span>
-                </Link>
-              ))
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Owner</th>
+                    <th>Risk Level</th>
+                    <th>Version</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {skills.items.map((skill) => (
+                    <tr key={skill.id} style={{ cursor: "pointer" }}>
+                      <td>
+                        <Link href={`/skills/${skill.id}`} style={{ textDecoration: "none" }}>
+                          {skill.name}
+                        </Link>
+                      </td>
+                      <td>{skill.owner_team}</td>
+                      <td>{skill.risk_level}</td>
+                      <td>{skill.current_version || t("noVersions")}</td>
+                      <td>
+                        <span className={`badge badge-${skill.status}`}>{skill.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </article>
@@ -94,21 +106,32 @@ async function SkillsContent() {
             <p className="section-kicker">{t("versions")}</p>
             <h2 className="panel-title">{t("versions")}</h2>
           </div>
-          <div className="list">
+          <div className="table-wrapper">
             {versions.items.length === 0 ? (
               <p className="empty-note">{t("noVersions")}</p>
             ) : (
-              versions.items.map((version) => (
-                <article className="list-card" key={version.id}>
-                  <div className="list-card-main">
-                    <h3 className="list-card-title">
-                      {version.skill_id} · {version.version}
-                    </h3>
-                    <p className="list-card-meta">{version.change_summary}</p>
-                  </div>
-                  <span className={`badge badge-${version.status}`}>{version.status}</span>
-                </article>
-              ))
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Skill ID</th>
+                    <th>Version</th>
+                    <th>Change Summary</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {versions.items.map((version) => (
+                    <tr key={version.id}>
+                      <td>{version.skill_id}</td>
+                      <td>{version.version}</td>
+                      <td>{version.change_summary}</td>
+                      <td>
+                        <span className={`badge badge-${version.status}`}>{version.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </article>

@@ -114,9 +114,9 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
         ))}
       </div>
 
-      <div className="page-header" style={{ marginTop: "var(--space-6)", marginBottom: "var(--space-4)", paddingBottom: 0, borderBottom: "none" }}>
+      <div className="page-header">
         <div className="page-header-content">
-          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          <div className="tabs">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -165,7 +165,7 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
       )}
 
       {(activeTab === "datasets" || activeTab === "runs" || activeTab === "policies") && (
-        <div className="search-bar" style={{ marginTop: "var(--space-2)" }}>
+        <div className="search-bar">
           <input
             type="text"
             placeholder={t("searchPlaceholder")}
@@ -175,7 +175,7 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
         </div>
       )}
 
-      <section className="panel" style={{ marginTop: "var(--space-4)" }}>
+      <section className="panel">
         {activeTab === "datasets" && (
           <>
             <div className="panel-header">
@@ -185,33 +185,47 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
                 {t("viewAllDatasets")}
               </Link>
             </div>
-            <div className="list">
+            <div className="table-wrapper">
               {filteredDatasets.length === 0 ? (
                 <p className="empty-note">{searchQuery ? "No matching datasets" : t("noDatasets")}</p>
               ) : (
-                filteredDatasets.map((ds) => (
-                  <article className="list-card" key={ds.dataset_id}>
-                    <div className="list-card-main">
-                      <h3 className="list-card-title">{ds.name}</h3>
-                      <p className="list-card-meta">
-                        {ds.version} · {ds.owner} · {ds.case_count} {t("cases")}
-                      </p>
-                    </div>
-                    <div className="list-card-actions">
-                      <span className="badge badge-muted">{ds.dataset_id}</span>
-                      <Link href={`/seh/datasets/${ds.dataset_id}`} className="btn btn-secondary btn-sm">
-                        {t("viewDetails")}
-                      </Link>
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        onClick={() => handleDeleteDataset(ds.dataset_id, ds.name)}
-                        disabled={deletingId === ds.dataset_id}
-                      >
-                        {deletingId === ds.dataset_id ? t("deleting") : t("delete")}
-                      </button>
-                    </div>
-                  </article>
-                ))
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Version</th>
+                      <th>Owner</th>
+                      <th>Cases</th>
+                      <th>Dataset ID</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDatasets.map((ds) => (
+                      <tr key={ds.dataset_id}>
+                        <td>{ds.name}</td>
+                        <td>{ds.version}</td>
+                        <td>{ds.owner}</td>
+                        <td>{ds.case_count}</td>
+                        <td><span className="badge badge-muted">{ds.dataset_id}</span></td>
+                        <td>
+                          <div className="flex gap-2">
+                            <Link href={`/seh/datasets/${ds.dataset_id}`} className="btn btn-secondary btn-sm">
+                              {t("viewDetails")}
+                            </Link>
+                            <button
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => handleDeleteDataset(ds.dataset_id, ds.name)}
+                              disabled={deletingId === ds.dataset_id}
+                            >
+                              {deletingId === ds.dataset_id ? t("deleting") : t("delete")}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
           </>
@@ -226,35 +240,51 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
                 {t("viewAllRuns")}
               </Link>
             </div>
-            <div className="list">
+            <div className="table-wrapper">
               {filteredRuns.length === 0 ? (
                 <p className="empty-note">{searchQuery ? "No matching runs" : t("noRuns")}</p>
               ) : (
-                filteredRuns.map((run) => (
-                  <article className="list-card" key={run.run_id}>
-                    <div className="list-card-main">
-                      <h3 className="list-card-title">{run.skill}</h3>
-                      <p className="list-card-meta">
-                        {t("score")}: {run.metrics.score.toFixed(2)} · {t("success")}: {(run.metrics.success_rate * 100).toFixed(0)}%
-                      </p>
-                    </div>
-                    <div className="list-card-actions">
-                      <span className={`badge badge-${run.metrics.score >= 0.75 ? "succeeded" : "failed"}`}>
-                        {run.run_id}
-                      </span>
-                      <Link href={`/seh/runs/${run.run_id}`} className="btn btn-secondary btn-sm">
-                        {t("viewDetails")}
-                      </Link>
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        onClick={() => handleTriggerRelease(run.skill)}
-                        disabled={releasingId === run.skill}
-                      >
-                        {releasingId === run.skill ? t("triggering") : t("triggerRun")}
-                      </button>
-                    </div>
-                  </article>
-                ))
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Skill</th>
+                      <th>Dataset</th>
+                      <th>Score</th>
+                      <th>Success Rate</th>
+                      <th>Run ID</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRuns.map((run) => (
+                      <tr key={run.run_id}>
+                        <td>{run.skill}</td>
+                        <td>{run.dataset_id}</td>
+                        <td>
+                          <span className={`badge badge-${run.metrics.score >= 0.75 ? "succeeded" : "failed"}`}>
+                            {run.metrics.score.toFixed(2)}
+                          </span>
+                        </td>
+                        <td>{(run.metrics.success_rate * 100).toFixed(0)}%</td>
+                        <td><span className="badge badge-muted">{run.run_id}</span></td>
+                        <td>
+                          <div className="flex gap-2">
+                            <Link href={`/seh/runs/${run.run_id}`} className="btn btn-secondary btn-sm">
+                              {t("viewDetails")}
+                            </Link>
+                            <button
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => handleTriggerRelease(run.skill)}
+                              disabled={releasingId === run.skill}
+                            >
+                              {releasingId === run.skill ? t("triggering") : t("triggerRun")}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
           </>
@@ -269,30 +299,41 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
                 {t("viewAllPolicies")}
               </Link>
             </div>
-            <div className="list">
+            <div className="table-wrapper">
               {filteredPolicies.length === 0 ? (
                 <p className="empty-note">{searchQuery ? "No matching policies" : t("noPolicies")}</p>
               ) : (
-                filteredPolicies.map((policy) => (
-                  <article className="list-card" key={policy.policy_id}>
-                    <div className="list-card-main">
-                      <h3 className="list-card-title">{policy.name}</h3>
-                      <p className="list-card-meta">
-                        {policy.require_provenance ? `${t("provenanceRequired")} · ` : ""}
-                        {t("minDiversity")}: {policy.min_source_diversity} · {t("minGolden")}: {policy.min_golden_weight}
-                      </p>
-                    </div>
-                    <div className="list-card-actions">
-                      <span className="badge badge-muted">{policy.policy_id}</span>
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => setEditingPolicy(policy)}
-                      >
-                        {tc("edit")}
-                      </button>
-                    </div>
-                  </article>
-                ))
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Provenance</th>
+                      <th>Min Diversity</th>
+                      <th>Min Golden</th>
+                      <th>Policy ID</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPolicies.map((policy) => (
+                      <tr key={policy.policy_id}>
+                        <td>{policy.name}</td>
+                        <td>{policy.require_provenance ? t("provenanceRequired") : "—"}</td>
+                        <td>{policy.min_source_diversity}</td>
+                        <td>{policy.min_golden_weight}</td>
+                        <td><span className="badge badge-muted">{policy.policy_id}</span></td>
+                        <td>
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => setEditingPolicy(policy)}
+                          >
+                            {tc("edit")}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
           </>

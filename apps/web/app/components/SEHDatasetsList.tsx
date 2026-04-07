@@ -37,7 +37,7 @@ export default function SEHDatasetsList({ datasets, total, hasMore }: Props) {
   return (
     <main className="shell">
       <section className="toprail">
-        <Link href="/seh">{tc("back")} to SEH</Link>
+        <Link href="/seh" className="toprail-link">← {tc("back")} to SEH</Link>
       </section>
 
       <header className="hero-page hero-compact">
@@ -62,26 +62,38 @@ export default function SEHDatasetsList({ datasets, total, hasMore }: Props) {
             />
           </div>
 
-          <div className="list">
+          <div className="table-wrapper">
             {paged.length === 0 ? (
               <p className="empty-note">{searchQuery ? "No matching datasets" : t("noDatasets")}</p>
             ) : (
-              paged.map((dataset) => (
-                <Link
-                  key={dataset.dataset_id}
-                  href={`/seh/datasets/${dataset.dataset_id}`}
-                  className="list-card"
-                  style={{ textDecoration: "none" }}
-                >
-                  <div className="list-card-main">
-                    <h3 className="list-card-title">{dataset.name}</h3>
-                    <p className="list-card-meta">
-                      {dataset.version} · {dataset.owner} · {dataset.case_count} {t("cases")}
-                    </p>
-                  </div>
-                  <span className="badge badge-muted">{dataset.dataset_id}</span>
-                </Link>
-              ))
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Version</th>
+                    <th>Owner</th>
+                    <th>Cases</th>
+                    <th>Dataset ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paged.map((dataset) => (
+                    <tr
+                      key={dataset.dataset_id}
+                      onClick={() => window.location.href = `/seh/datasets/${dataset.dataset_id}`}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <td>{dataset.name}</td>
+                      <td>{dataset.version}</td>
+                      <td>{dataset.owner}</td>
+                      <td>{dataset.case_count}</td>
+                      <td>
+                        <span className="badge badge-muted">{dataset.dataset_id}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
 

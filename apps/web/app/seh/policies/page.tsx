@@ -11,7 +11,7 @@ export default async function SEHPoliciesPage() {
   return (
     <main className="shell">
       <section className="toprail">
-        <Link href="/seh">{tc("back")} to SEH</Link>
+        <Link href="/seh" className="toprail-link">← {tc("back")} to SEH</Link>
       </section>
 
       <header className="hero-page hero-compact">
@@ -25,24 +25,36 @@ export default async function SEHPoliciesPage() {
           <p className="section-kicker">SEH</p>
           <h2 className="panel-title">{t("activePolicies", { count: policies.length })}</h2>
         </div>
-        <div className="list">
-          {policies.length === 0 ? (
-            <p className="empty-note">{t("noPolicies")}</p>
-          ) : (
-            policies.map((policy) => (
-              <article className="list-card" key={policy.policy_id}>
-                <div className="list-card-main">
-                  <h3 className="list-card-title">{policy.name}</h3>
-                  <p className="list-card-meta">
-                    {policy.require_provenance ? `${t("provenanceRequired")} · ` : ""}
-                    {t("minDiversity")}: {policy.min_source_diversity} · {t("minGolden")}: {policy.min_golden_weight}
-                  </p>
-                </div>
-                <span className="badge badge-muted">{policy.policy_id}</span>
-              </article>
-            ))
-          )}
-        </div>
+        {policies.length === 0 ? (
+          <p className="empty-note">{t("noPolicies")}</p>
+        ) : (
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Provenance</th>
+                  <th>Min Diversity</th>
+                  <th>Min Golden</th>
+                  <th>Policy ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {policies.map((policy) => (
+                  <tr key={policy.policy_id}>
+                    <td>{policy.name}</td>
+                    <td>{policy.require_provenance ? t("provenanceRequired") : "—"}</td>
+                    <td>{policy.min_source_diversity}</td>
+                    <td>{policy.min_golden_weight}</td>
+                    <td>
+                      <span className="badge badge-muted">{policy.policy_id}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </main>
   );

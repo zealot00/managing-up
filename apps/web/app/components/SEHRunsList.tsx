@@ -37,7 +37,7 @@ export default function SEHRunsList({ runs, total, hasMore }: Props) {
   return (
     <main className="shell">
       <section className="toprail">
-        <Link href="/seh">{tc("back")} to SEH</Link>
+        <Link href="/seh" className="toprail-link">← {tc("back")} to SEH</Link>
       </section>
 
       <header className="hero-page hero-compact">
@@ -62,28 +62,44 @@ export default function SEHRunsList({ runs, total, hasMore }: Props) {
             />
           </div>
 
-          <div className="list">
+          <div className="table-wrapper">
             {paged.length === 0 ? (
               <p className="empty-note">{searchQuery ? "No matching runs" : t("noRuns")}</p>
             ) : (
-              paged.map((run) => (
-                <Link
-                  key={run.run_id}
-                  href={`/seh/runs/${run.run_id}`}
-                  className="list-card"
-                  style={{ textDecoration: "none" }}
-                >
-                  <div className="list-card-main">
-                    <h3 className="list-card-title">{run.skill}</h3>
-                    <p className="list-card-meta">
-                      {t("score")}: {run.metrics.score.toFixed(2)} · {t("success")}: {(run.metrics.success_rate * 100).toFixed(0)}%
-                    </p>
-                  </div>
-                  <span className={`badge badge-${run.metrics.score >= 0.75 ? "succeeded" : "failed"}`}>
-                    {run.run_id}
-                  </span>
-                </Link>
-              ))
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Skill</th>
+                    <th>Dataset</th>
+                    <th>Score</th>
+                    <th>Success Rate</th>
+                    <th>Run ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paged.map((run) => (
+                    <tr
+                      key={run.run_id}
+                      onClick={() => window.location.href = `/seh/runs/${run.run_id}`}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <td>{run.skill}</td>
+                      <td>{run.dataset_id}</td>
+                      <td>
+                        <span style={{ color: run.metrics.score >= 0.75 ? "var(--success)" : "var(--danger)", fontWeight: 600 }}>
+                          {run.metrics.score.toFixed(2)}
+                        </span>
+                      </td>
+                      <td>{(run.metrics.success_rate * 100).toFixed(0)}%</td>
+                      <td>
+                        <span className={`badge badge-${run.metrics.score >= 0.75 ? "succeeded" : "failed"}`}>
+                          {run.run_id}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
 
