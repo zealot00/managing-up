@@ -85,8 +85,8 @@ func (r *RedisBudgetChecker) CheckBudget(ctx context.Context, key string, tokens
 	monthlyKey := fmt.Sprintf("budget:monthly:%s", key)
 
 	now := time.Now()
-	dailyTTL := secondsToEndOfDay(now)
-	monthlyTTL := secondsToEndOfMonth(now)
+	dailyTTL := millisecondsToEndOfDay(now)
+	monthlyTTL := millisecondsToEndOfMonth(now)
 
 	result, err := r.script.Run(ctx, r.client, []string{dailyKey, monthlyKey},
 		tokens, r.config.DailyLimit, r.config.MonthlyLimit,
@@ -248,14 +248,12 @@ func estimateRequestTokens(r *http.Request) int {
 	return 100
 }
 
-// secondsToEndOfDay calculates seconds until end of day UTC
-func secondsToEndOfDay(t time.Time) int64 {
+func millisecondsToEndOfDay(t time.Time) int64 {
 	endOfDay := time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 0, time.UTC)
-	return int64(endOfDay.Sub(t).Seconds())
+	return int64(endOfDay.Sub(t).Milliseconds())
 }
 
-// secondsToEndOfMonth calculates seconds until end of month UTC
-func secondsToEndOfMonth(t time.Time) int64 {
+func millisecondsToEndOfMonth(t time.Time) int64 {
 	endOfMonth := time.Date(t.Year(), t.Month()+1, 0, 23, 59, 59, 0, time.UTC)
-	return int64(endOfMonth.Sub(t).Seconds())
+	return int64(endOfMonth.Sub(t).Milliseconds())
 }

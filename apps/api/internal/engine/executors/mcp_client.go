@@ -48,16 +48,30 @@ func validateStdioConfig(config MCPClientConfig) error {
 		return fmt.Errorf("command is required for stdio transport")
 	}
 
-	// Check allowlist
-	base := strings.TrimPrefix(config.Command, "/usr/local/bin/")
-	base = strings.TrimPrefix(base, "/usr/bin/")
-	base = strings.Split(base, " ")[0] // Handle full paths
+	cmd := config.Command
+	parts := strings.Split(cmd, " ")
+	base := parts[0]
+	baseName := strings.TrimPrefix(base, "/usr/local/bin/")
+	baseName = strings.TrimPrefix(baseName, "/usr/bin/")
+	baseName = strings.Split(baseName, "/")[0]
 
-	if !allowedCommands[base] && !strings.HasPrefix(config.Command, "/") {
-		return fmt.Errorf("command not in allowlist: %s", config.Command)
+	if !allowedCommands[baseName] {
+		if strings.HasPrefix(cmd, "/") {
+			allowed := false
+			for _, allowedPath := range config.AllowedPaths {
+				if strings.HasPrefix(cmd, allowedPath) {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				return fmt.Errorf("command not in allowlist: %s", cmd)
+			}
+		} else {
+			return fmt.Errorf("command not in allowlist: %s", cmd)
+		}
 	}
 
-	// Validate args don't contain shell metacharacters
 	shellMeta := regexp.MustCompile("[;&|`\"$<>\\\\]")
 	for _, arg := range config.Args {
 		if shellMeta.MatchString(arg) {

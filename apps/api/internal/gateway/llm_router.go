@@ -66,8 +66,7 @@ func (r *FallbackRouter) Route(ctx context.Context) (llm.Client, error) {
 	for i, p := range r.providers {
 		key := string(p.Provider)
 		allowed, err := r.circuitBreaker.Allow(ctx, key)
-		if err != nil {
-			// If circuit breaker check fails, try next provider
+		if err != nil && !allowed {
 			continue
 		}
 		if allowed {

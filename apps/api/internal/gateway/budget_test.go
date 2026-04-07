@@ -87,18 +87,18 @@ func TestEstimateRequestTokens(t *testing.T) {
 	}
 }
 
-func TestSecondsToEndOfDay(t *testing.T) {
+func TestMillisecondsToEndOfDay(t *testing.T) {
 	now := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
-	result := secondsToEndOfDay(now)
-	if result <= 0 || result > 24*60*60 {
-		t.Errorf("secondsToEndOfDay() = %d, want > 0 and <= 86400", result)
+	result := millisecondsToEndOfDay(now)
+	if result <= 0 || result > 24*60*60*1000 {
+		t.Errorf("millisecondsToEndOfDay() = %d, want > 0 and <= 86400000", result)
 	}
 }
 
-func TestSecondsToEndOfMonth(t *testing.T) {
+func TestMillisecondsToEndOfMonth(t *testing.T) {
 	now := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
-	result := secondsToEndOfMonth(now)
-	if result <= 0 || result > 31*24*60*60 {
-		t.Errorf("secondsToEndOfMonth() = %d, want > 0 and <= 2678400", result)
+	result := millisecondsToEndOfMonth(now)
+	if result <= 0 || result > 31*24*60*60*1000 {
+		t.Errorf("millisecondsToEndOfMonth() = %d, want > 0 and <= 2678400000", result)
 	}
 }
