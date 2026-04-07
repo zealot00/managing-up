@@ -37,7 +37,9 @@
     "getStarted": "Get Started",
     "viewOnGitHub": "View on GitHub",
     "enable": "Enable",
-    "disable": "Disable"
+    "disable": "Disable",
+    "deleteConfirmTitle": "Delete \"{name}\"?",
+    "deleteConfirmDescription": "This action cannot be undone. The task and all its test cases will be permanently removed."
   },
   "landing": {
     "eyebrow": "Enterprise AI Quality Infrastructure",

@@ -37,7 +37,9 @@
     "getStarted": "开始使用",
     "viewOnGitHub": "查看 GitHub",
     "enable": "启用",
-    "disable": "禁用"
+    "disable": "禁用",
+    "deleteConfirmTitle": "确定删除「{name}」？",
+    "deleteConfirmDescription": "此操作无法撤销。任务及其所有测试用例将被永久删除。"
   },
   "landing": {
     "eyebrow": "企业级 AI 质量基础设施",

@@ -9,6 +9,7 @@ import EditPolicyForm from "./EditPolicyForm";
 import { useTranslations } from "next-intl";
 import { deleteSEHDataset, createSEHRelease } from "../lib/seh-api";
 import { useToast } from "../../components/ToastProvider";
+import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { Database, Play, Target, LayoutDashboard } from "lucide-react";
 
 type Dataset = { dataset_id: string; name: string; version: string; owner: string; case_count: number };
@@ -35,6 +36,7 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [releasingId, setReleasingId] = useState<string | null>(null);
   const [expandedCase, setExpandedCase] = useState<string | null>(null);
+  const [deleteDialogData, setDeleteDialogData] = useState<{ id: string; name: string } | null>(null);
 
   const metrics = [
     { label: t("datasets"), value: summary.total_datasets, icon: <Database size={20} aria-hidden="true" /> },
@@ -77,16 +79,17 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
     );
   }, [policies, searchQuery]);
 
-  async function handleDeleteDataset(id: string, name: string) {
-    if (!confirm(t("confirmDelete", { name }))) return;
-    setDeletingId(id);
+  async function handleDeleteDataset() {
+    if (!deleteDialogData) return;
+    setDeletingId(deleteDialogData.id);
     try {
-      await deleteSEHDataset(id);
+      await deleteSEHDataset(deleteDialogData.id);
       router.refresh();
     } catch {
       toast.error(tc("failed") + ": Failed to delete dataset");
     } finally {
       setDeletingId(null);
+      setDeleteDialogData(null);
     }
   }
 
@@ -215,7 +218,7 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
                             </Link>
                             <button
                               className="btn btn-sm btn-ghost"
-                              onClick={() => handleDeleteDataset(ds.dataset_id, ds.name)}
+                              onClick={() => setDeleteDialogData({ id: ds.dataset_id, name: ds.name })}
                               disabled={deletingId === ds.dataset_id}
                             >
                               {deletingId === ds.dataset_id ? t("deleting") : t("delete")}
@@ -339,6 +342,17 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
           </>
         )}
       </section>
+
+      <ConfirmDialog
+        isOpen={deleteDialogData !== null}
+        onClose={() => setDeleteDialogData(null)}
+        onConfirm={handleDeleteDataset}
+        title={tc("deleteConfirmTitle", { name: deleteDialogData?.name || "" })}
+        description={tc("deleteConfirmDescription")}
+        confirmText={t("delete")}
+        cancelText={tc("cancel")}
+        variant="danger"
+      />
     </>
   );
 }
