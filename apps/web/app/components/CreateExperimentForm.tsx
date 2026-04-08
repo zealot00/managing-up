@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { createExperiment, Task } from "../lib/api";
 import { useTranslations } from "next-intl";
-import { useToast } from "../../components/ToastProvider";
+import { useApiMutation } from "../lib/use-mutations";
 
 type Props = {
   tasks: Task[];
@@ -14,39 +13,31 @@ type Props = {
 export default function CreateExperimentForm({ tasks, onCreated }: Props) {
   const t = useTranslations("experiments");
   const tc = useTranslations("common");
-  const router = useRouter();
-  const toast = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [taskIds, setTaskIds] = useState("");
   const [agentIds, setAgentIds] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      await createExperiment({
-        name,
-        description,
-        task_ids: taskIds.split(",").map((t) => t.trim()).filter(Boolean),
-        agent_ids: agentIds.split(",").map((a) => a.trim()).filter(Boolean),
-      });
+  const createExperimentMutation = useApiMutation(createExperiment, {
+    queryKeysToInvalidate: [["experiments"]],
+    successMessage: tc("success") + ": Experiment created",
+    onSuccess: () => {
       setName("");
       setDescription("");
       setTaskIds("");
       setAgentIds("");
-      toast.success(tc("success") + ": Experiment created");
       onCreated?.();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create experiment");
-    } finally {
-      setLoading(false);
-    }
+    },
+  });
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    createExperimentMutation.mutate({
+      name,
+      description,
+      task_ids: taskIds.split(",").map((t) => t.trim()).filter(Boolean),
+      agent_ids: agentIds.split(",").map((a) => a.trim()).filter(Boolean),
+    });
   }
 
   return (
@@ -56,7 +47,7 @@ export default function CreateExperimentForm({ tasks, onCreated }: Props) {
         <h2>{t("createExperiment")}</h2>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {createExperimentMutation.error && <p className="form-error">{createExperimentMutation.error.message}</p>}
 
       <div className="form-fields">
         <label className="form-label">
@@ -105,8 +96,8 @@ export default function CreateExperimentForm({ tasks, onCreated }: Props) {
         </label>
       </div>
 
-      <button type="submit" disabled={loading} className="form-submit">
-        {loading ? t("creating") : t("createExperiment")}
+      <button type="submit" disabled={createExperimentMutation.isPending} className="form-submit">
+        {createExperimentMutation.isPending ? t("creating") : t("createExperiment")}
       </button>
     </form>
   );

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { runExperiment, checkRegression, Experiment } from "../lib/api";
+import { runExperiment, Experiment } from "../lib/api";
 import { useTranslations } from "next-intl";
 import { Badge } from "./ui/Badge";
+import { useApiMutation } from "../lib/use-mutations";
 
 type Props = {
   exp: Experiment;
@@ -14,22 +13,16 @@ type Props = {
 export default function ExperimentCardWithActions({ exp, onRun }: Props) {
   const t = useTranslations("experiments");
   const tc = useTranslations("common");
-  const router = useRouter();
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleRun() {
-    setRunning(true);
-    setError("");
-    try {
-      await runExperiment(exp.id);
+  const runExperimentMutation = useApiMutation(runExperiment, {
+    queryKeysToInvalidate: [["experiments"]],
+    onSuccess: () => {
       onRun?.();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to run experiment");
-    } finally {
-      setRunning(false);
-    }
+    },
+  });
+
+  function handleRun() {
+    runExperimentMutation.mutate(exp.id);
   }
 
   return (
@@ -47,16 +40,16 @@ export default function ExperimentCardWithActions({ exp, onRun }: Props) {
         <span className="tag">{t("tasksCount", { count: exp.task_ids.length })}</span>
         <span className="tag">{t("agentsCount", { count: exp.agent_ids.length })}</span>
       </div>
-      {error && <p className="form-error" style={{ marginTop: "var(--space-2)" }}>{error}</p>}
+      {runExperimentMutation.error && <p className="form-error" style={{ marginTop: "var(--space-2)" }}>{runExperimentMutation.error.message}</p>}
       <div className="eval-card-footer">
         <span>{tc("createdAt")}: {new Date(exp.created_at).toLocaleString()}</span>
         {exp.status === "pending" && (
           <button
             className="btn btn-sm btn-primary"
             onClick={handleRun}
-            disabled={running}
+            disabled={runExperimentMutation.isPending}
           >
-            {running ? t("running") : t("run")}
+            {runExperimentMutation.isPending ? t("running") : t("run")}
           </button>
         )}
       </div>

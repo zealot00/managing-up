@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import CreateDatasetForm from "./CreateDatasetForm";
 import CreatePolicyForm from "./CreatePolicyForm";
 import EditPolicyForm from "./EditPolicyForm";
 import { useTranslations } from "next-intl";
 import { deleteSEHDataset, createSEHRelease } from "../lib/seh-api";
-import { useToast } from "../../components/ToastProvider";
+import { useApiMutation } from "../lib/use-mutations";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
@@ -28,17 +27,26 @@ type Props = {
 export default function SEHManager({ summary, datasets, runs, policies }: Props) {
   const t = useTranslations("seh");
   const tc = useTranslations("common");
-  const router = useRouter();
-  const toast = useToast();
   const [activeTab, setActiveTab] = useState<"datasets" | "runs" | "policies">("datasets");
   const [showCreateDataset, setShowCreateDataset] = useState(false);
   const [showCreatePolicy, setShowCreatePolicy] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<Policy | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [releasingId, setReleasingId] = useState<string | null>(null);
   const [expandedCase, setExpandedCase] = useState<string | null>(null);
   const [deleteDialogData, setDeleteDialogData] = useState<{ id: string; name: string } | null>(null);
+
+  const deleteDatasetMutation = useApiMutation(deleteSEHDataset, {
+    queryKeysToInvalidate: [["datasets"]],
+    successMessage: tc("success") + ": Dataset deleted",
+    onSuccess: () => {
+      setDeleteDialogData(null);
+    },
+  });
+
+  const createReleaseMutation = useApiMutation(createSEHRelease, {
+    queryKeysToInvalidate: [["releases"]],
+    successMessage: tc("success") + ": Release created",
+  });
 
   const metrics = [
     { label: t("datasets"), value: summary.total_datasets, icon: <Database size={20} aria-hidden="true" /> },
@@ -81,30 +89,13 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
     );
   }, [policies, searchQuery]);
 
-  async function handleDeleteDataset() {
+  function handleDeleteDataset() {
     if (!deleteDialogData) return;
-    setDeletingId(deleteDialogData.id);
-    try {
-      await deleteSEHDataset(deleteDialogData.id);
-      router.refresh();
-    } catch {
-      toast.error(tc("failed") + ": Failed to delete dataset");
-    } finally {
-      setDeletingId(null);
-      setDeleteDialogData(null);
-    }
+    deleteDatasetMutation.mutate(deleteDialogData.id);
   }
 
-  async function handleTriggerRelease(skillId: string) {
-    setReleasingId(skillId);
-    try {
-      await createSEHRelease(skillId);
-      router.refresh();
-    } catch {
-      toast.error(tc("failed") + ": Failed to create release");
-    } finally {
-      setReleasingId(null);
-    }
+  function handleTriggerRelease(skillId: string) {
+    createReleaseMutation.mutate(skillId);
   }
 
   return (
@@ -157,18 +148,18 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
       />
 
       {activeTab === "datasets" && showCreateDataset && (
-        <CreateDatasetForm onCreated={() => { setShowCreateDataset(false); router.refresh(); }} />
+        <CreateDatasetForm onCreated={() => { setShowCreateDataset(false); }} />
       )}
 
       {activeTab === "policies" && showCreatePolicy && (
-        <CreatePolicyForm onCreated={() => { setShowCreatePolicy(false); router.refresh(); }} />
+        <CreatePolicyForm onCreated={() => { setShowCreatePolicy(false); }} />
       )}
 
       {activeTab === "policies" && editingPolicy && (
         <EditPolicyForm
           policy={editingPolicy}
           onCancel={() => setEditingPolicy(null)}
-          onUpdated={() => { setEditingPolicy(null); router.refresh(); }}
+          onUpdated={() => { setEditingPolicy(null); }}
         />
       )}
 
@@ -226,9 +217,9 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
                             <button
                               className="btn btn-sm btn-ghost"
                               onClick={() => setDeleteDialogData({ id: ds.dataset_id, name: ds.name })}
-                              disabled={deletingId === ds.dataset_id}
+                              disabled={deleteDatasetMutation.isPending}
                             >
-                              {deletingId === ds.dataset_id ? t("deleting") : t("delete")}
+                              {deleteDatasetMutation.isPending ? t("deleting") : t("delete")}
                             </button>
                           </div>
                         </td>
@@ -285,9 +276,9 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
                             <button
                               className="btn btn-sm btn-ghost"
                               onClick={() => handleTriggerRelease(run.skill)}
-                              disabled={releasingId === run.skill}
+                              disabled={createReleaseMutation.isPending}
                             >
-                              {releasingId === run.skill ? t("triggering") : t("triggerRun")}
+                              {createReleaseMutation.isPending ? t("triggering") : t("triggerRun")}
                             </button>
                           </div>
                         </td>

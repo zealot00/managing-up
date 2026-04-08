@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { createSEHDataset } from "../lib/seh-api";
 import { useTranslations } from "next-intl";
-import { useToast } from "../../components/ToastProvider";
+import { useApiMutation } from "../lib/use-mutations";
 
 type Props = {
   onCreated?: () => void;
@@ -13,34 +12,26 @@ type Props = {
 export default function CreateDatasetForm({ onCreated }: Props) {
   const t = useTranslations("seh");
   const tc = useTranslations("common");
-  const router = useRouter();
-  const toast = useToast();
   const [name, setName] = useState("");
   const [version, setVersion] = useState("");
   const [owner, setOwner] = useState("");
   const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      await createSEHDataset({ name, version, owner, description });
+  const createDatasetMutation = useApiMutation(createSEHDataset, {
+    queryKeysToInvalidate: [["datasets"]],
+    successMessage: tc("success") + ": Dataset created",
+    onSuccess: () => {
       setName("");
       setVersion("");
       setOwner("");
       setDescription("");
-      toast.success(tc("success") + ": Dataset created");
       onCreated?.();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create dataset");
-    } finally {
-      setLoading(false);
-    }
+    },
+  });
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    createDatasetMutation.mutate({ name, version, owner, description });
   }
 
   return (
@@ -50,7 +41,7 @@ export default function CreateDatasetForm({ onCreated }: Props) {
         <h2>{t("createDataset")}</h2>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {createDatasetMutation.error && <p className="form-error">{createDatasetMutation.error.message}</p>}
 
       <div className="form-fields">
         <label className="form-label">
@@ -101,8 +92,8 @@ export default function CreateDatasetForm({ onCreated }: Props) {
         </label>
       </div>
 
-      <button type="submit" disabled={loading} className="form-submit">
-        {loading ? t("creating") : t("createDataset")}
+      <button type="submit" disabled={createDatasetMutation.isPending} className="form-submit">
+        {createDatasetMutation.isPending ? t("creating") : t("createDataset")}
       </button>
     </form>
   );

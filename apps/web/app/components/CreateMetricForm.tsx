@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { createMetric } from "../lib/api";
 import { useTranslations } from "next-intl";
-import { useToast } from "../../components/ToastProvider";
+import { useApiMutation } from "../lib/use-mutations";
 
 type Props = {
   onCreated?: () => void;
@@ -14,48 +13,44 @@ export default function CreateMetricForm({ onCreated }: Props) {
   const t = useTranslations("evaluations");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
-  const router = useRouter();
-  const toast = useToast();
   const [name, setName] = useState("");
   const [type, setType] = useState("exact_match");
   const [config, setConfig] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [localError, setLocalError] = useState("");
 
-  async function handleSubmit(e: FormEvent) {
+  const createMetricMutation = useApiMutation(createMetric, {
+    queryKeysToInvalidate: [["metrics"]],
+    successMessage: tc("success") + ": Metric created",
+    onSuccess: () => {
+      setName("");
+      setType("exact_match");
+      setConfig("");
+      onCreated?.();
+    },
+  });
+
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    setLocalError("");
 
     let parsedConfig: Record<string, unknown> = {};
     if (config.trim()) {
       try {
         parsedConfig = JSON.parse(config);
       } catch {
-        setError(te("configInvalid"));
-        setLoading(false);
+        setLocalError(te("configInvalid"));
         return;
       }
     }
 
-    try {
-      await createMetric({
-        name,
-        type,
-        config: parsedConfig,
-      });
-      setName("");
-      setType("exact_match");
-      setConfig("");
-      toast.success(tc("success") + ": Metric created");
-      onCreated?.();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create metric");
-    } finally {
-      setLoading(false);
-    }
+    createMetricMutation.mutate({
+      name,
+      type,
+      config: parsedConfig,
+    });
   }
+
+  const error = createMetricMutation.error?.message || localError;
 
   return (
     <form onSubmit={handleSubmit} className="form-panel">
@@ -104,8 +99,8 @@ export default function CreateMetricForm({ onCreated }: Props) {
         </label>
       </div>
 
-      <button type="submit" disabled={loading} className="form-submit">
-        {loading ? t("creating") : t("createMetric")}
+      <button type="submit" disabled={createMetricMutation.isPending} className="form-submit">
+        {createMetricMutation.isPending ? t("creating") : t("createMetric")}
       </button>
     </form>
   );

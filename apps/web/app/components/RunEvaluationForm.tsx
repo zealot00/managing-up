@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { runTaskEvaluation, Task } from "../lib/api";
 import { useTranslations } from "next-intl";
-import { useToast } from "../../components/ToastProvider";
+import { useApiMutation } from "../lib/use-mutations";
 
 type Props = {
   tasks: Task[];
@@ -15,48 +14,44 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
   const t = useTranslations("evaluations");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
-  const router = useRouter();
-  const toast = useToast();
   const [taskId, setTaskId] = useState("");
   const [agentId, setAgentId] = useState("");
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [localError, setLocalError] = useState("");
 
-  async function handleSubmit(e: FormEvent) {
+  const runEvaluationMutation = useApiMutation(runTaskEvaluation, {
+    queryKeysToInvalidate: [["task-executions"]],
+    successMessage: tc("success") + ": Evaluation started",
+    onSuccess: () => {
+      setTaskId("");
+      setAgentId("");
+      setInput("");
+      onCreated?.();
+    },
+  });
+
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    setLocalError("");
 
     let parsedInput: Record<string, unknown> = {};
     if (input.trim()) {
       try {
         parsedInput = JSON.parse(input);
       } catch {
-        setError(te("inputInvalid"));
-        setLoading(false);
+        setLocalError(te("inputInvalid"));
         return;
       }
     }
 
-    try {
-      await runTaskEvaluation({
-        task_id: taskId,
-        agent_id: agentId,
-        input: parsedInput,
-      });
-      setTaskId("");
-      setAgentId("");
-      setInput("");
-      toast.success(tc("success") + ": Evaluation started");
-      onCreated?.();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to run evaluation");
-    } finally {
-      setLoading(false);
-    }
+    runEvaluationMutation.mutate({
+      task_id: taskId,
+      agent_id: agentId,
+      input: parsedInput,
+    });
   }
+
+  const error = runEvaluationMutation.error?.message || localError;
 
   return (
     <form onSubmit={handleSubmit} className="form-panel">
@@ -109,8 +104,8 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
         </label>
       </div>
 
-      <button type="submit" disabled={loading} className="form-submit">
-        {loading ? t("running") : t("run")}
+      <button type="submit" disabled={runEvaluationMutation.isPending} className="form-submit">
+        {runEvaluationMutation.isPending ? t("running") : t("run")}
       </button>
     </form>
   );
