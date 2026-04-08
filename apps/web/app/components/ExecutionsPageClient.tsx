@@ -11,6 +11,9 @@ import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { FormModal } from "./ui/FormModal";
 import { ListSkeleton } from "./layout/Skeleton";
+import { LoadMore } from "./ui/LoadMore";
+
+const PAGE_SIZE = 20;
 
 export default function ExecutionsPageClient() {
   const t = useTranslations("executions");
@@ -22,6 +25,7 @@ export default function ExecutionsPageClient() {
   const [input, setInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
   const { data: executionsData, isLoading, isFetching } = useQuery({
     queryKey: ["executions"],
@@ -59,6 +63,9 @@ export default function ExecutionsPageClient() {
       return matchesStatus && matchesSearch;
     });
   }, [executions.items, statusFilter, searchQuery]);
+
+  const displayedExecutions = filteredExecutions.slice(0, displayCount);
+  const hasMore = displayCount < filteredExecutions.length;
 
   const uniqueStatuses = useMemo(() => {
     const statuses = new Set(executions.items.map((e) => e.status));
@@ -107,7 +114,10 @@ export default function ExecutionsPageClient() {
             type="text"
             placeholder="Search by skill or operator..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setDisplayCount(PAGE_SIZE);
+            }}
             className="form-input"
             style={{ width: "100%" }}
           />
@@ -115,7 +125,7 @@ export default function ExecutionsPageClient() {
 
         <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
           <button
-            onClick={() => setStatusFilter("all")}
+            onClick={() => { setStatusFilter("all"); setDisplayCount(PAGE_SIZE); }}
             className={`btn btn-sm ${statusFilter === "all" ? "btn-primary" : "btn-secondary"}`}
           >
             All
@@ -123,7 +133,7 @@ export default function ExecutionsPageClient() {
           {uniqueStatuses.map((status) => (
             <button
               key={status}
-              onClick={() => setStatusFilter(status)}
+              onClick={() => { setStatusFilter(status); setDisplayCount(PAGE_SIZE); }}
               className={`btn btn-sm ${statusFilter === status ? "btn-primary" : "btn-secondary"}`}
             >
               {status}
@@ -133,7 +143,7 @@ export default function ExecutionsPageClient() {
 
         {(searchQuery || statusFilter !== "all") && (
           <button
-            onClick={() => { setSearchQuery(""); setStatusFilter("all"); }}
+            onClick={() => { setSearchQuery(""); setStatusFilter("all"); setDisplayCount(PAGE_SIZE); }}
             className="btn btn-ghost btn-sm"
           >
             Clear
@@ -155,10 +165,14 @@ export default function ExecutionsPageClient() {
               </h2>
             </div>
             <div className="list">
-              {filteredExecutions.length === 0 ? (
-                <EmptyState title={t("noExecutions")} />
+              {displayedExecutions.length === 0 ? (
+                filteredExecutions.length === 0 && executions.items.length > 0 ? (
+                  <EmptyState title="No matching executions" description="Try adjusting your filters" />
+                ) : (
+                  <EmptyState title={t("noExecutions")} />
+                )
               ) : (
-                filteredExecutions.map((execution) => (
+                displayedExecutions.map((execution) => (
                   <article className="list-card" key={execution.id}>
                     <div className="list-card-main">
                       <h3 className="list-card-title">{execution.skill_name}</h3>
@@ -176,6 +190,12 @@ export default function ExecutionsPageClient() {
                 ))
               )}
             </div>
+            <LoadMore
+              hasMore={hasMore}
+              isLoading={isFetching}
+              onLoadMore={() => setDisplayCount((c) => c + PAGE_SIZE)}
+              label="Load more"
+            />
           </section>
         </div>
       )}

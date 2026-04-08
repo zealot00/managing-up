@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { TaskExecution, Task, Metric, runTaskEvaluation, createMetric } from "../lib/api";
+import { TaskExecution, Task, Metric } from "../lib/api";
 import { useTranslations } from "next-intl";
 import RunEvaluationForm from "./RunEvaluationForm";
 import CreateMetricForm from "./CreateMetricForm";
@@ -10,6 +9,10 @@ import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { Badge } from "./ui/Badge";
 import { DataToolbar } from "./ui/DataToolbar";
+import { LoadMore } from "./ui/LoadMore";
+import { formatRelativeTime, formatDurationMs } from "../lib/format";
+
+const PAGE_SIZE = 20;
 
 type Props = {
   executions: TaskExecution[];
@@ -25,6 +28,8 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
+  const [execDisplayCount, setExecDisplayCount] = useState(PAGE_SIZE);
+  const [taskDisplayCount, setTaskDisplayCount] = useState(PAGE_SIZE);
 
   const filteredExecutions = useMemo(() => {
     return executions.filter((exec) => {
@@ -57,6 +62,11 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
       return true;
     });
   }, [tasks, searchQuery, difficultyFilter]);
+
+  const displayedExecutions = filteredExecutions.slice(0, execDisplayCount);
+  const displayedTasks = filteredTasks.slice(0, taskDisplayCount);
+  const hasMoreExec = execDisplayCount < filteredExecutions.length;
+  const hasMoreTasks = taskDisplayCount < filteredTasks.length;
 
   return (
     <>
@@ -101,12 +111,12 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
       <section aria-label="Task executions" style={{ marginTop: "var(--space-6)" }}>
         <DataToolbar
           searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
+          onSearchChange={(v) => { setSearchQuery(v); setExecDisplayCount(PAGE_SIZE); }}
           filters={
             <>
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => { setStatusFilter(e.target.value); setExecDisplayCount(PAGE_SIZE); }}
                 className="form-select"
                 style={{ minWidth: 140 }}
               >
@@ -122,20 +132,30 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
         <div className="panel">
           <div className="panel-header">
             <p className="section-kicker">{t("eyebrow")}</p>
-            <h2 className="panel-title">{t("taskExecutions", { count: filteredExecutions.length })}</h2>
+            <h2 className="panel-title">
+              {filteredExecutions.length === executions.length
+                ? t("taskExecutions", { count: executions.length })
+                : `${filteredExecutions.length} of ${executions.length} executions`}
+            </h2>
           </div>
-          {filteredExecutions.length > 0 ? (
-            <div className="eval-grid">
-              {filteredExecutions.map((exec) => (
-                <ExecutionCard key={exec.id} exec={exec} tasks={tasks} />
-              ))}
-            </div>
+          {displayedExecutions.length > 0 ? (
+            <>
+              <div className="eval-grid">
+                {displayedExecutions.map((exec) => (
+                  <ExecutionCard key={exec.id} exec={exec} tasks={tasks} />
+                ))}
+              </div>
+              <LoadMore
+                hasMore={hasMoreExec}
+                isLoading={false}
+                onLoadMore={() => setExecDisplayCount((c) => c + PAGE_SIZE)}
+                label="Load more executions"
+              />
+            </>
+          ) : executions.length > 0 ? (
+            <EmptyState title="No matching executions" />
           ) : (
-            <EmptyState
-              icon="◎"
-              title={t("noExecutions")}
-              description={t("noExecutionsDesc")}
-            />
+            <EmptyState title={t("noExecutions")} description={t("noExecutionsDesc")} />
           )}
         </div>
       </section>
@@ -143,11 +163,11 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
       <section aria-label="Task overview" style={{ marginTop: "var(--space-6)" }}>
         <DataToolbar
           searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
+          onSearchChange={(v) => { setSearchQuery(v); setTaskDisplayCount(PAGE_SIZE); }}
           filters={
             <select
               value={difficultyFilter}
-              onChange={(e) => setDifficultyFilter(e.target.value)}
+              onChange={(e) => { setDifficultyFilter(e.target.value); setTaskDisplayCount(PAGE_SIZE); }}
               className="form-select"
               style={{ minWidth: 140 }}
             >
@@ -161,24 +181,38 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
         <div className="panel">
           <div className="panel-header">
             <p className="section-kicker">Tasks</p>
-            <h2 className="panel-title">{t("taskOverview", { count: filteredTasks.length })}</h2>
+            <h2 className="panel-title">
+              {filteredTasks.length === tasks.length
+                ? t("taskOverview", { count: tasks.length })
+                : `${filteredTasks.length} of ${tasks.length} tasks`}
+            </h2>
           </div>
-          {filteredTasks.length > 0 ? (
-            <div className="list">
-              {filteredTasks.map((task) => (
-                <article className="list-card" key={task.id}>
-                  <div className="list-card-main">
-                    <h3 className="list-card-title">{task.name}</h3>
-                    <p className="list-card-meta">
-                      {task.test_cases.length} test cases · {task.difficulty} difficulty
-                    </p>
-                  </div>
-                  <Badge variant={task.difficulty as "easy" | "medium" | "hard"}>
-                    {task.difficulty}
-                  </Badge>
-                </article>
-              ))}
-            </div>
+          {displayedTasks.length > 0 ? (
+            <>
+              <div className="list">
+                {displayedTasks.map((task) => (
+                  <article className="list-card" key={task.id}>
+                    <div className="list-card-main">
+                      <h3 className="list-card-title">{task.name}</h3>
+                      <p className="list-card-meta">
+                        {task.test_cases.length} test cases · {task.difficulty} difficulty
+                      </p>
+                    </div>
+                    <Badge variant={task.difficulty as "easy" | "medium" | "hard"}>
+                      {task.difficulty}
+                    </Badge>
+                  </article>
+                ))}
+              </div>
+              <LoadMore
+                hasMore={hasMoreTasks}
+                isLoading={false}
+                onLoadMore={() => setTaskDisplayCount((c) => c + PAGE_SIZE)}
+                label="Load more tasks"
+              />
+            </>
+          ) : tasks.length > 0 ? (
+            <EmptyState title="No matching tasks" />
           ) : (
             <p className="empty-note">{t("noTasksDesc")}</p>
           )}
@@ -206,11 +240,11 @@ function ExecutionCard({ exec, tasks }: { exec: TaskExecution; tasks: Task[] }) 
       </div>
       {exec.duration_ms && (
         <p className="eval-card-body" style={{ marginTop: "var(--space-3)" }}>
-          {t("duration", { ms: exec.duration_ms })}
+          {formatDurationMs(exec.duration_ms)}
         </p>
       )}
       <div className="eval-card-footer">
-        <span>{t("createdAt")} {new Date(exec.created_at).toLocaleString()}</span>
+        <span>{t("createdAt")} {formatRelativeTime(exec.created_at)}</span>
       </div>
     </article>
   );

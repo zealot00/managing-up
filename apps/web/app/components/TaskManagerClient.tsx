@@ -13,7 +13,10 @@ import { EmptyState } from "./layout/EmptyState";
 import { CardGridSkeleton } from "./layout/Skeleton";
 import { BulkActionBar } from "./ui/BulkActionBar";
 import { SelectableCard } from "./ui/SelectableCard";
+import { LoadMore } from "./ui/LoadMore";
 import { Trash2 } from "lucide-react";
+
+const PAGE_SIZE = 20;
 
 export default function TaskManagerClient() {
   const t = useTranslations("tasks");
@@ -23,6 +26,7 @@ export default function TaskManagerClient() {
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [skillFilter, setSkillFilter] = useState<string>("all");
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
   function toggleTaskSelection(taskId: string) {
     setSelectedTaskIds((prev) => {
@@ -82,6 +86,9 @@ export default function TaskManagerClient() {
     });
   }, [tasks, searchQuery, difficultyFilter, skillFilter]);
 
+  const displayedTasks = filteredTasks.slice(0, displayCount);
+  const hasMore = displayCount < filteredTasks.length;
+
   const uniqueDifficulties = useMemo(() => {
     const difficulties = new Set(tasks.map((task) => task.difficulty));
     return Array.from(difficulties).sort();
@@ -115,7 +122,10 @@ export default function TaskManagerClient() {
             type="text"
             placeholder="Search tasks..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setDisplayCount(PAGE_SIZE);
+            }}
             className="form-input"
             style={{ width: "100%" }}
           />
@@ -124,7 +134,10 @@ export default function TaskManagerClient() {
         <div style={{ flex: "0 0 auto" }}>
           <select
             value={difficultyFilter}
-            onChange={(e) => setDifficultyFilter(e.target.value)}
+            onChange={(e) => {
+              setDifficultyFilter(e.target.value);
+              setDisplayCount(PAGE_SIZE);
+            }}
             className="form-select"
             style={{ minWidth: 120 }}
           >
@@ -140,7 +153,10 @@ export default function TaskManagerClient() {
         <div style={{ flex: "0 0 auto" }}>
           <select
             value={skillFilter}
-            onChange={(e) => setSkillFilter(e.target.value)}
+            onChange={(e) => {
+              setSkillFilter(e.target.value);
+              setDisplayCount(PAGE_SIZE);
+            }}
             className="form-select"
             style={{ minWidth: 140 }}
           >
@@ -159,6 +175,7 @@ export default function TaskManagerClient() {
               setSearchQuery("");
               setDifficultyFilter("all");
               setSkillFilter("all");
+              setDisplayCount(PAGE_SIZE);
             }}
             className="btn btn-ghost"
             style={{ flex: "0 0 auto" }}
@@ -189,21 +206,29 @@ export default function TaskManagerClient() {
           <CardGridSkeleton count={6} columns={3} />
         ) : (
           <div style={{ opacity: isFetching && !isLoading ? 0.5 : 1, transition: "opacity 0.2s" }}>
-            {filteredTasks.length > 0 ? (
-              <div className="eval-grid">
-                {filteredTasks.map((task) => (
-                  <SelectableCard
-                    key={task.id}
-                    isSelected={selectedTaskIds.has(task.id)}
-                    onToggle={() => toggleTaskSelection(task.id)}
-                  >
-                    <TaskCardWithActions
-                      task={task}
-                      onEdit={setEditingTask}
-                    />
-                  </SelectableCard>
-                ))}
-              </div>
+            {displayedTasks.length > 0 ? (
+              <>
+                <div className="eval-grid">
+                  {displayedTasks.map((task) => (
+                    <SelectableCard
+                      key={task.id}
+                      isSelected={selectedTaskIds.has(task.id)}
+                      onToggle={() => toggleTaskSelection(task.id)}
+                    >
+                      <TaskCardWithActions
+                        task={task}
+                        onEdit={setEditingTask}
+                      />
+                    </SelectableCard>
+                  ))}
+                </div>
+                <LoadMore
+                  hasMore={hasMore}
+                  isLoading={isFetching}
+                  onLoadMore={() => setDisplayCount((c) => c + PAGE_SIZE)}
+                  label="Load more tasks"
+                />
+              </>
             ) : tasks.length > 0 ? (
               <EmptyState
                 icon="🔍"
@@ -216,6 +241,7 @@ export default function TaskManagerClient() {
                       setSearchQuery("");
                       setDifficultyFilter("all");
                       setSkillFilter("all");
+                      setDisplayCount(PAGE_SIZE);
                     }}
                   >
                     Clear filters

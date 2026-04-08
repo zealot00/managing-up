@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Approval, ProcedureDraft, getApprovals, getProcedureDrafts } from "../lib/api";
+import { Approval, ProcedureDraft, getApprovals, getProcedureDrafts, approveExecution } from "../lib/api";
+import { useApiMutation } from "../lib/use-mutations";
 import { useTranslations } from "next-intl";
 import ApprovalForm from "./ApprovalForm";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { FormModal } from "./ui/FormModal";
 import { ListSkeleton } from "./layout/Skeleton";
+import { BulkActionBar } from "./ui/BulkActionBar";
+import { SelectableCard } from "./ui/SelectableCard";
+import { CheckCircle, XCircle } from "lucide-react";
 
 type TabType = "pending" | "drafts" | "history";
 
@@ -16,6 +20,7 @@ export default function ApprovalsPageClient() {
   const t = useTranslations("approvals");
   const [activeTab, setActiveTab] = useState<TabType>("pending");
   const [selectedApproval, setSelectedApproval] = useState<Approval | null>(null);
+  const [selectedApprovalIds, setSelectedApprovalIds] = useState<Set<string>>(new Set());
 
   const { data: approvalsData, isLoading: isLoadingApprovals, isFetching: isFetchingApprovals } = useQuery({
     queryKey: ["approvals"],
@@ -38,6 +43,43 @@ export default function ApprovalsPageClient() {
   const pendingApprovals = approvals.items.filter((a) => a.status === "waiting");
   const completedApprovals = approvals.items.filter((a) => a.status !== "waiting");
 
+  function toggleApprovalSelection(id: string) {
+    setSelectedApprovalIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedApprovalIds(new Set());
+  }
+
+  const approveMutation = useApiMutation(
+    ({ executionId, approver, decision, note }: { executionId: string; approver: string; decision: "approved" | "rejected"; note: string }) =>
+      approveExecution(executionId, { approver, decision, note }),
+    {
+      queryKeysToInvalidate: [["approvals"], ["executions"]],
+      successMessage: "",
+    }
+  );
+
+  async function handleBulkApprove(decision: "approved" | "rejected") {
+    const approver = prompt("Enter approver name:");
+    if (!approver) return;
+    const note = decision === "approved" ? "Bulk approved" : "Bulk rejected";
+    for (const approval of pendingApprovals.filter((a) => selectedApprovalIds.has(a.id))) {
+      await approveMutation.mutateAsync({
+        executionId: approval.execution_id,
+        approver,
+        decision,
+        note,
+      });
+    }
+    clearSelection();
+  }
+
   function handleApprovalUpdated() {
     setSelectedApproval(null);
   }
@@ -52,7 +94,7 @@ export default function ApprovalsPageClient() {
 
       <div className="tabs" style={{ marginBottom: "var(--space-6)", borderBottom: "1px solid var(--line)", display: "flex", gap: "var(--space-1)" }}>
         <button
-          onClick={() => setActiveTab("pending")}
+          onClick={() => { setActiveTab("pending"); clearSelection(); }}
           className={`tab-btn ${activeTab === "pending" ? "tab-btn-active" : ""}`}
           style={{
             padding: "var(--space-3) var(--space-4)",
@@ -69,7 +111,7 @@ export default function ApprovalsPageClient() {
           Pending ({pendingApprovals.length})
         </button>
         <button
-          onClick={() => setActiveTab("drafts")}
+          onClick={() => { setActiveTab("drafts"); clearSelection(); }}
           className={`tab-btn ${activeTab === "drafts" ? "tab-btn-active" : ""}`}
           style={{
             padding: "var(--space-3) var(--space-4)",
@@ -86,7 +128,7 @@ export default function ApprovalsPageClient() {
           Drafts ({drafts.items.length})
         </button>
         <button
-          onClick={() => setActiveTab("history")}
+          onClick={() => { setActiveTab("history"); clearSelection(); }}
           className={`tab-btn ${activeTab === "history" ? "tab-btn-active" : ""}`}
           style={{
             padding: "var(--space-3) var(--space-4)",
@@ -120,20 +162,25 @@ export default function ApprovalsPageClient() {
                 ) : (
                   <div className="list">
                     {pendingApprovals.map((approval) => (
-                      <article
-                        className="list-card"
+                      <SelectableCard
                         key={approval.id}
-                        onClick={() => setSelectedApproval(approval)}
-                        style={{ cursor: "pointer" }}
+                        isSelected={selectedApprovalIds.has(approval.id)}
+                        onToggle={() => toggleApprovalSelection(approval.id)}
                       >
-                        <div className="list-card-main">
-                          <h3 className="list-card-title">{approval.skill_name}</h3>
-                          <p className="list-card-meta">
-                            {approval.step_id} · {approval.approver_group}
-                          </p>
-                        </div>
-                        <span className={`badge badge-${approval.status}`}>{approval.status}</span>
-                      </article>
+                        <article
+                          className="list-card"
+                          onClick={() => setSelectedApproval(approval)}
+                          style={{ flex: 1, cursor: "pointer" }}
+                        >
+                          <div className="list-card-main">
+                            <h3 className="list-card-title">{approval.skill_name}</h3>
+                            <p className="list-card-meta">
+                              {approval.step_id} · {approval.approver_group}
+                            </p>
+                          </div>
+                          <span className={`badge badge-${approval.status}`}>{approval.status}</span>
+                        </article>
+                      </SelectableCard>
                     ))}
                   </div>
                 )}
@@ -194,6 +241,25 @@ export default function ApprovalsPageClient() {
           </div>
         )}
       </div>
+
+      <BulkActionBar
+        selectedCount={selectedApprovalIds.size}
+        onClear={clearSelection}
+        actions={[
+          {
+            label: `Approve (${selectedApprovalIds.size})`,
+            icon: <CheckCircle size={16} />,
+            variant: "primary",
+            onClick: () => handleBulkApprove("approved"),
+          },
+          {
+            label: `Reject (${selectedApprovalIds.size})`,
+            icon: <XCircle size={16} />,
+            variant: "danger",
+            onClick: () => handleBulkApprove("rejected"),
+          },
+        ]}
+      />
 
       <FormModal
         isOpen={selectedApproval !== null}
