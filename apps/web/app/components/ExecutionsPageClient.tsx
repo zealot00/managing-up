@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Execution, Skill, createExecution } from "../lib/api";
 import { useTranslations } from "next-intl";
 import { useToast } from "../../components/ToastProvider";
+import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
 
 type Props = {
   executions: { items: Execution[] };
@@ -78,20 +80,19 @@ export default function ExecutionsPageClient({ executions, skills }: Props) {
 
   return (
     <>
-      <header className="hero-page hero-compact" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <p className="eyebrow">{t("eyebrow")}</p>
-          <h1>{t("title")}</h1>
-          <p className="lede">{t("lede")}</p>
-        </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowModal(true)}
-          style={{ flexShrink: 0 }}
-        >
-          + {t("triggerExecution")}
-        </button>
-      </header>
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        description={t("lede")}
+        actions={
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowModal(true)}
+          >
+            + {t("triggerExecution")}
+          </button>
+        }
+      />
 
       <div style={{ display: "flex", gap: "var(--space-4)", marginBottom: "var(--space-6)", flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ flex: "1 1 200px", maxWidth: 280 }}>
@@ -144,7 +145,7 @@ export default function ExecutionsPageClient({ executions, skills }: Props) {
         </div>
         <div className="list">
           {filteredExecutions.length === 0 ? (
-            <p className="empty-note">{t("noExecutions")}</p>
+            <EmptyState title={t("noExecutions")} />
           ) : (
             filteredExecutions.map((execution) => (
               <article className="list-card" key={execution.id}>

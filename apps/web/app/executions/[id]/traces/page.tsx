@@ -2,26 +2,14 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { getExecution, getTraces } from "../../../lib/api";
 import type { Execution, TraceEvent } from "../../../lib/api";
+import { PageSkeleton } from "../../../components/layout/Skeleton";
 
 type Props = {
   params: Promise<{ id: string }>;
 };
 
 function SkeletonTracePage() {
-  return (
-    <main className="shell">
-      <section className="toprail">
-        <div className="loading-pulse" style={{ width: 160, height: 44, borderRadius: 999 }} />
-      </section>
-      <div className="loading-pulse loading-pulse-medium" style={{ marginBottom: 8 }} />
-      <div className="loading-pulse loading-pulse-short" />
-      <div className="skeleton-grid" style={{ marginTop: 32 }}>
-        {[1, 2, 3, 4].map((i) => (
-          <div className="skeleton-card" key={i} />
-        ))}
-      </div>
-    </main>
-  );
+  return <PageSkeleton headerActions={false} content="cards" contentCount={4} />;
 }
 
 function getMarkerClass(eventType: string): string {

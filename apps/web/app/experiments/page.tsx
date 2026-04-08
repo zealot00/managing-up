@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { getExperiments, getTasks } from "../lib/api";
 import ExperimentManager from "../components/ExperimentManager";
+import { PageSkeleton } from "../components/layout/Skeleton";
+import { PageHeader } from "../components/layout/PageHeader";
 
 async function ExperimentsContent() {
   const t = await getTranslations("experiments");
@@ -15,13 +17,11 @@ async function ExperimentsContent() {
 
   return (
     <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">{t("eyebrow")}</p>
-        <h1>{t("title")}</h1>
-        <p className="lede">
-          {t("lede")}
-        </p>
-      </header>
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        description={t("lede")}
+      />
 
       <ExperimentManager experiments={experiments} tasks={tasks} />
     </main>
@@ -29,22 +29,7 @@ async function ExperimentsContent() {
 }
 
 function SkeletonExperiments() {
-  return (
-    <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">Experiment DB</p>
-        <h1>Experiments</h1>
-        <p className="lede">
-          Compare agent and skill performance across multiple task executions.
-        </p>
-      </header>
-      <div className="skeleton-grid">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="skeleton-card" />
-        ))}
-      </div>
-    </main>
-  );
+  return <PageSkeleton headerActions={true} content="cards" contentCount={3} />;
 }
 
 export default function ExperimentsPage() {

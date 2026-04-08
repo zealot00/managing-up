@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Approval, ProcedureDraft } from "../lib/api";
 import { useTranslations } from "next-intl";
 import ApprovalForm from "./ApprovalForm";
+import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
 
 type Props = {
   approvals: { items: Approval[] };
@@ -29,11 +31,11 @@ export default function ApprovalsPageClient({ approvals, drafts }: Props) {
 
   return (
     <>
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">{t("eyebrow")}</p>
-        <h1>{t("title")}</h1>
-        <p className="lede">{t("lede")}</p>
-      </header>
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        description={t("lede")}
+      />
 
       <div className="tabs" style={{ marginBottom: "var(--space-6)", borderBottom: "1px solid var(--line)", display: "flex", gap: "var(--space-1)" }}>
         <button
@@ -97,7 +99,7 @@ export default function ApprovalsPageClient({ approvals, drafts }: Props) {
               <h2 className="panel-title">{t("decisions")}</h2>
             </div>
             {pendingApprovals.length === 0 ? (
-              <p className="empty-note">{t("noDecisions")}</p>
+              <EmptyState title={t("noDecisions")} />
             ) : (
               <div className="list">
                 {pendingApprovals.map((approval) => (
@@ -128,7 +130,7 @@ export default function ApprovalsPageClient({ approvals, drafts }: Props) {
               <h2 className="panel-title">{t("verificationQueue", { count: drafts.items.length })}</h2>
             </div>
             {drafts.items.length === 0 ? (
-              <p className="empty-note">{t("noDrafts")}</p>
+              <EmptyState title={t("noDrafts")} />
             ) : (
               <div className="list">
                 {drafts.items.map((draft) => (
@@ -154,7 +156,7 @@ export default function ApprovalsPageClient({ approvals, drafts }: Props) {
               <h2 className="panel-title">{t("approvalHistory", { count: completedApprovals.length })}</h2>
             </div>
             {completedApprovals.length === 0 ? (
-              <p className="empty-note">{t("noDecisions")}</p>
+              <EmptyState title={t("noDecisions")} />
             ) : (
               <div className="list">
                 {completedApprovals.map((approval) => (

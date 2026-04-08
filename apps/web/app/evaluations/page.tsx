@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import { getTaskExecutions, getTasks, getMetrics } from "../lib/api";
 import EvaluationManager from "../components/EvaluationManager";
+import { PageSkeleton } from "../components/layout/Skeleton";
+import { PageHeader } from "../components/layout/PageHeader";
 
 async function EvaluationsContent() {
   const t = await getTranslations("evaluations");
@@ -17,13 +19,11 @@ async function EvaluationsContent() {
 
   return (
     <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">{t("eyebrow")}</p>
-        <h1>{t("title")}</h1>
-        <p className="lede">
-          {t("lede")}
-        </p>
-      </header>
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        description={t("lede")}
+      />
 
       <EvaluationManager
         executions={execItems}
@@ -35,22 +35,7 @@ async function EvaluationsContent() {
 }
 
 function SkeletonEvaluations() {
-  return (
-    <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">Evaluation Engine</p>
-        <h1>Task Executions</h1>
-        <p className="lede">
-          View agent performance across evaluation tasks. Each execution runs a task and produces metrics scores.
-        </p>
-      </header>
-      <div className="skeleton-grid">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="skeleton-card" />
-        ))}
-      </div>
-    </main>
-  );
+  return <PageSkeleton headerActions={true} content="cards" contentCount={4} />;
 }
 
 export default function EvaluationsPage() {

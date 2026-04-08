@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Skill, createSkill } from "../lib/api";
 import { useToast } from "../../components/ToastProvider";
+import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
 
 type Props = {
   skills: { items: Skill[] };
@@ -44,20 +46,19 @@ export default function SkillsPageClient({ skills }: Props) {
 
   return (
     <>
-      <header className="hero-page hero-compact" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <p className="eyebrow">{t("eyebrow")}</p>
-          <h1>{t("title")}</h1>
-          <p className="lede">{t("lede")}</p>
-        </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowCreateModal(true)}
-          style={{ flexShrink: 0 }}
-        >
-          + {t("registerSkill")}
-        </button>
-      </header>
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        description={t("lede")}
+        actions={
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowCreateModal(true)}
+          >
+            + {t("registerSkill")}
+          </button>
+        }
+      />
 
       <div className="panel">
         <div className="panel-header">
@@ -66,7 +67,7 @@ export default function SkillsPageClient({ skills }: Props) {
         </div>
         <div className="table-wrapper">
           {skills.items.length === 0 ? (
-            <p className="empty-note">{t("noSkills")}</p>
+            <EmptyState title={t("noSkills")} />
           ) : (
             <table className="table">
               <thead>
