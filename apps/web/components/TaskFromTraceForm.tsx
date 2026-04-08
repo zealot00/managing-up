@@ -58,7 +58,7 @@ export default function TaskFromTraceForm({ onTaskCreated, initialExecutionId, i
     <>
       <form onSubmit={handleSubmit} className="form-panel">
         <div className="panel-header">
-          <p className="section-kicker">{t("taskBuilder")}</p>
+          <p className="section-kicker">{t("taskBuilder.eyebrow")}</p>
           <h2>{t("taskBuilder.title")}</h2>
         </div>
 
