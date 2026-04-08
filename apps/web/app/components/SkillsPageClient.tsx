@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Skill, createSkill } from "../lib/api";
-import { useToast } from "../../components/ToastProvider";
+import { useApiMutation } from "../lib/use-mutations";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 
@@ -16,32 +15,23 @@ type Props = {
 export default function SkillsPageClient({ skills }: Props) {
   const t = useTranslations("skills");
   const tc = useTranslations("common");
-  const router = useRouter();
-  const toast = useToast();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleCreateSkill(e: React.FormEvent<HTMLFormElement>) {
+  const createSkillMutation = useApiMutation(createSkill, {
+    queryKeysToInvalidate: [["skills"]],
+    successMessage: tc("success") + ": Skill created",
+    onSuccess: () => setShowCreateModal(false),
+  });
+
+  function handleCreateSkill(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
-    setError("");
 
     const formData = new FormData(e.currentTarget);
     const name = formData.get("name") as string;
     const ownerTeam = formData.get("owner_team") as string;
     const riskLevel = formData.get("risk_level") as string;
 
-    try {
-      await createSkill({ name, owner_team: ownerTeam, risk_level: riskLevel });
-      toast.success(tc("success") + ": Skill created");
-      setShowCreateModal(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create skill");
-    } finally {
-      setLoading(false);
-    }
+    createSkillMutation.mutate({ name, owner_team: ownerTeam, risk_level: riskLevel });
   }
 
   return (
@@ -151,7 +141,7 @@ export default function SkillsPageClient({ skills }: Props) {
               </button>
             </div>
 
-            {error && <p className="form-error" style={{ marginBottom: "var(--space-4)" }}>{error}</p>}
+            {createSkillMutation.error && <p className="form-error" style={{ marginBottom: "var(--space-4)" }}>{createSkillMutation.error.message}</p>}
 
             <form onSubmit={handleCreateSkill}>
               <div className="form-fields">
@@ -187,8 +177,8 @@ export default function SkillsPageClient({ skills }: Props) {
                 </label>
               </div>
 
-              <button type="submit" disabled={loading} className="form-submit" style={{ marginTop: "var(--space-4)" }}>
-                {loading ? t("registering") : t("registerSkill")}
+              <button type="submit" disabled={createSkillMutation.isPending} className="form-submit" style={{ marginTop: "var(--space-4)" }}>
+                {createSkillMutation.isPending ? t("registering") : t("registerSkill")}
               </button>
             </form>
           </div>

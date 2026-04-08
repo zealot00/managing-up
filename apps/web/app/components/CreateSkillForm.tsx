@@ -1,39 +1,30 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { createSkill } from "../lib/api";
 import { useTranslations } from "next-intl";
-import { useToast } from "../../components/ToastProvider";
+import { useApiMutation } from "../lib/use-mutations";
 
 export default function CreateSkillForm() {
   const t = useTranslations("skills");
   const tc = useTranslations("common");
-  const router = useRouter();
-  const toast = useToast();
   const [name, setName] = useState("");
   const [ownerTeam, setOwnerTeam] = useState("");
   const [riskLevel, setRiskLevel] = useState("medium");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      await createSkill({ name, owner_team: ownerTeam, risk_level: riskLevel });
+  const createSkillMutation = useApiMutation(createSkill, {
+    queryKeysToInvalidate: [["skills"]],
+    successMessage: tc("success") + ": Skill created",
+    onSuccess: () => {
       setName("");
       setOwnerTeam("");
       setRiskLevel("medium");
-      toast.success(tc("success") + ": Skill created");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create skill");
-    } finally {
-      setLoading(false);
-    }
+    },
+  });
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    createSkillMutation.mutate({ name, owner_team: ownerTeam, risk_level: riskLevel });
   }
 
   return (
@@ -43,7 +34,7 @@ export default function CreateSkillForm() {
         <h2>{t("registerSkill")}</h2>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {createSkillMutation.error && <p className="form-error">{createSkillMutation.error.message}</p>}
 
       <div className="form-fields">
         <label className="form-label">
@@ -84,8 +75,8 @@ export default function CreateSkillForm() {
         </label>
       </div>
 
-      <button type="submit" disabled={loading} className="form-submit">
-        {loading ? t("registering") : t("registerSkill")}
+      <button type="submit" disabled={createSkillMutation.isPending} className="form-submit">
+        {createSkillMutation.isPending ? t("registering") : t("registerSkill")}
       </button>
     </form>
   );
