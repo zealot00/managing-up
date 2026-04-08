@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { createExecution, Skill } from "../lib/api";
+import { useApiMutation } from "../lib/use-mutations";
 import { useTranslations } from "next-intl";
 import { useToast } from "../../components/ToastProvider";
 
@@ -13,48 +13,41 @@ type Props = {
 export default function TriggerExecutionForm({ skills }: Props) {
   const t = useTranslations("executions");
   const tc = useTranslations("common");
-  const router = useRouter();
   const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [skillId, setSkillId] = useState("");
   const [triggeredBy, setTriggeredBy] = useState("");
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleSubmit(e: FormEvent) {
+  const createExecutionMutation = useApiMutation(createExecution, {
+    queryKeysToInvalidate: [["executions"]],
+    successMessage: tc("success") + ": Execution triggered",
+    onSuccess: () => {
+      setSkillId("");
+      setTriggeredBy("");
+      setInput("");
+      setIsOpen(false);
+    },
+  });
+
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setError("");
 
     let parsedInput: Record<string, unknown> = {};
     if (input.trim()) {
       try {
         parsedInput = JSON.parse(input);
       } catch {
-        setError(tc("errors.inputInvalid"));
-        setLoading(false);
+        toast.error(tc("errors.inputInvalid"));
         return;
       }
     }
 
-    try {
-      await createExecution({
-        skill_id: skillId,
-        triggered_by: triggeredBy,
-        input: parsedInput,
-      });
-      setSkillId("");
-      setTriggeredBy("");
-      setInput("");
-      setIsOpen(false);
-      toast.success(tc("success") + ": Execution triggered");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to trigger execution");
-    } finally {
-      setLoading(false);
-    }
+    createExecutionMutation.mutate({
+      skill_id: skillId,
+      triggered_by: triggeredBy,
+      input: parsedInput,
+    });
   }
 
   return (
@@ -73,7 +66,9 @@ export default function TriggerExecutionForm({ skills }: Props) {
             <h2>{t("trigger")}</h2>
           </div>
 
-          {error && <p className="form-error">{error}</p>}
+          {createExecutionMutation.isError && (
+            <p className="form-error">{createExecutionMutation.error?.message || "Failed to trigger execution"}</p>
+          )}
 
           <div className="form-fields">
             <label className="form-label">
@@ -117,8 +112,8 @@ export default function TriggerExecutionForm({ skills }: Props) {
             </label>
           </div>
 
-          <button type="submit" disabled={loading} className="form-submit">
-            {loading ? t("triggering") : t("trigger")}
+          <button type="submit" disabled={createExecutionMutation.isPending} className="form-submit">
+            {createExecutionMutation.isPending ? t("triggering") : t("trigger")}
           </button>
         </form>
       )}
