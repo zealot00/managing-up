@@ -1,34 +1,46 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { createSkill } from "../lib/api";
 import { useTranslations } from "next-intl";
 import { useApiMutation } from "../lib/use-mutations";
+import { createSkillSchema } from "../lib/form-schemas";
 
 export default function CreateSkillForm() {
   const t = useTranslations("skills");
   const tc = useTranslations("common");
-  const [name, setName] = useState("");
-  const [ownerTeam, setOwnerTeam] = useState("");
-  const [riskLevel, setRiskLevel] = useState("medium");
-
   const createSkillMutation = useApiMutation(createSkill, {
     queryKeysToInvalidate: [["skills"]],
     successMessage: tc("success") + ": Skill created",
     onSuccess: () => {
-      setName("");
-      setOwnerTeam("");
-      setRiskLevel("medium");
+      reset();
     },
   });
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    createSkillMutation.mutate({ name, owner_team: ownerTeam, risk_level: riskLevel });
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(createSkillSchema),
+    defaultValues: {
+      risk_level: "medium",
+    },
+  });
+
+  function onSubmit(data: z.infer<typeof createSkillSchema>) {
+    createSkillMutation.mutate({
+      name: data.name,
+      owner_team: data.owner_team,
+      risk_level: data.risk_level,
+    });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-panel">
+    <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
       <div className="panel-header">
         <p className="section-kicker">{t("eyebrow")}</p>
         <h2>{t("registerSkill")}</h2>
@@ -41,42 +53,37 @@ export default function CreateSkillForm() {
           {t("skillName")}
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            {...register("name")}
             placeholder={t("skillNamePlaceholder")}
-            required
-            className="form-input"
+            className={`form-input ${errors.name ? "border-red-500" : ""}`}
           />
+          {errors.name && <p className="form-error">{errors.name.message}</p>}
         </label>
 
         <label className="form-label">
           {t("ownerTeam")}
           <input
             type="text"
-            value={ownerTeam}
-            onChange={(e) => setOwnerTeam(e.target.value)}
+            {...register("owner_team")}
             placeholder={t("ownerTeamPlaceholder")}
-            required
-            className="form-input"
+            className={`form-input ${errors.owner_team ? "border-red-500" : ""}`}
           />
+          {errors.owner_team && <p className="form-error">{errors.owner_team.message}</p>}
         </label>
 
         <label className="form-label">
           {t("riskLevel")}
-          <select
-            value={riskLevel}
-            onChange={(e) => setRiskLevel(e.target.value)}
-            className="form-select"
-          >
+          <select {...register("risk_level")} className="form-select">
             <option value="low">{t("low")}</option>
             <option value="medium">{t("medium")}</option>
             <option value="high">{t("high")}</option>
           </select>
+          {errors.risk_level && <p className="form-error">{errors.risk_level.message}</p>}
         </label>
       </div>
 
-      <button type="submit" disabled={createSkillMutation.isPending} className="form-submit">
-        {createSkillMutation.isPending ? t("registering") : t("registerSkill")}
+      <button type="submit" disabled={isSubmitting} className="form-submit">
+        {isSubmitting ? t("registering") : t("registerSkill")}
       </button>
     </form>
   );

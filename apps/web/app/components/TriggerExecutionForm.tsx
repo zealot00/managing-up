@@ -1,9 +1,13 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { createExecution, Skill } from "../lib/api";
 import { useApiMutation } from "../lib/use-mutations";
 import { useTranslations } from "next-intl";
+import { triggerExecutionSchema } from "../lib/form-schemas";
 import { useToast } from "../../components/ToastProvider";
 
 type Props = {
@@ -15,28 +19,35 @@ export default function TriggerExecutionForm({ skills }: Props) {
   const tc = useTranslations("common");
   const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [skillId, setSkillId] = useState("");
-  const [triggeredBy, setTriggeredBy] = useState("");
-  const [input, setInput] = useState("");
 
   const createExecutionMutation = useApiMutation(createExecution, {
     queryKeysToInvalidate: [["executions"]],
     successMessage: tc("success") + ": Execution triggered",
     onSuccess: () => {
-      setSkillId("");
-      setTriggeredBy("");
-      setInput("");
+      reset();
       setIsOpen(false);
     },
   });
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(triggerExecutionSchema),
+    defaultValues: {
+      skill_id: "",
+      triggered_by: "",
+      input: "",
+    },
+  });
 
+  function onSubmit(data: z.infer<typeof triggerExecutionSchema>) {
     let parsedInput: Record<string, unknown> = {};
-    if (input.trim()) {
+    if (data.input?.trim()) {
       try {
-        parsedInput = JSON.parse(input);
+        parsedInput = JSON.parse(data.input);
       } catch {
         toast.error(tc("errors.inputInvalid"));
         return;
@@ -44,8 +55,8 @@ export default function TriggerExecutionForm({ skills }: Props) {
     }
 
     createExecutionMutation.mutate({
-      skill_id: skillId,
-      triggered_by: triggeredBy,
+      skill_id: data.skill_id,
+      triggered_by: data.triggered_by,
       input: parsedInput,
     });
   }
@@ -60,7 +71,7 @@ export default function TriggerExecutionForm({ skills }: Props) {
       </button>
 
       {isOpen && (
-        <form onSubmit={handleSubmit} className="form-panel">
+        <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
           <div className="panel-header">
             <p className="section-kicker">{t("eyebrow")}</p>
             <h2>{t("trigger")}</h2>
@@ -74,10 +85,8 @@ export default function TriggerExecutionForm({ skills }: Props) {
             <label className="form-label">
               {t("skill")}
               <select
-                value={skillId}
-                onChange={(e) => setSkillId(e.target.value)}
-                required
-                className="form-select"
+                {...register("skill_id")}
+                className={`form-select ${errors.skill_id ? "border-red-500" : ""}`}
               >
                 <option value="">{t("selectSkill")}</option>
                 {skills.map((s) => (
@@ -86,34 +95,34 @@ export default function TriggerExecutionForm({ skills }: Props) {
                   </option>
                 ))}
               </select>
+              {errors.skill_id && <p className="form-error">{errors.skill_id.message}</p>}
             </label>
 
             <label className="form-label">
               {t("triggeredBy")}
               <input
                 type="text"
-                value={triggeredBy}
-                onChange={(e) => setTriggeredBy(e.target.value)}
+                {...register("triggered_by")}
                 placeholder={t("triggeredByPlaceholder")}
-                required
-                className="form-input"
+                className={`form-input ${errors.triggered_by ? "border-red-500" : ""}`}
               />
+              {errors.triggered_by && <p className="form-error">{errors.triggered_by.message}</p>}
             </label>
 
             <label className="form-label">
               {t("input")}
               <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+                {...register("input")}
                 placeholder={t("inputPlaceholder")}
                 rows={3}
                 className="form-textarea"
               />
+              {errors.input && <p className="form-error">{errors.input.message}</p>}
             </label>
           </div>
 
-          <button type="submit" disabled={createExecutionMutation.isPending} className="form-submit">
-            {createExecutionMutation.isPending ? t("triggering") : t("trigger")}
+          <button type="submit" disabled={isSubmitting} className="form-submit">
+            {isSubmitting ? t("triggering") : t("trigger")}
           </button>
         </form>
       )}

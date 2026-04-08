@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { createMetric } from "../lib/api";
 import { useTranslations } from "next-intl";
 import { useApiMutation } from "../lib/use-mutations";
+import { createMetricSchema } from "../lib/form-schemas";
+import { useToast } from "../../components/ToastProvider";
 
 type Props = {
   onCreated?: () => void;
@@ -13,85 +17,81 @@ export default function CreateMetricForm({ onCreated }: Props) {
   const t = useTranslations("evaluations");
   const tc = useTranslations("common");
   const te = useTranslations("errors");
-  const [name, setName] = useState("");
-  const [type, setType] = useState("exact_match");
-  const [config, setConfig] = useState("");
-  const [localError, setLocalError] = useState("");
-
+  const toast = useToast();
   const createMetricMutation = useApiMutation(createMetric, {
     queryKeysToInvalidate: [["metrics"]],
     successMessage: tc("success") + ": Metric created",
     onSuccess: () => {
-      setName("");
-      setType("exact_match");
-      setConfig("");
+      reset();
       onCreated?.();
     },
   });
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setLocalError("");
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(createMetricSchema),
+    defaultValues: {
+      type: "exact_match",
+    },
+  });
 
+  function onSubmit(data: z.infer<typeof createMetricSchema>) {
     let parsedConfig: Record<string, unknown> = {};
-    if (config.trim()) {
+    if (data.config?.trim()) {
       try {
-        parsedConfig = JSON.parse(config);
+        parsedConfig = JSON.parse(data.config);
       } catch {
-        setLocalError(te("configInvalid"));
+        toast.error(te("configInvalid"));
         return;
       }
     }
 
     createMetricMutation.mutate({
-      name,
-      type,
+      name: data.name,
+      type: data.type,
       config: parsedConfig,
     });
   }
 
-  const error = createMetricMutation.error?.message || localError;
-
   return (
-    <form onSubmit={handleSubmit} className="form-panel">
+    <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
       <div className="panel-header">
         <p className="section-kicker">{t("eyebrow")}</p>
         <h2>{t("createMetric")}</h2>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {createMetricMutation.error && <p className="form-error">{createMetricMutation.error.message}</p>}
 
       <div className="form-fields">
         <label className="form-label">
           {t("metricName")}
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            {...register("name")}
             placeholder={t("metricNamePlaceholder")}
-            required
-            className="form-input"
+            className={`form-input ${errors.name ? "border-red-500" : ""}`}
           />
+          {errors.name && <p className="form-error">{errors.name.message}</p>}
         </label>
 
         <label className="form-label">
           {t("metricType")}
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="form-select"
-          >
+          <select {...register("type")} className="form-select">
             <option value="exact_match">{t("exactMatch")}</option>
             <option value="llm_judge">{t("llmJudge")}</option>
             <option value="custom">{t("custom")}</option>
           </select>
+          {errors.type && <p className="form-error">{errors.type.message}</p>}
         </label>
 
         <label className="form-label">
           {t("config")}
           <textarea
-            value={config}
-            onChange={(e) => setConfig(e.target.value)}
+            {...register("config")}
             placeholder={t("configPlaceholder")}
             rows={3}
             className="form-textarea"
@@ -99,8 +99,8 @@ export default function CreateMetricForm({ onCreated }: Props) {
         </label>
       </div>
 
-      <button type="submit" disabled={createMetricMutation.isPending} className="form-submit">
-        {createMetricMutation.isPending ? t("creating") : t("createMetric")}
+      <button type="submit" disabled={isSubmitting} className="form-submit">
+        {isSubmitting ? t("creating") : t("createMetric")}
       </button>
     </form>
   );

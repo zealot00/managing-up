@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { updateTask, Skill, Task, CreateTaskRequest } from "../lib/api";
 import { useTranslations } from "next-intl";
 import { useApiMutation } from "../lib/use-mutations";
+import { updateTaskSchema } from "../lib/form-schemas";
 import { useToast } from "../../components/ToastProvider";
 
 type Props = {
@@ -26,13 +29,6 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
   const t = useTranslations("tasks");
   const te = useTranslations("errors");
   const toast = useToast();
-  const [name, setName] = useState(task.name);
-  const [description, setDescription] = useState(task.description);
-  const [skillId, setSkillId] = useState(task.skill_id);
-  const [difficulty, setDifficulty] = useState<string>(task.difficulty);
-  const [tags, setTags] = useState(task.tags.join(", "));
-  const [testCases, setTestCases] = useState(JSON.stringify(task.test_cases, null, 2));
-
   const updateMutation = useApiMutation(updateTaskWrapper, {
     successMessage: "Task updated",
     queryKeysToInvalidate: [["tasks"]],
@@ -41,13 +37,27 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
     },
   });
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(updateTaskSchema),
+    defaultValues: {
+      name: task.name,
+      description: task.description,
+      skill_id: task.skill_id,
+      difficulty: task.difficulty,
+      tags: task.tags.join(", "),
+      test_cases: JSON.stringify(task.test_cases, null, 2),
+    },
+  });
 
+  function onSubmit(data: z.infer<typeof updateTaskSchema>) {
     let parsedTestCases: Array<{ input: Record<string, unknown>; expected: unknown }> = [];
-    if (testCases.trim()) {
+    if (data.test_cases?.trim()) {
       try {
-        parsedTestCases = JSON.parse(testCases);
+        parsedTestCases = JSON.parse(data.test_cases);
       } catch {
         toast.error(te("testCasesInvalid"));
         return;
@@ -56,17 +66,17 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
 
     updateMutation.mutate({
       id: task.id,
-      name,
-      description,
-      skill_id: skillId,
-      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-      difficulty,
+      name: data.name,
+      description: data.description,
+      skill_id: data.skill_id,
+      tags: data.tags?.split(",").map((t) => t.trim()).filter(Boolean),
+      difficulty: data.difficulty,
       test_cases: parsedTestCases,
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-panel">
+    <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
       <div className="panel-header">
         <p className="section-kicker">{t("eyebrow")}</p>
         <h2>{t("editTask", { name: task.name })}</h2>
@@ -79,18 +89,16 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
           {t("taskName")}
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            className="form-input"
+            {...register("name")}
+            className={`form-input ${errors.name ? "border-red-500" : ""}`}
           />
+          {errors.name && <p className="form-error">{errors.name.message}</p>}
         </label>
 
         <label className="form-label">
           {t("description")}
           <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            {...register("description")}
             rows={2}
             className="form-textarea"
           />
@@ -98,11 +106,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
 
         <label className="form-label">
           {t("linkedSkill")}
-          <select
-            value={skillId}
-            onChange={(e) => setSkillId(e.target.value)}
-            className="form-select"
-          >
+          <select {...register("skill_id")} className="form-select">
             <option value="">{t("noSkill")}</option>
             {skills.map((s) => (
               <option key={s.id} value={s.id}>
@@ -114,11 +118,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
 
         <label className="form-label">
           {t("difficulty")}
-          <select
-            value={difficulty}
-            onChange={(e) => setDifficulty(e.target.value)}
-            className="form-select"
-          >
+          <select {...register("difficulty")} className="form-select">
             <option value="easy">{t("easy")}</option>
             <option value="medium">{t("medium")}</option>
             <option value="hard">{t("hard")}</option>
@@ -129,8 +129,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
           {t("tags")}
           <input
             type="text"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
+            {...register("tags")}
             className="form-input"
           />
         </label>
@@ -138,17 +137,17 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
         <label className="form-label">
           {t("testCases")}
           <textarea
-            value={testCases}
-            onChange={(e) => setTestCases(e.target.value)}
+            {...register("test_cases")}
             rows={3}
             className="form-textarea"
           />
+          {errors.test_cases && <p className="form-error">{errors.test_cases.message}</p>}
         </label>
       </div>
 
       <div className="form-actions">
-        <button type="submit" disabled={updateMutation.isPending} className="form-submit" style={{ flex: 1 }}>
-          {updateMutation.isPending ? t("saving") : t("saveChanges")}
+        <button type="submit" disabled={isSubmitting} className="form-submit" style={{ flex: 1 }}>
+          {isSubmitting ? t("saving") : t("saveChanges")}
         </button>
         <button type="button" onClick={onCancel} className="btn btn-secondary" style={{ flex: 1 }}>
           {t("cancel")}

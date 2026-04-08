@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, FormEvent } from "react";
-import { createTask, Skill } from "../lib/api";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useTranslations } from "next-intl";
 import { useApiMutation } from "../lib/use-mutations";
+import { createTask, Skill } from "../lib/api";
+import { createTaskSchema } from "../lib/form-schemas";
 import { useToast } from "../../components/ToastProvider";
 
 type Props = {
@@ -15,34 +18,32 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
   const t = useTranslations("tasks");
   const te = useTranslations("errors");
   const toast = useToast();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [skillId, setSkillId] = useState("");
-  const [difficulty, setDifficulty] = useState("medium");
-  const [tags, setTags] = useState("");
-  const [testCases, setTestCases] = useState("");
-
   const createMutation = useApiMutation(createTask, {
     successMessage: "Task created",
     queryKeysToInvalidate: [["tasks"]],
     onSuccess: () => {
-      setName("");
-      setDescription("");
-      setSkillId("");
-      setDifficulty("medium");
-      setTags("");
-      setTestCases("");
+      reset();
       onCreated?.();
     },
   });
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(createTaskSchema),
+    defaultValues: {
+      difficulty: "medium",
+    },
+  });
 
+  function onSubmit(data: z.infer<typeof createTaskSchema>) {
     let parsedTestCases: Array<{ input: Record<string, unknown>; expected: unknown }> = [];
-    if (testCases.trim()) {
+    if (data.test_cases?.trim()) {
       try {
-        parsedTestCases = JSON.parse(testCases);
+        parsedTestCases = JSON.parse(data.test_cases);
       } catch {
         toast.error(te("testCasesInvalid"));
         return;
@@ -50,17 +51,17 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
     }
 
     createMutation.mutate({
-      name,
-      description,
-      skill_id: skillId,
-      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-      difficulty,
+      name: data.name,
+      description: data.description ?? "",
+      skill_id: data.skill_id ?? "",
+      tags: data.tags?.split(",").map((t) => t.trim()).filter(Boolean) ?? [],
+      difficulty: data.difficulty,
       test_cases: parsedTestCases,
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-panel">
+    <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
       <div className="panel-header">
         <p className="section-kicker">{t("eyebrow")}</p>
         <h2>{t("createTask")}</h2>
@@ -73,19 +74,17 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
           {t("taskName")}
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            {...register("name")}
             placeholder={t("taskNamePlaceholder")}
-            required
-            className="form-input"
+            className={`form-input ${errors.name ? "border-red-500" : ""}`}
           />
+          {errors.name && <p className="form-error">{errors.name.message}</p>}
         </label>
 
         <label className="form-label">
           {t("description")}
           <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            {...register("description")}
             placeholder="What does this task evaluate?"
             rows={2}
             className="form-textarea"
@@ -94,11 +93,7 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
 
         <label className="form-label">
           {t("linkedSkill")}
-          <select
-            value={skillId}
-            onChange={(e) => setSkillId(e.target.value)}
-            className="form-select"
-          >
+          <select {...register("skill_id")} className="form-select">
             <option value="">{t("noSkill")}</option>
             {skills.map((s) => (
               <option key={s.id} value={s.id}>
@@ -110,11 +105,7 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
 
         <label className="form-label">
           {t("difficulty")}
-          <select
-            value={difficulty}
-            onChange={(e) => setDifficulty(e.target.value)}
-            className="form-select"
-          >
+          <select {...register("difficulty")} className="form-select">
             <option value="easy">{t("easy")}</option>
             <option value="medium">{t("medium")}</option>
             <option value="hard">{t("hard")}</option>
@@ -125,8 +116,7 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
           {t("tags")}
           <input
             type="text"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
+            {...register("tags")}
             placeholder={t("tagsPlaceholder")}
             className="form-input"
           />
@@ -135,17 +125,17 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
         <label className="form-label">
           {t("testCases")}
           <textarea
-            value={testCases}
-            onChange={(e) => setTestCases(e.target.value)}
+            {...register("test_cases")}
             placeholder={t("testCasesPlaceholder")}
             rows={3}
             className="form-textarea"
           />
+          {errors.test_cases && <p className="form-error">{errors.test_cases.message}</p>}
         </label>
       </div>
 
-      <button type="submit" disabled={createMutation.isPending} className="form-submit">
-        {createMutation.isPending ? t("creating") : t("create")}
+      <button type="submit" disabled={isSubmitting} className="form-submit">
+        {isSubmitting ? t("creating") : t("create")}
       </button>
     </form>
   );

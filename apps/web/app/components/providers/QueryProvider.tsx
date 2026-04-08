@@ -11,6 +11,8 @@ export function QueryProvider({children}: {children: ReactNode}) {
           queries: {
             staleTime: 60 * 1000,
             refetchOnWindowFocus: false,
+            // Keep previous data while fetching new data (prevents flicker on filter changes)
+            placeholderData: (previousData: unknown) => previousData as unknown,
           },
         },
       })

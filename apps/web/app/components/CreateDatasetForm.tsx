@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { createSEHDataset } from "../lib/seh-api";
 import { useTranslations } from "next-intl";
 import { useApiMutation } from "../lib/use-mutations";
+import { createDatasetSchema } from "../lib/form-schemas";
 
 type Props = {
   onCreated?: () => void;
@@ -12,30 +15,35 @@ type Props = {
 export default function CreateDatasetForm({ onCreated }: Props) {
   const t = useTranslations("seh");
   const tc = useTranslations("common");
-  const [name, setName] = useState("");
-  const [version, setVersion] = useState("");
-  const [owner, setOwner] = useState("");
-  const [description, setDescription] = useState("");
-
   const createDatasetMutation = useApiMutation(createSEHDataset, {
     queryKeysToInvalidate: [["datasets"]],
     successMessage: tc("success") + ": Dataset created",
     onSuccess: () => {
-      setName("");
-      setVersion("");
-      setOwner("");
-      setDescription("");
+      reset();
       onCreated?.();
     },
   });
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    createDatasetMutation.mutate({ name, version, owner, description });
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(createDatasetSchema),
+  });
+
+  function onSubmit(data: z.infer<typeof createDatasetSchema>) {
+    createDatasetMutation.mutate({
+      name: data.name,
+      version: data.version,
+      owner: data.owner,
+      description: data.description,
+    });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-panel">
+    <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
       <div className="panel-header">
         <p className="section-kicker">{t("eyebrow")}</p>
         <h2>{t("createDataset")}</h2>
@@ -48,43 +56,39 @@ export default function CreateDatasetForm({ onCreated }: Props) {
           {t("datasetName")}
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            {...register("name")}
             placeholder={t("datasetNamePlaceholder")}
-            required
-            className="form-input"
+            className={`form-input ${errors.name ? "border-red-500" : ""}`}
           />
+          {errors.name && <p className="form-error">{errors.name.message}</p>}
         </label>
 
         <label className="form-label">
           {t("datasetVersion")}
           <input
             type="text"
-            value={version}
-            onChange={(e) => setVersion(e.target.value)}
+            {...register("version")}
             placeholder={t("datasetVersionPlaceholder")}
-            required
-            className="form-input"
+            className={`form-input ${errors.version ? "border-red-500" : ""}`}
           />
+          {errors.version && <p className="form-error">{errors.version.message}</p>}
         </label>
 
         <label className="form-label">
           {t("datasetOwner")}
           <input
             type="text"
-            value={owner}
-            onChange={(e) => setOwner(e.target.value)}
+            {...register("owner")}
             placeholder={t("datasetOwnerPlaceholder")}
-            required
-            className="form-input"
+            className={`form-input ${errors.owner ? "border-red-500" : ""}`}
           />
+          {errors.owner && <p className="form-error">{errors.owner.message}</p>}
         </label>
 
         <label className="form-label">
           {t("datasetDescription")}
           <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            {...register("description")}
             placeholder={t("datasetDescriptionPlaceholder")}
             rows={2}
             className="form-textarea"
@@ -92,8 +96,8 @@ export default function CreateDatasetForm({ onCreated }: Props) {
         </label>
       </div>
 
-      <button type="submit" disabled={createDatasetMutation.isPending} className="form-submit">
-        {createDatasetMutation.isPending ? t("creating") : t("createDataset")}
+      <button type="submit" disabled={isSubmitting} className="form-submit">
+        {isSubmitting ? t("creating") : t("createDataset")}
       </button>
     </form>
   );
