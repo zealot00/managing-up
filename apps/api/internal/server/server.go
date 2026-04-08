@@ -614,20 +614,21 @@ func (s *ExperimentRunService) UpdateExperimentRun(run ExperimentRun) error {
 
 // Server wraps the HTTP server and route registration for the API service.
 type Server struct {
-	httpServer        *http.Server
-	repo              Repository
-	skillSvc          *service.SkillService
-	execSvc           *service.ExecutionService
-	taskSvc           *service.TaskService
-	experimentSvc     *service.ExperimentService
-	gatewayServer     *gateway.Server
-	gatewayLimiter    gateway.RateLimiter
-	orchestrator      *orchestrator.Server
-	sehServer         *seh.Server
-	authHandler       *handlers.AuthHandler
-	mcpRouterHandler  *handlers.MCPRouterHandler
-	mcpServersHandler *handlers.MCPServersHandler
-	closeFn           func() error
+	httpServer         *http.Server
+	repo               Repository
+	skillSvc           *service.SkillService
+	execSvc            *service.ExecutionService
+	taskSvc            *service.TaskService
+	experimentSvc      *service.ExperimentService
+	gatewayServer      *gateway.Server
+	gatewayLimiter     gateway.RateLimiter
+	orchestrator       *orchestrator.Server
+	sehServer          *seh.Server
+	authHandler        *handlers.AuthHandler
+	mcpRouterHandler   *handlers.MCPRouterHandler
+	mcpServersHandler  *handlers.MCPServersHandler
+	skillEnterpriseSvc *service.SkillEnterpriseService
+	closeFn            func() error
 }
 
 // New creates a configured API server.
@@ -689,12 +690,13 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 			gateway.WithUsageRecorder(gatewayRecorder),
 			gateway.WithProviderKeyResolver(gatewayProviderKeyResolver),
 		),
-		gatewayLimiter:    gatewayLimiter,
-		orchestrator:      orchestratorServer,
-		sehServer:         sehServer,
-		authHandler:       authHandler,
-		mcpRouterHandler:  mcpRouterHandler,
-		mcpServersHandler: mcpServersHandler,
+		gatewayLimiter:     gatewayLimiter,
+		orchestrator:       orchestratorServer,
+		sehServer:          sehServer,
+		authHandler:        authHandler,
+		mcpRouterHandler:   mcpRouterHandler,
+		mcpServersHandler:  mcpServersHandler,
+		skillEnterpriseSvc: service.NewSkillEnterpriseService(repoToSkillRepoAdapter{repo}),
 	}
 
 	mux.HandleFunc("/healthz", handleHealth)
@@ -707,6 +709,11 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/procedure-drafts", srv.handleProcedureDrafts)
 	mux.HandleFunc("/api/v1/skills", srv.handleSkills)
 	mux.HandleFunc("/api/v1/skills/", srv.handleSkillByID)
+	mux.HandleFunc("/api/v1/skills/{id}/dependencies", srv.handleSkillDependencies)
+	mux.HandleFunc("/api/v1/skills/{id}/rate", srv.handleSkillRate)
+	mux.HandleFunc("/api/v1/skills/market", srv.handleSkillMarket)
+	mux.HandleFunc("/api/v1/skills/search", srv.handleSkillSearch)
+	mux.HandleFunc("/api/v1/skills/resolve-deps", srv.handleSkillResolveDeps)
 	mux.HandleFunc("/api/v1/skills/{id}/spec", srv.handleSkillSpec)
 	mux.HandleFunc("/api/v1/skill-versions", srv.handleSkillVersions)
 	mux.HandleFunc("/api/v1/approvals", srv.handleApprovals)
