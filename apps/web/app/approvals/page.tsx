@@ -1,7 +1,6 @@
 import { Suspense } from "react";
-import { getTranslations } from "next-intl/server";
-import { getApprovals, getProcedureDrafts } from "../lib/api";
 import ApprovalsPageClient from "../components/ApprovalsPageClient";
+import { ListSkeleton } from "../components/layout/Skeleton";
 
 function SkeletonApprovalsPage() {
   return (
@@ -20,24 +19,7 @@ function SkeletonApprovalsPage() {
         ))}
       </div>
 
-      <div className="panel">
-        <div className="loading-pulse loading-pulse-medium" style={{ marginBottom: 16 }} />
-        <div className="skeleton-grid">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="skeleton-card" />
-          ))}
-        </div>
-      </div>
-    </main>
-  );
-}
-
-async function ApprovalsContent() {
-  const [approvals, drafts] = await Promise.all([getApprovals(), getProcedureDrafts()]);
-
-  return (
-    <main className="shell">
-      <ApprovalsPageClient approvals={approvals} drafts={drafts} />
+      <ListSkeleton rows={5} />
     </main>
   );
 }
@@ -45,7 +27,7 @@ async function ApprovalsContent() {
 export default function ApprovalsPage() {
   return (
     <Suspense fallback={<SkeletonApprovalsPage />}>
-      <ApprovalsContent />
+      <ApprovalsPageClient />
     </Suspense>
   );
 }

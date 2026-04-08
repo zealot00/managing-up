@@ -1,26 +1,39 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Task, Skill } from "../lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { Task, Skill, getTasks, getSkills } from "../lib/api";
 import CreateTaskForm from "./CreateTaskForm";
 import TaskCardWithActions from "./TaskCardWithActions";
 import EditTaskForm from "./EditTaskForm";
 import { useTranslations } from "next-intl";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
+import { CardGridSkeleton } from "./layout/Skeleton";
 
-type Props = {
-  tasks: Task[];
-  skills: Skill[];
-};
-
-export default function TaskManagerClient({ tasks, skills }: Props) {
+export default function TaskManagerClient() {
   const t = useTranslations("tasks");
   const [showCreate, setShowCreate] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [skillFilter, setSkillFilter] = useState<string>("all");
+
+  const { data: tasksData, isLoading, isFetching } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: getTasks,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const tasks = tasksData?.items ?? [];
+
+  const { data: skillsData } = useQuery({
+    queryKey: ["skills"],
+    queryFn: getSkills,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const skills = skillsData?.items ?? [];
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -139,50 +152,56 @@ export default function TaskManagerClient({ tasks, skills }: Props) {
       )}
 
       <section aria-label="Task list">
-        {filteredTasks.length > 0 ? (
-          <div className="eval-grid">
-            {filteredTasks.map((task) => (
-              <TaskCardWithActions
-                key={task.id}
-                task={task}
-                onEdit={setEditingTask}
-              />
-            ))}
-          </div>
-        ) : tasks.length > 0 ? (
-          <EmptyState
-            icon="🔍"
-            title="No matching tasks"
-            description="Try adjusting your search or filter criteria"
-            action={
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setSearchQuery("");
-                  setDifficultyFilter("all");
-                  setSkillFilter("all");
-                }}
-              >
-                Clear filters
-              </button>
-            }
-          />
+        {isLoading ? (
+          <CardGridSkeleton count={6} columns={3} />
         ) : (
-          <EmptyState
-            icon="◎"
-            title={t("noTasks")}
-            description={t("noTasksDesc")}
-            action={
-              <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
-                <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-                  {t("createTask")}
-                </button>
-                <a href="/tasks/from-trace" className="btn btn-secondary">
-                  {t("buildFromTrace")}
-                </a>
+          <div style={{ opacity: isFetching && !isLoading ? 0.5 : 1, transition: "opacity 0.2s" }}>
+            {filteredTasks.length > 0 ? (
+              <div className="eval-grid">
+                {filteredTasks.map((task) => (
+                  <TaskCardWithActions
+                    key={task.id}
+                    task={task}
+                    onEdit={setEditingTask}
+                  />
+                ))}
               </div>
-            }
-          />
+            ) : tasks.length > 0 ? (
+              <EmptyState
+                icon="🔍"
+                title="No matching tasks"
+                description="Try adjusting your search or filter criteria"
+                action={
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setDifficultyFilter("all");
+                      setSkillFilter("all");
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon="◎"
+                title={t("noTasks")}
+                description={t("noTasksDesc")}
+                action={
+                  <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
+                    <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                      {t("createTask")}
+                    </button>
+                    <a href="/tasks/from-trace" className="btn btn-secondary">
+                      {t("buildFromTrace")}
+                    </a>
+                  </div>
+                }
+              />
+            )}
+          </div>
         )}
       </section>
     </>

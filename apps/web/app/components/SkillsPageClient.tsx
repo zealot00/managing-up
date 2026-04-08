@@ -2,21 +2,27 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { Skill, createSkill } from "../lib/api";
+import { createSkill, getSkills } from "../lib/api";
 import { useApiMutation } from "../lib/use-mutations";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { FormModal } from "./ui/FormModal";
+import { TableSkeleton } from "./layout/Skeleton";
 
-type Props = {
-  skills: { items: Skill[] };
-};
-
-export default function SkillsPageClient({ skills }: Props) {
+export default function SkillsPageClient() {
   const t = useTranslations("skills");
   const tc = useTranslations("common");
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const { data: skillsData, isLoading, isFetching } = useQuery({
+    queryKey: ["skills"],
+    queryFn: getSkills,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const skills = skillsData ?? { items: [] };
 
   const createSkillMutation = useApiMutation(createSkill, {
     queryKeysToInvalidate: [["skills"]],
@@ -56,40 +62,46 @@ export default function SkillsPageClient({ skills }: Props) {
           <p className="section-kicker">{t("eyebrow")}</p>
           <h2 className="panel-title">{t("title")}</h2>
         </div>
-        <div className="table-wrapper">
-          {skills.items.length === 0 ? (
-            <EmptyState title={t("noSkills")} />
-          ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Owner</th>
-                  <th>Risk Level</th>
-                  <th>Version</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {skills.items.map((skill) => (
-                  <tr key={skill.id} style={{ cursor: "pointer" }}>
-                    <td>
-                      <Link href={`/skills/${skill.id}`} style={{ textDecoration: "none" }}>
-                        {skill.name}
-                      </Link>
-                    </td>
-                    <td>{skill.owner_team}</td>
-                    <td>{skill.risk_level}</td>
-                    <td>{skill.current_version || t("noVersions")}</td>
-                    <td>
-                      <span className={`badge badge-${skill.status}`}>{skill.status}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        {isLoading ? (
+          <TableSkeleton rows={5} columns={4} />
+        ) : (
+          <div style={{ opacity: isFetching && !isLoading ? 0.5 : 1, transition: "opacity 0.2s" }}>
+            <div className="table-wrapper">
+              {skills.items.length === 0 ? (
+                <EmptyState title={t("noSkills")} />
+              ) : (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Owner</th>
+                      <th>Risk Level</th>
+                      <th>Version</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {skills.items.map((skill) => (
+                      <tr key={skill.id} style={{ cursor: "pointer" }}>
+                        <td>
+                          <Link href={`/skills/${skill.id}`} style={{ textDecoration: "none" }}>
+                            {skill.name}
+                          </Link>
+                        </td>
+                        <td>{skill.owner_team}</td>
+                        <td>{skill.risk_level}</td>
+                        <td>{skill.current_version || t("noVersions")}</td>
+                        <td>
+                          <span className={`badge badge-${skill.status}`}>{skill.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <FormModal

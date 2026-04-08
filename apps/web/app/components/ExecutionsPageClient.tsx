@@ -2,20 +2,17 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Execution, Skill, createExecution } from "../lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { Skill, createExecution, getExecutions, getSkills } from "../lib/api";
 import { useApiMutation } from "../lib/use-mutations";
 import { useTranslations } from "next-intl";
 import { useToast } from "../../components/ToastProvider";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { FormModal } from "./ui/FormModal";
+import { ListSkeleton } from "./layout/Skeleton";
 
-type Props = {
-  executions: { items: Execution[] };
-  skills: Skill[];
-};
-
-export default function ExecutionsPageClient({ executions, skills }: Props) {
+export default function ExecutionsPageClient() {
   const t = useTranslations("executions");
   const tc = useTranslations("common");
   const toast = useToast();
@@ -25,6 +22,22 @@ export default function ExecutionsPageClient({ executions, skills }: Props) {
   const [input, setInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: executionsData, isLoading, isFetching } = useQuery({
+    queryKey: ["executions"],
+    queryFn: getExecutions,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const executions = executionsData ?? { items: [] };
+
+  const { data: skillsData } = useQuery({
+    queryKey: ["skills"],
+    queryFn: getSkills,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const skills = skillsData?.items ?? [];
 
   const createExecutionMutation = useApiMutation(createExecution, {
     queryKeysToInvalidate: [["executions"]],
@@ -128,38 +141,44 @@ export default function ExecutionsPageClient({ executions, skills }: Props) {
         )}
       </div>
 
-      <section className="panel">
-        <div className="panel-header">
-          <p className="section-kicker">{t("runs")}</p>
-          <h2 className="panel-title">
-            {filteredExecutions.length === executions.items.length
-              ? t("executionQueue")
-              : `${filteredExecutions.length} of ${executions.items.length} runs`}
-          </h2>
+      {isLoading ? (
+        <ListSkeleton rows={5} />
+      ) : (
+        <div style={{ opacity: isFetching && !isLoading ? 0.5 : 1, transition: "opacity 0.2s" }}>
+          <section className="panel">
+            <div className="panel-header">
+              <p className="section-kicker">{t("runs")}</p>
+              <h2 className="panel-title">
+                {filteredExecutions.length === executions.items.length
+                  ? t("executionQueue")
+                  : `${filteredExecutions.length} of ${executions.items.length} runs`}
+              </h2>
+            </div>
+            <div className="list">
+              {filteredExecutions.length === 0 ? (
+                <EmptyState title={t("noExecutions")} />
+              ) : (
+                filteredExecutions.map((execution) => (
+                  <article className="list-card" key={execution.id}>
+                    <div className="list-card-main">
+                      <h3 className="list-card-title">{execution.skill_name}</h3>
+                      <p className="list-card-meta">
+                        {execution.current_step_id} · {t("triggeredBy")} {execution.triggered_by}
+                      </p>
+                    </div>
+                    <div className="list-card-actions">
+                      <Link href={`/executions/${execution.id}`} className="trace-link">
+                        {t("viewTrace")}
+                      </Link>
+                      <span className={`badge badge-${execution.status}`}>{execution.status}</span>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
         </div>
-        <div className="list">
-          {filteredExecutions.length === 0 ? (
-            <EmptyState title={t("noExecutions")} />
-          ) : (
-            filteredExecutions.map((execution) => (
-              <article className="list-card" key={execution.id}>
-                <div className="list-card-main">
-                  <h3 className="list-card-title">{execution.skill_name}</h3>
-                  <p className="list-card-meta">
-                    {execution.current_step_id} · {t("triggeredBy")} {execution.triggered_by}
-                  </p>
-                </div>
-                <div className="list-card-actions">
-                  <Link href={`/executions/${execution.id}`} className="trace-link">
-                    {t("viewTrace")}
-                  </Link>
-                  <span className={`badge badge-${execution.status}`}>{execution.status}</span>
-                </div>
-              </article>
-            ))
-          )}
-        </div>
-      </section>
+      )}
 
       <FormModal
         isOpen={showModal}
