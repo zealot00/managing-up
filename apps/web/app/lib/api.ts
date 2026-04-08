@@ -454,3 +454,21 @@ export type CheckRegressionRequest = {
 export async function checkRegression(req: CheckRegressionRequest): Promise<{ current_score: number; baseline_score: number; delta: number; regression: boolean }> {
   return postEnvelope<CheckRegressionRequest, { current_score: number; baseline_score: number; delta: number; regression: boolean }>("/api/v1/check-regression", req);
 }
+
+// MCP Router API
+export type MCPRouterCatalogEntry = {
+  id: string;
+  server_id: string;
+  name: string;
+  description?: string;
+  transport_type: string;
+  task_types: string[];
+  tags?: string[];
+  trust_score: number;
+  use_count: number;
+  status: string;
+};
+
+export async function getMCPRouterCatalog(): Promise<MCPRouterCatalogEntry[]> {
+  return readEnvelope<MCPRouterCatalogEntry[]>("/api/v1/router/mcp/catalog");
+}
