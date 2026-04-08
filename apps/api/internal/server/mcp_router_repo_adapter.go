@@ -56,7 +56,19 @@ func (r *inMemoryMCPRouterRepo) IncrementUseCount(ctx context.Context, id string
 	r.useCount[id]++
 }
 
-func (r *inMemoryMCPRouterRepo) SyncServer(ctx context.Context, serverID string, approvedBy string) error {
+func (r *inMemoryMCPRouterRepo) SyncServer(ctx context.Context, server service.MCPServer, approvedBy string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.servers[server.ID] = server
+	r.catalog = append(r.catalog, service.RouterCatalogEntry{
+		ID:            server.ID,
+		ServerID:      server.ID,
+		Name:          server.Name,
+		TrustScore:    server.TrustScore,
+		TransportType: server.TransportType,
+		URL:           server.URL,
+	})
 	return nil
 }
 

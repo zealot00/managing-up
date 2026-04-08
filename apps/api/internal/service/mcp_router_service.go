@@ -27,7 +27,7 @@ type RouterCatalogEntry struct {
 type MCPRouterRepository interface {
 	FindMatchingServers(ctx context.Context, taskTypes []string, tags []string) ([]MCPServer, error)
 	IncrementUseCount(ctx context.Context, id string)
-	SyncServer(ctx context.Context, serverID string, approvedBy string) error
+	SyncServer(ctx context.Context, server MCPServer, approvedBy string) error
 	ListCatalog(ctx context.Context) ([]RouterCatalogEntry, error)
 }
 
@@ -77,8 +77,8 @@ type MatchResult struct {
 	MatchScore float64
 }
 
-func (s *MCPRouterService) SyncFromMCPServer(ctx context.Context, serverID string, approvedBy string) error {
-	return s.repo.SyncServer(ctx, serverID, approvedBy)
+func (s *MCPRouterService) SyncFromMCPServer(ctx context.Context, server MCPServer, approvedBy string) error {
+	return s.repo.SyncServer(ctx, server, approvedBy)
 }
 
 func (s *MCPRouterService) GetCatalog(ctx context.Context) ([]RouterCatalogEntry, error) {

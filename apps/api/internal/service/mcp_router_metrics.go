@@ -10,8 +10,6 @@ type MetricsCollector struct {
 	RequestsTotal   *prometheus.CounterVec
 	RequestDuration *prometheus.HistogramVec
 	MatchFailures   *prometheus.CounterVec
-	registry        *prometheus.Registry
-	mu              sync.Mutex
 }
 
 var (
@@ -21,9 +19,7 @@ var (
 
 func NewMetricsCollector() *MetricsCollector {
 	metricsOnce.Do(func() {
-		metricsInstance = &MetricsCollector{
-			registry: prometheus.NewRegistry(),
-		}
+		metricsInstance = &MetricsCollector{}
 
 		metricsInstance.RequestsTotal = prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -50,7 +46,7 @@ func NewMetricsCollector() *MetricsCollector {
 			[]string{"reason"},
 		)
 
-		metricsInstance.registry.MustRegister(
+		prometheus.MustRegister(
 			metricsInstance.RequestsTotal,
 			metricsInstance.RequestDuration,
 			metricsInstance.MatchFailures,

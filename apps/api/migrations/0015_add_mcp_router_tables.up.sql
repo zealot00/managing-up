@@ -1,7 +1,7 @@
 -- MCP Router Catalog
 CREATE TABLE mcp_router_catalog (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    server_id       UUID NOT NULL UNIQUE,
+    server_id       TEXT NOT NULL UNIQUE,
     name            VARCHAR(255) NOT NULL,
     description     TEXT,
     transport_type  VARCHAR(50) NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE mcp_router_logs (
     task_complexity     VARCHAR(50),
     raw_description     TEXT,
     matched             BOOLEAN NOT NULL,
-    matched_server_id   UUID,
+    matched_server_id   TEXT,
     match_score         DECIMAL(3,2),
     match_latency_ms    INTEGER,
     status              VARCHAR(50),
@@ -59,11 +59,11 @@ CREATE INDEX idx_mcp_router_logs_server ON mcp_router_logs(matched_server_id);
 -- MCP Router Sync Log
 CREATE TABLE mcp_router_sync_log (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    server_id       UUID NOT NULL,
+    server_id       TEXT NOT NULL,
     sync_type       VARCHAR(50) NOT NULL,
     old_status      VARCHAR(50),
     new_status      VARCHAR(50),
-    approved_by     UUID,
+    approved_by     TEXT,
     approved_at     TIMESTAMP,
     note            TEXT,
     created_at      TIMESTAMP DEFAULT NOW(),

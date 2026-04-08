@@ -9,10 +9,10 @@ ALTER TABLE skills ADD COLUMN IF NOT EXISTS tags TEXT[];
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS trust_score DECIMAL(3,2) DEFAULT 0.5;
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false;
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
-ALTER TABLE skills ADD COLUMN IF NOT EXISTS published_by UUID;
+ALTER TABLE skills ADD COLUMN IF NOT EXISTS published_by TEXT;
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS draft_source VARCHAR(50) DEFAULT 'manual';
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS draft_source_meta JSONB DEFAULT '{}';
-ALTER TABLE skills ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE skills ADD COLUMN IF NOT EXISTS created_by TEXT;
 
 ALTER TABLE skills ADD CONSTRAINT fk_skills_published_by FOREIGN KEY (published_by) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE skills ADD CONSTRAINT fk_skills_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_skills_sop ON skills(sop_id);
 -- Extend skill_versions table
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS changelog TEXT;
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS sop_version VARCHAR(50);
-ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS approved_by UUID;
+ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS approved_by TEXT;
 ALTER TABLE skill_versions ADD CONSTRAINT fk_skill_versions_approved_by FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_skill_versions_skill ON skill_versions(skill_id);
@@ -51,7 +51,7 @@ CREATE INDEX idx_skill_deps_dep ON skill_dependencies(dependency_skill_id);
 CREATE TABLE skill_ratings (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id    UUID NOT NULL,
-    user_id     UUID NOT NULL,
+    user_id     TEXT NOT NULL,
     rating      INTEGER NOT NULL,
     comment     TEXT,
     created_at  TIMESTAMP DEFAULT NOW(),
@@ -69,7 +69,7 @@ CREATE INDEX idx_skill_ratings_user ON skill_ratings(user_id);
 CREATE TABLE skill_installs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id        UUID NOT NULL,
-    user_id         UUID,
+    user_id         TEXT,
     version         VARCHAR(50) NOT NULL,
     environment     VARCHAR(50) DEFAULT 'production',
     installed_at    TIMESTAMP DEFAULT NOW(),
@@ -89,9 +89,9 @@ CREATE TABLE skill_publish_approvals (
     skill_id                UUID NOT NULL,
     version                 VARCHAR(50) NOT NULL,
     status                  VARCHAR(50) DEFAULT 'pending',
-    submitted_by            UUID NOT NULL,
+    submitted_by            TEXT NOT NULL,
     submitted_at            TIMESTAMP DEFAULT NOW(),
-    reviewed_by             UUID,
+    reviewed_by             TEXT,
     reviewed_at             TIMESTAMP,
     review_note             TEXT,
     compliance_check_passed  BOOLEAN DEFAULT false,

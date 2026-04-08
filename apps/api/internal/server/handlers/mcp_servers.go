@@ -126,7 +126,14 @@ func (h *MCPServersHandler) Approve(w http.ResponseWriter, r *http.Request) {
 		if user != nil {
 			approvedBy = user.ID
 		}
-		if err := h.mcpRouterSvc.SyncFromMCPServer(ctx, mcpServer.ID, approvedBy); err != nil {
+		syncServer := service.MCPServer{
+			ID:            mcpServer.ID,
+			Name:          mcpServer.Name,
+			TrustScore:    0.5,
+			TransportType: mcpServer.TransportType,
+			URL:           mcpServer.URL,
+		}
+		if err := h.mcpRouterSvc.SyncFromMCPServer(ctx, syncServer, approvedBy); err != nil {
 			log.Printf("failed to sync to router catalog: %v", err)
 		}
 	}

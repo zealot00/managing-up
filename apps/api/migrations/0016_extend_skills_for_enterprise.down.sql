@@ -1,9 +1,9 @@
 ALTER TABLE skill_publish_approvals DROP CONSTRAINT IF EXISTS fk_skill_pub_reviewed;
 ALTER TABLE skill_publish_approvals DROP CONSTRAINT IF EXISTS fk_skill_pub_submitted;
 ALTER TABLE skill_publish_approvals DROP CONSTRAINT IF EXISTS fk_skill_pub_skill;
-ALTER TABLE skill_publish_approvals DROP INDEX IF EXISTS idx_skill_pub_submitted;
-ALTER TABLE skill_publish_approvals DROP INDEX IF EXISTS idx_skill_pub_status;
-ALTER TABLE skill_publish_approvals DROP INDEX IF EXISTS idx_skill_pub_skill;
+DROP INDEX IF EXISTS idx_skill_pub_submitted;
+DROP INDEX IF EXISTS idx_skill_pub_status;
+DROP INDEX IF EXISTS idx_skill_pub_skill;
 DROP TABLE IF EXISTS skill_publish_approvals;
 
 ALTER TABLE skill_installs DROP CONSTRAINT IF EXISTS fk_skill_installs_user;
