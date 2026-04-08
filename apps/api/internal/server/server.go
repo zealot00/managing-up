@@ -512,6 +512,64 @@ func (a repoToExperimentRunRepoAdapter) UpdateExperimentRun(run service.Experime
 	return nil
 }
 
+type repoToMCPServersRepoAdapter struct {
+	repo Repository
+}
+
+func (a repoToMCPServersRepoAdapter) GetMCPServer(id string) (handlers.MCPServerDTO, bool) {
+	server, ok := a.repo.GetMCPServer(id)
+	if !ok {
+		return handlers.MCPServerDTO{}, false
+	}
+	return toMCPServerDTO(server), true
+}
+
+func (a repoToMCPServersRepoAdapter) UpdateMCPServer(server handlers.MCPServerDTO) error {
+	return a.repo.UpdateMCPServer(toMCPServer(server))
+}
+
+func toMCPServerDTO(s MCPServer) handlers.MCPServerDTO {
+	return handlers.MCPServerDTO{
+		ID:              s.ID,
+		Name:            s.Name,
+		Description:     s.Description,
+		TransportType:   s.TransportType,
+		Command:         s.Command,
+		Args:            s.Args,
+		Env:             s.Env,
+		URL:             s.URL,
+		Headers:         s.Headers,
+		Status:          s.Status,
+		RejectionReason: s.RejectionReason,
+		ApprovedBy:      s.ApprovedBy,
+		ApprovedAt:      s.ApprovedAt,
+		IsEnabled:       s.IsEnabled,
+		CreatedAt:       s.CreatedAt,
+		UpdatedAt:       s.UpdatedAt,
+	}
+}
+
+func toMCPServer(dto handlers.MCPServerDTO) MCPServer {
+	return MCPServer{
+		ID:              dto.ID,
+		Name:            dto.Name,
+		Description:     dto.Description,
+		TransportType:   dto.TransportType,
+		Command:         dto.Command,
+		Args:            dto.Args,
+		Env:             dto.Env,
+		URL:             dto.URL,
+		Headers:         dto.Headers,
+		Status:          dto.Status,
+		RejectionReason: dto.RejectionReason,
+		ApprovedBy:      dto.ApprovedBy,
+		ApprovedAt:      dto.ApprovedAt,
+		IsEnabled:       dto.IsEnabled,
+		CreatedAt:       dto.CreatedAt,
+		UpdatedAt:       dto.UpdatedAt,
+	}
+}
+
 // ExperimentRunService provides ExperimentRun persistence using the Repository.
 type ExperimentRunService struct {
 	repo Repository
@@ -532,19 +590,20 @@ func (s *ExperimentRunService) UpdateExperimentRun(run ExperimentRun) error {
 
 // Server wraps the HTTP server and route registration for the API service.
 type Server struct {
-	httpServer       *http.Server
-	repo             Repository
-	skillSvc         *service.SkillService
-	execSvc          *service.ExecutionService
-	taskSvc          *service.TaskService
-	experimentSvc    *service.ExperimentService
-	gatewayServer    *gateway.Server
-	gatewayLimiter   gateway.RateLimiter
-	orchestrator     *orchestrator.Server
-	sehServer        *seh.Server
-	authHandler      *handlers.AuthHandler
-	mcpRouterHandler *handlers.MCPRouterHandler
-	closeFn          func() error
+	httpServer        *http.Server
+	repo              Repository
+	skillSvc          *service.SkillService
+	execSvc           *service.ExecutionService
+	taskSvc           *service.TaskService
+	experimentSvc     *service.ExperimentService
+	gatewayServer     *gateway.Server
+	gatewayLimiter    gateway.RateLimiter
+	orchestrator      *orchestrator.Server
+	sehServer         *seh.Server
+	authHandler       *handlers.AuthHandler
+	mcpRouterHandler  *handlers.MCPRouterHandler
+	mcpServersHandler *handlers.MCPServersHandler
+	closeFn           func() error
 }
 
 // New creates a configured API server.
@@ -591,6 +650,8 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	metricsCollector := service.NewMetricsCollector()
 	mcpRouterRepo := newInMemoryMCPRouterRepo()
 	mcpRouterHandler := handlers.NewMCPRouterHandler(service.NewMCPRouterService(mcpRouterRepo, metricsCollector), metricsCollector)
+	mcpRouterSvc := service.NewMCPRouterService(mcpRouterRepo, metricsCollector)
+	mcpServersHandler := handlers.NewMCPServersHandler(repoToMCPServersRepoAdapter{repo: repo}, mcpRouterSvc)
 	srv := &Server{
 		repo:          repo,
 		closeFn:       closeFn,
@@ -604,11 +665,12 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 			gateway.WithUsageRecorder(gatewayRecorder),
 			gateway.WithProviderKeyResolver(gatewayProviderKeyResolver),
 		),
-		gatewayLimiter:   gatewayLimiter,
-		orchestrator:     orchestratorServer,
-		sehServer:        sehServer,
-		authHandler:      authHandler,
-		mcpRouterHandler: mcpRouterHandler,
+		gatewayLimiter:    gatewayLimiter,
+		orchestrator:      orchestratorServer,
+		sehServer:         sehServer,
+		authHandler:       authHandler,
+		mcpRouterHandler:  mcpRouterHandler,
+		mcpServersHandler: mcpServersHandler,
 	}
 
 	mux.HandleFunc("/healthz", handleHealth)
@@ -653,7 +715,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 
 	mux.HandleFunc("/api/v1/mcp-servers", srv.handleMCPServers)
 	mux.HandleFunc("/api/v1/mcp-servers/{id}", srv.handleMCPServerByID)
-	mux.HandleFunc("/api/v1/mcp-servers/{id}/approve", srv.handleApproveMCPServer)
+	mux.HandleFunc("/api/v1/mcp-servers/{id}/approve", srv.mcpServersHandler.Approve)
 
 	mux.HandleFunc("/api/v1/capabilities", srv.handleCapabilities)
 	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)
