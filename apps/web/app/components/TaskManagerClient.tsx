@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Task, Skill, getTasks, getSkills } from "../lib/api";
+import { Task, Skill, getTasks, getSkills, deleteTask } from "../lib/api";
+import { useApiMutation } from "../lib/use-mutations";
 import CreateTaskForm from "./CreateTaskForm";
 import TaskCardWithActions from "./TaskCardWithActions";
 import EditTaskForm from "./EditTaskForm";
@@ -10,6 +11,9 @@ import { useTranslations } from "next-intl";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { CardGridSkeleton } from "./layout/Skeleton";
+import { BulkActionBar } from "./ui/BulkActionBar";
+import { SelectableCard } from "./ui/SelectableCard";
+import { Trash2 } from "lucide-react";
 
 export default function TaskManagerClient() {
   const t = useTranslations("tasks");
@@ -18,6 +22,35 @@ export default function TaskManagerClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [skillFilter, setSkillFilter] = useState<string>("all");
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+
+  function toggleTaskSelection(taskId: string) {
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedTaskIds(new Set());
+  }
+
+  const deleteTaskMutation = useApiMutation(deleteTask, {
+    successMessage: "Task deleted",
+    queryKeysToInvalidate: [["tasks"]],
+    onSuccess: () => clearSelection(),
+  });
+
+  async function handleBulkDelete() {
+    for (const id of selectedTaskIds) {
+      await deleteTaskMutation.mutateAsync(id);
+    }
+  }
 
   const { data: tasksData, isLoading, isFetching } = useQuery({
     queryKey: ["tasks"],
@@ -159,11 +192,16 @@ export default function TaskManagerClient() {
             {filteredTasks.length > 0 ? (
               <div className="eval-grid">
                 {filteredTasks.map((task) => (
-                  <TaskCardWithActions
+                  <SelectableCard
                     key={task.id}
-                    task={task}
-                    onEdit={setEditingTask}
-                  />
+                    isSelected={selectedTaskIds.has(task.id)}
+                    onToggle={() => toggleTaskSelection(task.id)}
+                  >
+                    <TaskCardWithActions
+                      task={task}
+                      onEdit={setEditingTask}
+                    />
+                  </SelectableCard>
                 ))}
               </div>
             ) : tasks.length > 0 ? (
@@ -204,6 +242,19 @@ export default function TaskManagerClient() {
           </div>
         )}
       </section>
+
+      <BulkActionBar
+        selectedCount={selectedTaskIds.size}
+        onClear={clearSelection}
+        actions={[
+          {
+            label: `Delete (${selectedTaskIds.size})`,
+            icon: <Trash2 size={16} />,
+            variant: "danger",
+            onClick: handleBulkDelete,
+          },
+        ]}
+      />
     </>
   );
 }

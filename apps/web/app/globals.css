@@ -3334,3 +3334,108 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Bulk Action Bar */
+.bulk-action-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.bulk-action-bar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulk-action-count {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.bulk-action-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.bulk-action-clear:hover {
+  color: var(--ink);
+}
+
+.bulk-action-bar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Selectable Card */
+.selectable-card {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.selectable-card:hover {
+  border-color: var(--primary);
+}
+
+.selectable-card.selected {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface-raised));
+}
+
+.selectable-card-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  background: var(--surface-base);
+}
+
+.selectable-card.selected .selectable-card-checkbox {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.selectable-card-content {
+  flex: 1;
+  min-width: 0;
+}
