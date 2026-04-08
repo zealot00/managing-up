@@ -154,3 +154,113 @@ Act: 调整优先级，下一轮 Sprint
 | LLM Providers | 10 |
 | SDK Languages | 2 (Python, TypeScript) |
 | Phase 1 完成 | 6/6 items ✅ |
+
+## Frontend Refactoring — 2026-04-08
+
+### ✅ Completed
+
+#### P0-1: TanStack Query Introduction
+- `QueryProvider` client component with `QueryClient`
+- `useApiMutation` hook with query invalidation, toast, router refresh
+- **14 forms migrated** from imperative state to declarative mutations
+
+#### P0-2: Inline Modal Extraction
+- `FormModal` component replaces 248 lines of inline styles across 3 files
+- ExecutionsPageClient, SkillsPageClient, ApprovalsPageClient now use `FormModal`
+
+#### P0-3: API Type Safety
+- `zod` installed for runtime type validation
+- `api.schemas.ts`: 16 Zod schemas for all API types
+- `api.validator.ts`: `validateResponse()` utility
+- Note: OpenAPI codegen deferred pending backend spec coverage
+
+#### UX-1: Data Control Layer
+- Search + filter controls on Evaluations page
+- `DataToolbar` component for reusable search/filter bars
+- Client-side LoadMore pagination (20/page) on Executions, Tasks, Evaluations
+
+#### UX-2: Form Validation
+- `react-hook-form` + `@hookform/resolvers` installed
+- Real-time inline field validation on all forms
+- `form-schemas.ts` with Zod schemas including JSON field validation
+- Spinner component for inline loading states
+
+#### UX-3: Data Formatting
+- `date-fns` for relative time ("2 mins ago"), duration ("1m 5s"), percent formatting
+- `TruncatedText` component with expand/collapse for long text
+
+#### UX-4: Bulk Actions
+- `BulkActionBar` (fixed bottom, slide-up animation)
+- `SelectableCard` wrapper with checkbox selection
+- Tasks: bulk delete
+- Approvals: bulk approve/reject
+
+#### UX-5: Loading States
+- `ListSkeleton`/`CardGridSkeleton` wired to all list pages
+- `keepPreviousData: true` prevents flicker on filter changes
+- Smooth opacity transition (0.5) while fetching new data
+
+### 📊 Frontend Components Added (2026-04-08)
+
+| Component | Purpose |
+|----------|---------|
+| `providers/QueryProvider.tsx` | TanStack Query client |
+| `lib/use-mutations.ts` | Mutation hook with invalidation + toast |
+| `lib/form-schemas.ts` | Zod schemas for forms |
+| `lib/api.schemas.ts` | Zod schemas for API types |
+| `lib/api.validator.ts` | Runtime validation utility |
+| `lib/format.ts` | Date, duration, text formatters |
+| `hooks/use-formatters.ts` | Formatter hook |
+| `components/ui/FormModal.tsx` | Reusable centered modal |
+| `components/ui/BulkActionBar.tsx` | Batch action bar |
+| `components/ui/SelectableCard.tsx` | Selectable card wrapper |
+| `components/ui/DataToolbar.tsx` | Search + filter bar |
+| `components/ui/LoadMore.tsx` | Pagination trigger |
+| `components/ui/TruncatedText.tsx` | Expandable text |
+| `components/ui/Spinner.tsx` | Loading spinner |
+
+### Files Changed (2026-04-08)
+
+```
+frontend/
+  app/providers.tsx                    # Added QueryProvider
+  app/components/providers/           # QueryProvider
+  app/lib/                            # use-mutations, form-schemas, api.schemas, api.validator, format
+  app/hooks/                          # use-formatters
+  app/components/ui/                   # FormModal, BulkActionBar, SelectableCard, DataToolbar, LoadMore, TruncatedText, Spinner
+  app/components/TaskManagerClient.tsx  # useMutation + bulk actions + pagination
+  app/components/ExecutionsPageClient.tsx # useMutation + pagination + FormModal
+  app/components/SkillsPageClient.tsx    # useMutation + FormModal
+  app/components/ApprovalsPageClient.tsx  # useMutation + bulk approve/reject + FormModal
+  app/components/EvaluationManager.tsx    # search + filter + pagination + formatting
+  app/components/CreateTaskForm.tsx        # react-hook-form + Zod
+  app/components/EditTaskForm.tsx          # react-hook-form + Zod
+  app/components/TriggerExecutionForm.tsx  # react-hook-form + Zod
+  app/components/CreateSkillForm.tsx      # react-hook-form + Zod
+  app/components/CreateExperimentForm.tsx # react-hook-form + Zod
+  app/components/CreateMetricForm.tsx     # react-hook-form + Zod
+  app/components/CreateDatasetForm.tsx     # react-hook-form + Zod
+  components/Sidebar.tsx                  # Fixed dropdown expand + parent navigation
+  app/globals.css                         # BulkActionBar, SelectableCard, sidebar fixes
+```
+
+### Commits (2026-04-08)
+
+```
+6978a31 fix(web): sidebar-nav uses overflow-y visible to prevent scrollbar on expand
+7329b77 fix(web): sidebar dropdown items now navigate to parent page first, then expand
+fcc8b94 feat(web): add pagination + formatting + bulk approve actions
+b0bb8f3 feat(web): add bulk actions with selection to Tasks page (UX-4)
+554013d feat(web): add search and filter controls to EvaluationManager (UX-1)
+f3956f7 feat(web): add date-fns formatters for relative time, duration, text truncation (UX-3)
+cd243d1 feat(web): wire up skeletons + keepPreviousData for smooth loading states (UX-5)
+7b0283e feat(web): add react-hook-form + Zod inline validation to forms (UX-2)
+7f83a65 feat(web): add zod for runtime API type validation (P0-3)
+189ca1e feat(web): extract FormModal component, replace inline modals (P0-2)
+b72b348 feat(web): migrate remaining forms to useMutation (P0-1)
+8995a75 feat(web): migrate ApprovalsPageClient and ApprovalForm to useMutation (P0-1)
+fa55af2 feat(web): migrate SkillsPageClient and CreateSkillForm to useMutation (P0-1)
+f22a936 feat(web): migrate ExecutionsPageClient and TriggerExecutionForm to useMutation (P0-1)
+2fe11d2 feat(web): migrate TaskManager forms to useMutation (P0-1)
+66fe144 feat(web): add TanStack Query with QueryClientProvider
+```

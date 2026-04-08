@@ -6,9 +6,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2026-04-08]
+
+### Added
+
+#### Frontend P0 Refactoring (TanStack Query)
+
+- **TanStack Query integration**: Added `QueryClientProvider` in `providers.tsx` with `QueryProvider` client component
+- **`useApiMutation` hook**: Declarative mutations with automatic query invalidation, toast notifications, and router refresh
+- **14 forms migrated** from imperative `useState + router.refresh()` to `useMutation`:
+  - TaskManagerClient, CreateTaskForm, EditTaskForm, TaskCardWithActions
+  - ExecutionsPageClient, TriggerExecutionForm
+  - SkillsPageClient, CreateSkillForm
+  - ApprovalsPageClient, ApprovalListCard, ApprovalForm
+  - RunEvaluationForm, CreateSkillVersionForm, CreateExperimentForm, ExperimentCardWithActions
+  - CreateMetricForm, SEHManager, CreateDatasetForm
+
+#### Frontend UX Improvements
+
+- **Zod + React Hook Form**: Real-time inline field validation on all forms (`CreateTaskForm`, `TriggerExecutionForm`, `CreateSkillForm`, `CreateExperimentForm`, `CreateMetricForm`, `CreateDatasetForm`)
+- **`form-schemas.ts`**: Zod schemas for all form types with JSON field validation
+- **Skeleton loading**: All list pages (Executions, Tasks, Skills, Approvals) now show `ListSkeleton`/`CardGridSkeleton` on first load
+- **`keepPreviousData`**: Placeholder data prevents flicker on filter changes (smooth opacity transitions)
+- **DataToolbar**: Search + filter controls on Evaluations page with status/difficulty filters
+- **LoadMore pagination**: Client-side pagination (20 items/page) on Executions, Tasks, Evaluations pages
+- **Data formatters**: `date-fns` utilities for relative time, duration, text truncation (`formatRelativeTime`, `formatDurationMs`, `formatPercent`, `TruncatedText` component)
+- **Bulk actions**:
+  - `BulkActionBar` component with slide-up animation
+  - `SelectableCard` wrapper with checkbox selection
+  - Tasks: bulk delete with confirmation
+  - Approvals: bulk approve/reject
+
+#### Frontend Components
+
+- **`FormModal`**: Reusable centered modal replacing 248 lines of inline modal styles across 3 files
+- **`BulkActionBar`**: Fixed bottom action bar for batch operations
+- **`SelectableCard`**: Checkbox-selectable card wrapper
+- **`DataToolbar`**: Search + filter bar component
+- **`LoadMore`**: Pagination trigger button
+- **`TruncatedText`**: Expandable text with "Show more/less"
+- **`Spinner`**: Inline loading spinner for buttons
+
+#### API Type Safety
+
+- **`zod` runtime validation**: `api.schemas.ts` with 16 Zod schemas for all API types
+- **`api.validator.ts`**: `validateResponse()` utility for catching backend/frontend type drift
+- **Note**: OpenAPI codegen deferred (backend needs full OpenAPI spec coverage)
+
+### Fixed
+
+- **Sidebar dropdown scrollbar**: `sidebar-nav` changed to `overflow-y: visible` to prevent scrollbar when expanding children menus
+- **Sidebar SEH/Gateway navigation**: Clicking parent module (SEH, Gateway) now navigates to parent page AND expands children (removed `e.preventDefault()`)
+- **Skeleton flicker prevention**: `placeholderData` keeps old data visible (opacity 0.5) while fetching new data
+
 ### Added
 - Redis configuration support (`REDIS_ADDR`, `REDIS_PASSWORD`, `REDIS_DB`)
-- Embedding service configuration (`EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_API_KEY`, `EMBEDDING_BASE_URL`)
 - `EMBEDDING_BASE_URL` environment variable for configurable embedding API endpoint
 
 ### Changed

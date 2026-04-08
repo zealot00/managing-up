@@ -584,6 +584,12 @@ managing-up/
 | Admin Panel UI | ✅ | Sidebar layout, dark theme |
 | Usage Statistics | ✅ | Token ranking, cost tracking, charts |
 | Login Tips | ✅ | Database-driven quotes/tips |
+| TanStack Query | ✅ | Declarative data fetching + caching |
+| React Hook Form + Zod | ✅ | Real-time inline form validation |
+| Bulk Actions | ✅ | Checkbox selection + batch operations |
+| Data Pagination | ✅ | LoadMore on Executions/Tasks/Evaluations |
+| Data Formatters | ✅ | Relative time, duration, text truncation |
+| Skeleton Loading | ✅ | ListSkeleton/CardGridSkeleton + keepPreviousData |
 
 ---
 
