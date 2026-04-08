@@ -454,3 +454,101 @@ export type CheckRegressionRequest = {
 export async function checkRegression(req: CheckRegressionRequest): Promise<{ current_score: number; baseline_score: number; delta: number; regression: boolean }> {
   return postEnvelope<CheckRegressionRequest, { current_score: number; baseline_score: number; delta: number; regression: boolean }>("/api/v1/check-regression", req);
 }
+
+// MCP Router API
+export type MCPRouterCatalogEntry = {
+  id: string;
+  server_id: string;
+  name: string;
+  description?: string;
+  transport_type: string;
+  task_types: string[];
+  tags?: string[];
+  trust_score: number;
+  use_count: number;
+  status: string;
+};
+
+export type RouteRequest = {
+  task: {
+    description?: string;
+    structured?: {
+      task_type?: string;
+      language?: string;
+      complexity?: string;
+      tags?: string[];
+    };
+  };
+  agent_id?: string;
+  correlation_id?: string;
+};
+
+export type RouteResponse = {
+  matched: boolean;
+  target?: {
+    server_id: string;
+    server_name: string;
+    transport: string;
+    endpoint?: string;
+  };
+  match_score?: number;
+  routing_time_ms?: number;
+};
+
+export async function getMCPRouterCatalog(): Promise<MCPRouterCatalogEntry[]> {
+  return readEnvelope<MCPRouterCatalogEntry[]>("/api/v1/router/mcp/catalog");
+}
+
+export async function routeMCP(request: RouteRequest): Promise<RouteResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/router/mcp/route`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const body = await response.json();
+  return body.data;
+}
+
+export async function matchMCPRouter(taskType: string, tags?: string[]): Promise<RouteResponse | null> {
+  const params = new URLSearchParams({ task_type: taskType });
+  if (tags?.length) {
+    params.set("tags", tags.join(","));
+  }
+  return readEnvelope<RouteResponse | null>(`/api/v1/router/mcp/match?${params}`);
+}
+
+// Skill Market API
+export type SkillMarketEntry = {
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  trust_score: number;
+  verified: boolean;
+  avg_rating: number;
+  rating_count: number;
+  install_count: number;
+  sop_name?: string;
+  sop_version?: string;
+};
+
+export async function getSkillMarket(params?: { category?: string; search?: string }): Promise<SkillMarketEntry[]> {
+  const url = new URL(`${API_BASE_URL}/api/v1/skills/market`);
+  if (params?.category) url.searchParams.set("category", params.category);
+  if (params?.search) url.searchParams.set("search", params.search);
+  return readEnvelope<SkillMarketEntry[]>(url.pathname + url.search);
+}
+
+export async function searchSkills(query: string): Promise<SkillMarketEntry[]> {
+  return readEnvelope<SkillMarketEntry[]>(`/api/v1/skills/search?q=${encodeURIComponent(query)}`);
+}
+
+export async function rateSkill(skillId: string, rating: number, comment?: string): Promise<void> {
+  await postEnvelope<{ rating: number; comment?: string }, void>(`/api/v1/skills/${skillId}/rate`, { rating, comment });
+}
+
+export async function getMySkills(): Promise<Skill[]> {
+  return readEnvelope<Skill[]>("/api/v1/skills");
+}
