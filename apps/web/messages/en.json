@@ -168,6 +168,7 @@
     "linkedToSkill": "Linked to skill",
     "taskBuilder": {
       "title": "Build Task from Trace",
+      "drawerDescription": "Extract a reusable evaluation task from this execution trace with one click.",
       "eyebrow": "Task Builder",
       "lede": "Generate a reusable evaluation task from an existing execution trace. The system extracts input parameters and expected outputs automatically.",
       "taskConfig": "Task Configuration",

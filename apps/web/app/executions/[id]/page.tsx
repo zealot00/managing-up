@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getExecution, getTraces } from "../../lib/api";
-import { PageHeader } from "../../components/layout/PageHeader";
+import { ExecutionDetailHeader } from "./ExecutionDetailHeader";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -34,15 +34,9 @@ export default async function ExecutionDetailPage({ params }: Props) {
         <a href="/executions">{tc("back")} to {tc("executions")}</a>
       </section>
 
-      <PageHeader
+      <ExecutionDetailHeader
         eyebrow={t("eyebrow")}
-        title={execution.skill_name}
-        description={
-          <>
-            {execution.current_step_id} · {t("triggeredBy")} {execution.triggered_by} ·{" "}
-            <span className={`badge badge-${execution.status}`}>{execution.status}</span>
-          </>
-        }
+        execution={execution}
       />
 
       <section className="panel-grid panel-grid-wide">

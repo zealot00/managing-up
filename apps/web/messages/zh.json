@@ -168,6 +168,7 @@
     "linkedToSkill": "已关联技能",
     "taskBuilder": {
       "title": "从追踪构建任务",
+      "drawerDescription": "一键从本次执行追踪中提取可复用的评估任务。",
       "eyebrow": "任务构建器",
       "lede": "从现有执行追踪生成可复用的评估任务。系统自动提取输入参数和预期输出。",
       "taskConfig": "任务配置",
