@@ -38,6 +38,21 @@ type Skill struct {
 	CurrentVersion string    `json:"current_version"`
 	CreatedBy      string    `json:"created_by,omitempty"`
 	UpdatedAt      time.Time `json:"updated_at,omitempty"`
+
+	// Enterprise extensions
+	SOPID              string   `json:"sop_id,omitempty"`
+	SOPName            string   `json:"sop_name,omitempty"`
+	SOPVersion         string   `json:"sop_version,omitempty"`
+	SOPSection         string   `json:"sop_section,omitempty"`
+	ComplianceRequired bool     `json:"compliance_required"`
+	Category           string   `json:"category,omitempty"`
+	Tags               []string `json:"tags,omitempty"`
+	TrustScore         float64  `json:"trust_score"`
+	Verified           bool     `json:"verified"`
+	PublishedAt        string   `json:"published_at,omitempty"`
+	PublishedBy        string   `json:"published_by,omitempty"`
+	DraftSource        string   `json:"draft_source"`
+	DraftSourceMeta    JSONMap  `json:"draft_source_meta,omitempty"`
 }
 
 // SkillVersion represents an immutable version entry for a skill.
@@ -422,4 +437,36 @@ type ApproveMCPServerRequest struct {
 type MCPServerWithTools struct {
 	MCPServer
 	Tools []map[string]any `json:"tools,omitempty"`
+}
+
+type SkillDependency struct {
+	ID                string `json:"id"`
+	SkillID           string `json:"skill_id"`
+	DependencySkillID string `json:"dependency_skill_id"`
+	VersionConstraint string `json:"version_constraint"`
+	CreatedAt         string `json:"created_at"`
+}
+
+type SkillRating struct {
+	ID        string `json:"id"`
+	SkillID   string `json:"skill_id"`
+	UserID    string `json:"user_id"`
+	Rating    int    `json:"rating"`
+	Comment   string `json:"comment,omitempty"`
+	CreatedAt string `json:"created_at"`
+}
+
+type SkillInstall struct {
+	ID            string  `json:"id"`
+	SkillID       string  `json:"skill_id"`
+	UserID        string  `json:"user_id,omitempty"`
+	Version       string  `json:"version"`
+	Environment   string  `json:"environment"`
+	InstalledAt   string  `json:"installed_at"`
+	SkillSnapshot JSONMap `json:"skill_snapshot,omitempty"`
+}
+
+type RateSkillRequest struct {
+	Rating  int    `json:"rating"`
+	Comment string `json:"comment,omitempty"`
 }
