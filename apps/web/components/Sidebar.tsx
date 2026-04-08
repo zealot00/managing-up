@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useMobileSidebar } from "./MobileSidebarProvider";
 import UserDropdown from "../app/components/UserDropdown";
@@ -233,9 +233,8 @@ export default function Sidebar() {
                     <Link
                       href={item.href}
                       className={`sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
-                      onClick={(e) => {
+                      onClick={() => {
                         if (hasChildren) {
-                          e.preventDefault();
                           toggleExpanded(item.href);
                         }
                         handleLinkClick();
@@ -250,9 +249,10 @@ export default function Sidebar() {
                       )}
                     </Link>
 
-                    {hasChildren && isExpanded && (
+                    {hasChildren && (
                       <div className="sidebar-children" style={{
-                        animation: "slideDown 0.2s ease-out",
+                        animation: isExpanded ? "slideDown 0.2s ease-out" : "none",
+                        display: isExpanded ? "block" : "none",
                       }}>
                         {item.children?.map((child) => {
                           const isChildActive = pathname === child.href;
