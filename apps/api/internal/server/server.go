@@ -122,6 +122,30 @@ func (a repoToSkillRepoAdapter) CreateSkill(req service.CreateSkillRequest) serv
 	}
 }
 
+func (a repoToSkillRepoAdapter) ListDependencies(ctx context.Context, skillID string) ([]service.SkillDependency, error) {
+	return nil, nil
+}
+
+func (a repoToSkillRepoAdapter) UpsertRating(ctx context.Context, skillID, userID string, rating int, comment string) error {
+	return nil
+}
+
+func (a repoToSkillRepoAdapter) ListSkillsByCategory(ctx context.Context, category, search string) ([]service.Skill, error) {
+	return nil, nil
+}
+
+func (a repoToSkillRepoAdapter) GetRatingStats(ctx context.Context, skillID string) (float64, int, error) {
+	return 0, 0, nil
+}
+
+func (a repoToSkillRepoAdapter) GetInstallCount(ctx context.Context, skillID string) (int, error) {
+	return 0, nil
+}
+
+func (a repoToSkillRepoAdapter) ResolveDepTree(ctx context.Context, skillID string) ([]service.DependencyNode, error) {
+	return nil, nil
+}
+
 type repoToExecutionRepoAdapter struct {
 	repo Repository
 }

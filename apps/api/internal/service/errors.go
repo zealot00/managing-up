@@ -21,4 +21,5 @@ var (
 	ErrInvalidMetricType      = errors.New("invalid metric type")
 	ErrEvaluationNotFound     = errors.New("evaluation not found")
 	ErrExperimentNameRequired = errors.New("experiment name is required")
+	ErrInvalidRating          = errors.New("invalid rating: must be between 1 and 5")
 )
