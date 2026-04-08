@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Approval, ProcedureDraft } from "../lib/api";
 import { useTranslations } from "next-intl";
 import ApprovalForm from "./ApprovalForm";
@@ -17,7 +16,6 @@ type TabType = "pending" | "drafts" | "history";
 
 export default function ApprovalsPageClient({ approvals, drafts }: Props) {
   const t = useTranslations("approvals");
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>("pending");
   const [selectedApproval, setSelectedApproval] = useState<Approval | null>(null);
 
@@ -26,7 +24,6 @@ export default function ApprovalsPageClient({ approvals, drafts }: Props) {
 
   function handleApprovalUpdated() {
     setSelectedApproval(null);
-    router.refresh();
   }
 
   return (

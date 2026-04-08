@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { approveExecution, Approval } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useApiMutation } from "../lib/use-mutations";
 
 type Props = {
   approval: Approval;
@@ -11,34 +11,24 @@ type Props = {
 
 export default function ApprovalListCard({ approval }: Props) {
   const t = useTranslations("approvals");
-  const router = useRouter();
   const [approver, setApprover] = useState("");
   const [note, setNote] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const isWaiting = approval.status === "waiting";
 
-  async function handleDecision(decision: "approved" | "rejected") {
+  const approveExecutionMutation = useApiMutation(
+    (body: { approver: string; decision: "approved" | "rejected"; note: string }) =>
+      approveExecution(approval.execution_id, body),
+    {
+      queryKeysToInvalidate: [["approvals"], ["executions"]],
+    }
+  );
+
+  function handleDecision(decision: "approved" | "rejected") {
     if (!approver.trim()) {
-      setError(t("approver"));
       return;
     }
-    setLoading(true);
-    setError("");
-
-    try {
-      await approveExecution(approval.execution_id, {
-        approver,
-        decision,
-        note,
-      });
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit decision");
-    } finally {
-      setLoading(false);
-    }
+    approveExecutionMutation.mutate({ approver, decision, note });
   }
 
   return (
@@ -53,7 +43,7 @@ export default function ApprovalListCard({ approval }: Props) {
 
       {isWaiting && (
         <div className="inline-form">
-          {error && <p className="form-error">{error}</p>}
+          {approveExecutionMutation.error && <p className="form-error">{approveExecutionMutation.error.message}</p>}
           <input
             type="text"
             value={approver}
@@ -73,18 +63,18 @@ export default function ApprovalListCard({ approval }: Props) {
             <button
               type="button"
               onClick={() => handleDecision("approved")}
-              disabled={loading || !approver.trim()}
+              disabled={approveExecutionMutation.isPending || !approver.trim()}
               className="btn-approve"
             >
-              {loading ? "..." : t("approve")}
+              {approveExecutionMutation.isPending ? "..." : t("approve")}
             </button>
             <button
               type="button"
               onClick={() => handleDecision("rejected")}
-              disabled={loading || !approver.trim()}
+              disabled={approveExecutionMutation.isPending || !approver.trim()}
               className="btn-reject"
             >
-              {loading ? "..." : t("reject")}
+              {approveExecutionMutation.isPending ? "..." : t("reject")}
             </button>
           </div>
         </div>

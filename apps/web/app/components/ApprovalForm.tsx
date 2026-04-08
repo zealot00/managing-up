@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { approveExecution, Approval } from "../lib/api";
 import { useTranslations } from "next-intl";
-import { useToast } from "../../components/ToastProvider";
+import { useApiMutation } from "../lib/use-mutations";
 
 type Props = {
   approval: Approval;
@@ -14,35 +13,24 @@ type Props = {
 export default function ApprovalForm({ approval, onComplete }: Props) {
   const t = useTranslations("approvals");
   const tc = useTranslations("common");
-  const router = useRouter();
-  const toast = useToast();
   const [approver, setApprover] = useState("");
   const [note, setNote] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleDecision(decision: "approved" | "rejected") {
+  const approveExecutionMutation = useApiMutation(
+    (body: { approver: string; decision: "approved" | "rejected"; note: string }) =>
+      approveExecution(approval.execution_id, body),
+    {
+      successMessage: tc("success") + ": Decision submitted",
+      queryKeysToInvalidate: [["approvals"], ["executions"]],
+      onSuccess: () => onComplete?.(),
+    }
+  );
+
+  function handleDecision(decision: "approved" | "rejected") {
     if (!approver.trim()) {
-      setError(t("approverPlaceholder"));
       return;
     }
-    setLoading(true);
-    setError("");
-
-    try {
-      await approveExecution(approval.execution_id, {
-        approver,
-        decision,
-        note,
-      });
-      toast.success(tc("success") + ": Decision submitted");
-      router.refresh();
-      if (onComplete) onComplete();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit decision");
-    } finally {
-      setLoading(false);
-    }
+    approveExecutionMutation.mutate({ approver, decision, note });
   }
 
   return (
@@ -52,7 +40,7 @@ export default function ApprovalForm({ approval, onComplete }: Props) {
         <h2>{t("decision", { skill_name: approval.skill_name })}</h2>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {approveExecutionMutation.error && <p className="form-error">{approveExecutionMutation.error.message}</p>}
 
       <div className="form-fields">
         <label className="form-label">
@@ -83,18 +71,18 @@ export default function ApprovalForm({ approval, onComplete }: Props) {
         <button
           type="button"
           onClick={() => handleDecision("approved")}
-          disabled={loading || !approver.trim()}
+          disabled={approveExecutionMutation.isPending || !approver.trim()}
           className="btn-approve"
         >
-          {loading ? t("submitting") : t("approve")}
+          {approveExecutionMutation.isPending ? t("submitting") : t("approve")}
         </button>
         <button
           type="button"
           onClick={() => handleDecision("rejected")}
-          disabled={loading || !approver.trim()}
+          disabled={approveExecutionMutation.isPending || !approver.trim()}
           className="btn-reject"
         >
-          {loading ? t("submitting") : t("reject")}
+          {approveExecutionMutation.isPending ? t("submitting") : t("reject")}
         </button>
       </div>
     </div>
