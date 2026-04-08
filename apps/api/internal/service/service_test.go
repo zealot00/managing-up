@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
@@ -21,6 +22,24 @@ func (m *mockSkillRepo) GetSkill(id string) (Skill, bool) {
 }
 func (m *mockSkillRepo) CreateSkill(req CreateSkillRequest) Skill {
 	return Skill{ID: "new_skill", Name: req.Name}
+}
+func (m *mockSkillRepo) ListSkillsByCategory(ctx context.Context, category, search string) ([]Skill, error) {
+	return m.skills, m.err
+}
+func (m *mockSkillRepo) ListDependencies(ctx context.Context, skillID string) ([]SkillDependency, error) {
+	return nil, nil
+}
+func (m *mockSkillRepo) ResolveDepTree(ctx context.Context, skillID string) ([]DependencyNode, error) {
+	return nil, nil
+}
+func (m *mockSkillRepo) UpsertRating(ctx context.Context, skillID, userID string, rating int, comment string) error {
+	return nil
+}
+func (m *mockSkillRepo) GetRatingStats(ctx context.Context, skillID string) (float64, int, error) {
+	return 0, 0, nil
+}
+func (m *mockSkillRepo) GetInstallCount(ctx context.Context, skillID string) (int, error) {
+	return 0, nil
 }
 
 type mockExecutionRepo struct {

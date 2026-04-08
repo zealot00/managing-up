@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 )
 
@@ -24,6 +25,12 @@ type SkillRepository interface {
 	ListSkills(status string) []Skill
 	GetSkill(id string) (Skill, bool)
 	CreateSkill(req CreateSkillRequest) Skill
+	ListDependencies(ctx context.Context, skillID string) ([]SkillDependency, error)
+	UpsertRating(ctx context.Context, skillID, userID string, rating int, comment string) error
+	ListSkillsByCategory(ctx context.Context, category, search string) ([]Skill, error)
+	GetRatingStats(ctx context.Context, skillID string) (float64, int, error)
+	GetInstallCount(ctx context.Context, skillID string) (int, error)
+	ResolveDepTree(ctx context.Context, skillID string) ([]DependencyNode, error)
 }
 
 var ValidRiskLevels = []string{"low", "medium", "high"}

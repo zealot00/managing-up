@@ -23,6 +23,10 @@ export type Skill = {
   risk_level: string;
   status: string;
   current_version: string;
+  description?: string;
+  draft_source?: string;
+  verified?: boolean;
+  sop_name?: string;
 };
 
 export type SkillVersion = {

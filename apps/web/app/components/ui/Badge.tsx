@@ -19,6 +19,7 @@ type BadgeVariant =
   | "hard"
   | "low"
   | "high"
+  | "warning"
   | "success"
   | "outline";
 
