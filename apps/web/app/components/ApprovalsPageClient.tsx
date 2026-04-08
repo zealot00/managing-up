@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import ApprovalForm from "./ApprovalForm";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
+import { FormModal } from "./ui/FormModal";
 
 type Props = {
   approvals: { items: Approval[] };
@@ -173,60 +174,21 @@ export default function ApprovalsPageClient({ approvals, drafts }: Props) {
         )}
       </div>
 
-      {selectedApproval && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "var(--space-6)",
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSelectedApproval(null);
-          }}
-        >
-          <div
-            style={{
-              background: "var(--surface-raised)",
-              borderRadius: "var(--radius-lg)",
-              padding: "var(--space-6)",
-              width: "100%",
-              maxWidth: 520,
-              maxHeight: "90vh",
-              overflowY: "auto",
-              boxShadow: "var(--shadow-lg)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-5)" }}>
-              <div>
-                <p className="section-kicker">{t("eyebrow")}</p>
-                <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--ink-strong)" }}>
-                  {t("decision", { skill_name: selectedApproval.skill_name })}
-                </h2>
-              </div>
-              <button
-                onClick={() => setSelectedApproval(null)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "var(--text-xl)",
-                  cursor: "pointer",
-                  color: "var(--muted)",
-                  padding: "var(--space-2)",
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <ApprovalForm approval={selectedApproval} onComplete={handleApprovalUpdated} />
-          </div>
-        </div>
-      )}
+      <FormModal
+        isOpen={selectedApproval !== null}
+        onClose={() => setSelectedApproval(null)}
+        title={t("decision", { skill_name: selectedApproval?.skill_name || "" })}
+        eyebrow={t("eyebrow")}
+        error={undefined}
+        isPending={false}
+      >
+        {selectedApproval && (
+          <ApprovalForm
+            approval={selectedApproval}
+            onComplete={() => setSelectedApproval(null)}
+          />
+        )}
+      </FormModal>
     </>
   );
 }

@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { useToast } from "../../components/ToastProvider";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
+import { FormModal } from "./ui/FormModal";
 
 type Props = {
   executions: { items: Execution[] };
@@ -160,112 +161,62 @@ export default function ExecutionsPageClient({ executions, skills }: Props) {
         </div>
       </section>
 
-      {showModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "var(--space-6)",
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowModal(false);
-          }}
-        >
-          <div
-            style={{
-              background: "var(--surface-raised)",
-              borderRadius: "var(--radius-lg)",
-              padding: "var(--space-6)",
-              width: "100%",
-              maxWidth: 480,
-              maxHeight: "90vh",
-              overflowY: "auto",
-              boxShadow: "var(--shadow-lg)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-5)" }}>
-              <div>
-                <p className="section-kicker">{t("eyebrow")}</p>
-                <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--ink-strong)" }}>
-                  {t("trigger")}
-                </h2>
-              </div>
-              <button
-                onClick={() => setShowModal(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "var(--text-xl)",
-                  cursor: "pointer",
-                  color: "var(--muted)",
-                  padding: "var(--space-2)",
-                }}
+      <FormModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={t("trigger")}
+        eyebrow={t("eyebrow")}
+        error={createExecutionMutation.isError ? createExecutionMutation.error?.message : undefined}
+        isPending={createExecutionMutation.isPending}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="form-fields">
+            <label className="form-label">
+              {t("skill")}
+              <select
+                value={skillId}
+                onChange={(e) => setSkillId(e.target.value)}
+                required
+                className="form-select"
               >
-                ×
-              </button>
-            </div>
+                <option value="">{t("selectSkill")}</option>
+                {skills.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.owner_team})
+                  </option>
+                ))}
+              </select>
+            </label>
 
-            {createExecutionMutation.isError && (
-              <p className="form-error" style={{ marginBottom: "var(--space-4)" }}>
-                {createExecutionMutation.error?.message || "Failed to trigger execution"}
-              </p>
-            )}
+            <label className="form-label">
+              {t("triggeredBy")}
+              <input
+                type="text"
+                value={triggeredBy}
+                onChange={(e) => setTriggeredBy(e.target.value)}
+                placeholder={t("triggeredByPlaceholder")}
+                required
+                className="form-input"
+              />
+            </label>
 
-            <form onSubmit={handleSubmit}>
-              <div className="form-fields">
-                <label className="form-label">
-                  {t("skill")}
-                  <select
-                    value={skillId}
-                    onChange={(e) => setSkillId(e.target.value)}
-                    required
-                    className="form-select"
-                  >
-                    <option value="">{t("selectSkill")}</option>
-                    {skills.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.owner_team})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="form-label">
-                  {t("triggeredBy")}
-                  <input
-                    type="text"
-                    value={triggeredBy}
-                    onChange={(e) => setTriggeredBy(e.target.value)}
-                    placeholder={t("triggeredByPlaceholder")}
-                    required
-                    className="form-input"
-                  />
-                </label>
-
-                <label className="form-label">
-                  {t("input")}
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder={t("inputPlaceholder")}
-                    rows={3}
-                    className="form-textarea"
-                  />
-                </label>
-              </div>
-
-              <button type="submit" disabled={createExecutionMutation.isPending} className="form-submit" style={{ marginTop: "var(--space-4)" }}>
-                {createExecutionMutation.isPending ? t("triggering") : t("trigger")}
-              </button>
-            </form>
+            <label className="form-label">
+              {t("input")}
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={t("inputPlaceholder")}
+                rows={3}
+                className="form-textarea"
+              />
+            </label>
           </div>
-        </div>
-      )}
+
+          <button type="submit" disabled={createExecutionMutation.isPending} className="form-submit" style={{ marginTop: "var(--space-4)" }}>
+            {createExecutionMutation.isPending ? t("triggering") : t("trigger")}
+          </button>
+        </form>
+      </FormModal>
     </>
   );
 }

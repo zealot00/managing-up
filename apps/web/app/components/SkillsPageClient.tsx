@@ -7,6 +7,7 @@ import { Skill, createSkill } from "../lib/api";
 import { useApiMutation } from "../lib/use-mutations";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
+import { FormModal } from "./ui/FormModal";
 
 type Props = {
   skills: { items: Skill[] };
@@ -91,99 +92,53 @@ export default function SkillsPageClient({ skills }: Props) {
         </div>
       </div>
 
-      {showCreateModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "var(--space-6)",
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowCreateModal(false);
-          }}
-        >
-          <div
-            style={{
-              background: "var(--surface-raised)",
-              borderRadius: "var(--radius-lg)",
-              padding: "var(--space-6)",
-              width: "100%",
-              maxWidth: 480,
-              maxHeight: "90vh",
-              overflowY: "auto",
-              boxShadow: "var(--shadow-lg)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-5)" }}>
-              <div>
-                <p className="section-kicker">{t("eyebrow")}</p>
-                <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--ink-strong)" }}>
-                  {t("registerSkill")}
-                </h2>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "var(--text-xl)",
-                  cursor: "pointer",
-                  color: "var(--muted)",
-                  padding: "var(--space-2)",
-                }}
-              >
-                ×
-              </button>
-            </div>
+      <FormModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title={t("registerSkill")}
+        eyebrow={t("eyebrow")}
+        error={createSkillMutation.isError ? createSkillMutation.error?.message : undefined}
+        isPending={createSkillMutation.isPending}
+      >
+        <form onSubmit={handleCreateSkill}>
+          <div className="form-fields">
+            <label className="form-label">
+              {t("skillName")}
+              <input
+                type="text"
+                name="name"
+                placeholder={t("skillNamePlaceholder")}
+                required
+                className="form-input"
+              />
+            </label>
 
-            {createSkillMutation.error && <p className="form-error" style={{ marginBottom: "var(--space-4)" }}>{createSkillMutation.error.message}</p>}
+            <label className="form-label">
+              {t("ownerTeam")}
+              <input
+                type="text"
+                name="owner_team"
+                placeholder={t("ownerTeamPlaceholder")}
+                required
+                className="form-input"
+              />
+            </label>
 
-            <form onSubmit={handleCreateSkill}>
-              <div className="form-fields">
-                <label className="form-label">
-                  {t("skillName")}
-                  <input
-                    type="text"
-                    name="name"
-                    placeholder={t("skillNamePlaceholder")}
-                    required
-                    className="form-input"
-                  />
-                </label>
-
-                <label className="form-label">
-                  {t("ownerTeam")}
-                  <input
-                    type="text"
-                    name="owner_team"
-                    placeholder={t("ownerTeamPlaceholder")}
-                    required
-                    className="form-input"
-                  />
-                </label>
-
-                <label className="form-label">
-                  {t("riskLevel")}
-                  <select name="risk_level" className="form-select" defaultValue="medium">
-                    <option value="low">{t("low")}</option>
-                    <option value="medium">{t("medium")}</option>
-                    <option value="high">{t("high")}</option>
-                  </select>
-                </label>
-              </div>
-
-              <button type="submit" disabled={createSkillMutation.isPending} className="form-submit" style={{ marginTop: "var(--space-4)" }}>
-                {createSkillMutation.isPending ? t("registering") : t("registerSkill")}
-              </button>
-            </form>
+            <label className="form-label">
+              {t("riskLevel")}
+              <select name="risk_level" className="form-select" defaultValue="medium">
+                <option value="low">{t("low")}</option>
+                <option value="medium">{t("medium")}</option>
+                <option value="high">{t("high")}</option>
+              </select>
+            </label>
           </div>
-        </div>
-      )}
+
+          <button type="submit" disabled={createSkillMutation.isPending} className="form-submit" style={{ marginTop: "var(--space-4)" }}>
+            {createSkillMutation.isPending ? t("registering") : t("registerSkill")}
+          </button>
+        </form>
+      </FormModal>
     </>
   );
 }
