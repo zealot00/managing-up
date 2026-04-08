@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { TaskExecution, Task, Metric, runTaskEvaluation, createMetric } from "../lib/api";
 import { useTranslations } from "next-intl";
@@ -9,6 +9,7 @@ import CreateMetricForm from "./CreateMetricForm";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { Badge } from "./ui/Badge";
+import { DataToolbar } from "./ui/DataToolbar";
 
 type Props = {
   executions: TaskExecution[];
@@ -20,6 +21,42 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
   const t = useTranslations("evaluations");
   const [showRunEval, setShowRunEval] = useState(false);
   const [showCreateMetric, setShowCreateMetric] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
+
+  const filteredExecutions = useMemo(() => {
+    return executions.filter((exec) => {
+      if (searchQuery) {
+        const task = tasks.find((t) => t.id === exec.task_id);
+        const taskName = task?.name || "";
+        if (!taskName.toLowerCase().includes(searchQuery.toLowerCase()) &&
+            !exec.agent_id.toLowerCase().includes(searchQuery.toLowerCase())) {
+          return false;
+        }
+      }
+      if (statusFilter !== "all" && exec.status !== statusFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [executions, tasks, searchQuery, statusFilter]);
+
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (searchQuery) {
+        if (!task.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+            !task.description?.toLowerCase().includes(searchQuery.toLowerCase())) {
+          return false;
+        }
+      }
+      if (difficultyFilter !== "all" && task.difficulty !== difficultyFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [tasks, searchQuery, difficultyFilter]);
 
   return (
     <>
@@ -62,14 +99,34 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
       </section>
 
       <section aria-label="Task executions" style={{ marginTop: "var(--space-6)" }}>
+        <DataToolbar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          filters={
+            <>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="form-select"
+                style={{ minWidth: 140 }}
+              >
+                <option value="all">All Status</option>
+                <option value="running">Running</option>
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+              </select>
+            </>
+          }
+        />
         <div className="panel">
           <div className="panel-header">
             <p className="section-kicker">{t("eyebrow")}</p>
-            <h2 className="panel-title">{t("taskExecutions", { count: executions.length })}</h2>
+            <h2 className="panel-title">{t("taskExecutions", { count: filteredExecutions.length })}</h2>
           </div>
-          {executions.length > 0 ? (
+          {filteredExecutions.length > 0 ? (
             <div className="eval-grid">
-              {executions.map((exec) => (
+              {filteredExecutions.map((exec) => (
                 <ExecutionCard key={exec.id} exec={exec} tasks={tasks} />
               ))}
             </div>
@@ -84,14 +141,31 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
       </section>
 
       <section aria-label="Task overview" style={{ marginTop: "var(--space-6)" }}>
+        <DataToolbar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          filters={
+            <select
+              value={difficultyFilter}
+              onChange={(e) => setDifficultyFilter(e.target.value)}
+              className="form-select"
+              style={{ minWidth: 140 }}
+            >
+              <option value="all">All Difficulties</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          }
+        />
         <div className="panel">
           <div className="panel-header">
             <p className="section-kicker">Tasks</p>
-            <h2 className="panel-title">{t("taskOverview", { count: tasks.length })}</h2>
+            <h2 className="panel-title">{t("taskOverview", { count: filteredTasks.length })}</h2>
           </div>
-          {tasks.length > 0 ? (
+          {filteredTasks.length > 0 ? (
             <div className="list">
-              {tasks.map((task) => (
+              {filteredTasks.map((task) => (
                 <article className="list-card" key={task.id}>
                   <div className="list-card-main">
                     <h3 className="list-card-title">{task.name}</h3>
