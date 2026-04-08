@@ -23,6 +23,10 @@ export type Skill = {
   risk_level: string;
   status: string;
   current_version: string;
+  description?: string;
+  draft_source?: string;
+  verified?: boolean;
+  sop_name?: string;
 };
 
 export type SkillVersion = {
@@ -471,4 +475,8 @@ export type MCPRouterCatalogEntry = {
 
 export async function getMCPRouterCatalog(): Promise<MCPRouterCatalogEntry[]> {
   return readEnvelope<MCPRouterCatalogEntry[]>("/api/v1/router/mcp/catalog");
+}
+
+export async function getMySkills(): Promise<Skill[]> {
+  return readEnvelope<Skill[]>("/api/v1/skills");
 }

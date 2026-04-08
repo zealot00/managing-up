@@ -18,7 +18,10 @@ type BadgeVariant =
   | "medium"
   | "hard"
   | "low"
-  | "high";
+  | "high"
+  | "warning"
+  | "success"
+  | "outline";
 
 interface BadgeProps {
   variant: BadgeVariant;
