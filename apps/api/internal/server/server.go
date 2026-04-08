@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/zealot/managing-up/apps/api/internal/config"
 	"github.com/zealot/managing-up/apps/api/internal/engine/executors"
@@ -531,18 +532,19 @@ func (s *ExperimentRunService) UpdateExperimentRun(run ExperimentRun) error {
 
 // Server wraps the HTTP server and route registration for the API service.
 type Server struct {
-	httpServer     *http.Server
-	repo           Repository
-	skillSvc       *service.SkillService
-	execSvc        *service.ExecutionService
-	taskSvc        *service.TaskService
-	experimentSvc  *service.ExperimentService
-	gatewayServer  *gateway.Server
-	gatewayLimiter gateway.RateLimiter
-	orchestrator   *orchestrator.Server
-	sehServer      *seh.Server
-	authHandler    *handlers.AuthHandler
-	closeFn        func() error
+	httpServer       *http.Server
+	repo             Repository
+	skillSvc         *service.SkillService
+	execSvc          *service.ExecutionService
+	taskSvc          *service.TaskService
+	experimentSvc    *service.ExperimentService
+	gatewayServer    *gateway.Server
+	gatewayLimiter   gateway.RateLimiter
+	orchestrator     *orchestrator.Server
+	sehServer        *seh.Server
+	authHandler      *handlers.AuthHandler
+	mcpRouterHandler *handlers.MCPRouterHandler
+	closeFn          func() error
 }
 
 // New creates a configured API server.
@@ -586,6 +588,9 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	} else {
 		budgetChecker = &gateway.NoOpBudgetChecker{}
 	}
+	metricsCollector := service.NewMetricsCollector()
+	mcpRouterRepo := newInMemoryMCPRouterRepo()
+	mcpRouterHandler := handlers.NewMCPRouterHandler(service.NewMCPRouterService(mcpRouterRepo, metricsCollector), metricsCollector)
 	srv := &Server{
 		repo:          repo,
 		closeFn:       closeFn,
@@ -599,10 +604,11 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 			gateway.WithUsageRecorder(gatewayRecorder),
 			gateway.WithProviderKeyResolver(gatewayProviderKeyResolver),
 		),
-		gatewayLimiter: gatewayLimiter,
-		orchestrator:   orchestratorServer,
-		sehServer:      sehServer,
-		authHandler:    authHandler,
+		gatewayLimiter:   gatewayLimiter,
+		orchestrator:     orchestratorServer,
+		sehServer:        sehServer,
+		authHandler:      authHandler,
+		mcpRouterHandler: mcpRouterHandler,
 	}
 
 	mux.HandleFunc("/healthz", handleHealth)
@@ -652,6 +658,12 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/capabilities", srv.handleCapabilities)
 	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)
 	mux.HandleFunc("/api/v1/capabilities/{name}/diff", srv.handleCapabilityDiff)
+
+	mux.HandleFunc("/api/v1/router/mcp/route", srv.mcpRouterHandler.Route)
+	mux.HandleFunc("/api/v1/router/mcp/catalog", srv.mcpRouterHandler.Catalog)
+	mux.HandleFunc("/api/v1/router/mcp/match", srv.mcpRouterHandler.Match)
+
+	mux.Handle("/metrics", promhttp.Handler())
 
 	mux.Handle("/v1/chat/completions", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.BudgetMiddleware(budgetChecker, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleOpenAIChat)))))
 	mux.Handle("/v1/messages", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.BudgetMiddleware(budgetChecker, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleAnthropicMessages)))))
