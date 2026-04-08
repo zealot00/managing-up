@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
-import { updateTask, getSkills, Skill, Task } from "../lib/api";
+import { updateTask, Skill, Task, CreateTaskRequest } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useApiMutation } from "../lib/use-mutations";
 import { useToast } from "../../components/ToastProvider";
 
 type Props = {
@@ -13,11 +13,18 @@ type Props = {
   onUpdated: () => void;
 };
 
+type UpdateTaskVariables = {
+  id: string;
+} & Partial<CreateTaskRequest>;
+
+async function updateTaskWrapper(vars: UpdateTaskVariables) {
+  const { id, ...req } = vars;
+  return updateTask(id, req);
+}
+
 export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Props) {
   const t = useTranslations("tasks");
-  const tc = useTranslations("common");
   const te = useTranslations("errors");
-  const router = useRouter();
   const toast = useToast();
   const [name, setName] = useState(task.name);
   const [description, setDescription] = useState(task.description);
@@ -25,42 +32,37 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
   const [difficulty, setDifficulty] = useState<string>(task.difficulty);
   const [tags, setTags] = useState(task.tags.join(", "));
   const [testCases, setTestCases] = useState(JSON.stringify(task.test_cases, null, 2));
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleSubmit(e: FormEvent) {
+  const updateMutation = useApiMutation(updateTaskWrapper, {
+    successMessage: "Task updated",
+    queryKeysToInvalidate: [["tasks"]],
+    onSuccess: () => {
+      onUpdated();
+    },
+  });
+
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setError("");
 
     let parsedTestCases: Array<{ input: Record<string, unknown>; expected: unknown }> = [];
     if (testCases.trim()) {
       try {
         parsedTestCases = JSON.parse(testCases);
       } catch {
-        setError(te("testCasesInvalid"));
-        setLoading(false);
+        toast.error(te("testCasesInvalid"));
         return;
       }
     }
 
-    try {
-      await updateTask(task.id, {
-        name,
-        description,
-        skill_id: skillId,
-        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-        difficulty,
-        test_cases: parsedTestCases,
-      });
-      toast.success(tc("success") + ": Task updated");
-      onUpdated();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update task");
-    } finally {
-      setLoading(false);
-    }
+    updateMutation.mutate({
+      id: task.id,
+      name,
+      description,
+      skill_id: skillId,
+      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+      difficulty,
+      test_cases: parsedTestCases,
+    });
   }
 
   return (
@@ -70,7 +72,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
         <h2>{t("editTask", { name: task.name })}</h2>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {updateMutation.isError && <p className="form-error">{updateMutation.error?.message}</p>}
 
       <div className="form-fields">
         <label className="form-label">
@@ -85,7 +87,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
         </label>
 
         <label className="form-label">
-          {tc("description")}
+          {t("description")}
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -145,11 +147,11 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
       </div>
 
       <div className="form-actions">
-        <button type="submit" disabled={loading} className="form-submit" style={{ flex: 1 }}>
-          {loading ? t("saving") : t("saveChanges")}
+        <button type="submit" disabled={updateMutation.isPending} className="form-submit" style={{ flex: 1 }}>
+          {updateMutation.isPending ? t("saving") : t("saveChanges")}
         </button>
         <button type="button" onClick={onCancel} className="btn btn-secondary" style={{ flex: 1 }}>
-          {tc("cancel")}
+          {t("cancel")}
         </button>
       </div>
     </form>

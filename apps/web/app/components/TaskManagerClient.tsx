@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { Task, Skill } from "../lib/api";
 import CreateTaskForm from "./CreateTaskForm";
 import TaskCardWithActions from "./TaskCardWithActions";
@@ -17,7 +16,6 @@ type Props = {
 
 export default function TaskManagerClient({ tasks, skills }: Props) {
   const t = useTranslations("tasks");
-  const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -127,7 +125,7 @@ export default function TaskManagerClient({ tasks, skills }: Props) {
       {showCreate && (
         <CreateTaskForm
           skills={skills}
-          onCreated={() => { setShowCreate(false); router.refresh(); }}
+          onCreated={() => setShowCreate(false)}
         />
       )}
 
@@ -136,7 +134,7 @@ export default function TaskManagerClient({ tasks, skills }: Props) {
           task={editingTask}
           skills={skills}
           onCancel={() => setEditingTask(null)}
-          onUpdated={() => { setEditingTask(null); router.refresh(); }}
+          onUpdated={() => setEditingTask(null)}
         />
       )}
 
@@ -148,7 +146,6 @@ export default function TaskManagerClient({ tasks, skills }: Props) {
                 key={task.id}
                 task={task}
                 onEdit={setEditingTask}
-                onDeleted={() => router.refresh()}
               />
             ))}
           </div>

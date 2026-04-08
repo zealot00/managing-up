@@ -1,33 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { deleteTask, Task } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useApiMutation } from "../lib/use-mutations";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 
 type Props = {
   task: Task;
   onEdit: (task: Task) => void;
-  onDeleted: () => void;
 };
 
-export default function TaskCardWithActions({ task, onEdit, onDeleted }: Props) {
+export default function TaskCardWithActions({ task, onEdit }: Props) {
   const t = useTranslations("tasks");
   const tc = useTranslations("common");
-  const router = useRouter();
-  const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  async function handleDelete() {
-    setDeleting(true);
-    try {
-      await deleteTask(task.id);
-      onDeleted();
-      router.refresh();
-    } catch {
-      setDeleting(false);
-    }
+  const deleteMutation = useApiMutation(deleteTask, {
+    successMessage: "Task deleted",
+    queryKeysToInvalidate: [["tasks"]],
+  });
+
+  function handleDelete() {
+    deleteMutation.mutate(task.id);
     setShowDeleteDialog(false);
   }
 
@@ -61,9 +56,9 @@ export default function TaskCardWithActions({ task, onEdit, onDeleted }: Props) 
             <button
               className="btn btn-sm btn-ghost"
               onClick={() => setShowDeleteDialog(true)}
-              disabled={deleting}
+              disabled={deleteMutation.isPending}
             >
-              {deleting ? "..." : tc("delete")}
+              {deleteMutation.isPending ? "..." : tc("delete")}
             </button>
           </div>
         </div>

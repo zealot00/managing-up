@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
-import { createTask, getSkills, Skill } from "../lib/api";
+import { createTask, Skill } from "../lib/api";
 import { useTranslations } from "next-intl";
+import { useApiMutation } from "../lib/use-mutations";
 import { useToast } from "../../components/ToastProvider";
 
 type Props = {
@@ -13,9 +13,7 @@ type Props = {
 
 export default function CreateTaskForm({ skills, onCreated }: Props) {
   const t = useTranslations("tasks");
-  const tc = useTranslations("common");
   const te = useTranslations("errors");
-  const router = useRouter();
   const toast = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -23,48 +21,42 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
   const [difficulty, setDifficulty] = useState("medium");
   const [tags, setTags] = useState("");
   const [testCases, setTestCases] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    let parsedTestCases: Array<{ input: Record<string, unknown>; expected: unknown }> = [];
-    if (testCases.trim()) {
-      try {
-        parsedTestCases = JSON.parse(testCases);
-      } catch {
-        setError(te("testCasesInvalid"));
-        setLoading(false);
-        return;
-      }
-    }
-
-    try {
-      await createTask({
-        name,
-        description,
-        skill_id: skillId,
-        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-        difficulty,
-        test_cases: parsedTestCases,
-      });
+  const createMutation = useApiMutation(createTask, {
+    successMessage: "Task created",
+    queryKeysToInvalidate: [["tasks"]],
+    onSuccess: () => {
       setName("");
       setDescription("");
       setSkillId("");
       setDifficulty("medium");
       setTags("");
       setTestCases("");
-      toast.success(tc("success") + ": Task created");
       onCreated?.();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create task");
-    } finally {
-      setLoading(false);
+    },
+  });
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+
+    let parsedTestCases: Array<{ input: Record<string, unknown>; expected: unknown }> = [];
+    if (testCases.trim()) {
+      try {
+        parsedTestCases = JSON.parse(testCases);
+      } catch {
+        toast.error(te("testCasesInvalid"));
+        return;
+      }
     }
+
+    createMutation.mutate({
+      name,
+      description,
+      skill_id: skillId,
+      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+      difficulty,
+      test_cases: parsedTestCases,
+    });
   }
 
   return (
@@ -74,7 +66,7 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
         <h2>{t("createTask")}</h2>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {createMutation.isError && <p className="form-error">{createMutation.error?.message}</p>}
 
       <div className="form-fields">
         <label className="form-label">
@@ -152,8 +144,8 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
         </label>
       </div>
 
-      <button type="submit" disabled={loading} className="form-submit">
-        {loading ? t("creating") : t("create")}
+      <button type="submit" disabled={createMutation.isPending} className="form-submit">
+        {createMutation.isPending ? t("creating") : t("create")}
       </button>
     </form>
   );
