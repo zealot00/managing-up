@@ -95,6 +95,17 @@ managing-up 是一个 AI 系统的**质检部门 + 照妖镜**。
 │  │   API    │  │  Engine  │  │  (LLM SOP)  │            │
 │  └──────────┘  └──────────┘  └──────────────┘            │
 │                                                             │
+│  ┌──────────────────────────────────────────────────┐     │
+│  │           MCP Router (无状态接入层)                  │     │
+│  │  Ingress → Task Parser → Match Engine → Egress  │     │
+│  │  + Prometheus Metrics (/metrics)                  │     │
+│  └──────────────────────────────────────────────────┘     │
+│                                                             │
+│  ┌──────────────────────────────────────────────────┐     │
+│  │           Skill Repository (企业级仓库)            │     │
+│  │  Registry + Market + Dependencies + SOP Reference  │     │
+│  └──────────────────────────────────────────────────┘     │
+│                                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
 │  │    Tasks     │  │  Experiments │  │  Evaluations │    │
 │  │   任务定义    │  │   实验编排    │  │   评分引擎    │    │
@@ -427,6 +438,145 @@ curl -X POST http://localhost:8080/api/v1/mcp-servers/{id}/approve \
 
 ---
 
+## MCP Router (智能路由)
+
+MCP Router 是无状态接入层，基于任务类型+标签智能路由到最优 MCP 服务。
+
+### 特性
+
+- **智能路由**: 基于 task_type + tags 精确匹配
+- **信任评分**: 按 trust_score + use_count 排序选择最优服务
+- **Prometheus Metrics**: 请求速率、延迟分布、错误率监控
+- **审批自动同步**: MCP Server 审批通过后自动加入路由池
+
+### API 端点
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/router/mcp/route` | 路由请求 |
+| GET | `/api/v1/router/mcp/catalog` | 路由目录 |
+| GET | `/api/v1/router/mcp/match` | 匹配查询（调试用） |
+| GET | `/metrics` | Prometheus metrics |
+
+### 路由请求示例
+
+```bash
+# 路由请求
+curl -X POST http://localhost:8080/api/v1/router/mcp/route \
+  -H "Content-Type: application/json" \
+  -H "X-Agent-ID: openclaw-v1" \
+  -d '{
+    "task": {
+      "description": "帮我审查这段 Python 代码的性能问题",
+      "structured": {
+        "task_type": "code_review",
+        "language": "python",
+        "complexity": "high"
+      }
+    }
+  }'
+```
+
+### Prometheus Metrics
+
+```
+# HELP mcp_router_requests_total Total MCP router requests
+# TYPE mcp_router_requests_total counter
+mcp_router_requests_total{agent="openclaw-v1",task_type="code_review",status="success"} 1523
+
+# HELP mcp_router_request_duration_seconds MCP router request latency
+# TYPE mcp_router_request_duration_seconds histogram
+
+# HELP mcp_router_match_failures_total Route match failures
+# TYPE mcp_router_match_failures_total counter
+mcp_router_match_failures_total{reason="no_matching_server"} 23
+```
+
+---
+
+## Skill Repository (技能仓库)
+
+企业级 Skill 仓库，支持依赖管理、版本控制、市场发现和 SOP 参照。
+
+### 特性
+
+- **SOP 参照**: 每个 Skill 可关联标准操作规程版本
+- **依赖管理**: Skill 间依赖声明与解析
+- **评分系统**: 用户评分 + 信任评分
+- **多来源创建**: 手动创建 / 上传 / CLI 工具 / AI Agent 生成
+
+### API 端点
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/skills` | 列出 Skills |
+| GET | `/api/v1/skills/{id}` | Skill 详情 |
+| GET | `/api/v1/skills/{id}/spec` | 下载 Skill Spec YAML |
+| GET | `/api/v1/skills/market` | 浏览市场 |
+| GET | `/api/v1/skills/search` | 搜索 Skills |
+| POST | `/api/v1/skills/{id}/rate` | 评分 |
+| GET | `/api/v1/skills/{id}/dependencies` | 查看依赖 |
+| POST | `/api/v1/skills/{id}/versions` | 创建版本 |
+| POST | `/api/v1/skills/{id}/rollback/{ver}` | 回滚版本 |
+
+### Skill Spec 示例
+
+```yaml
+name: code-review-gpt
+version: 1.0.0
+risk_level: medium
+description: AI 代码审查技能
+inputs:
+  - name: code
+    type: string
+    required: true
+steps:
+  - id: review
+    type: tool
+    tool_ref: openai-gpt4
+    with:
+      model: gpt-4o
+      task: code_review
+
+# SOP 参照
+sop_reference:
+  sop_id: SOP-DEV-001
+  sop_name: 代码审查标准操作规程
+  sop_version: "2.1"
+  sop_section: "4.3 自动化审查"
+  compliance_required: true
+
+# 企业级扩展
+enterprise:
+  category: code_analysis
+  tags: [ai, review, security]
+  dependencies:
+    - skill_id: sandbox-runtime
+      version_constraint: ">=1.0.0"
+  trust_score: 0.95
+  verified: true
+```
+
+---
+
+## 独立 Build
+
+API 可独立构建：
+
+```bash
+# 单独构建 API
+cd apps/api
+go build ./...
+
+# 运行测试
+go test ./...
+
+# 迁移数据库
+go run cmd/migrate/main.go
+```
+
+---
+
 ## sop-to-skill Orchestrator API
 
 CLI 编排 API，用于远程增强提取、Skill 版本管理、测试编排和门禁评估。
@@ -566,7 +716,9 @@ managing-up/
 | Feature | Status | Notes |
 |---------|--------|-------|
 | MCP Server Management | ✅ | CRUD + approve workflow + validation |
+| MCP Router | ✅ | 无状态接入层 + 智能路由 + Prometheus |
 | Skill Registry | ✅ | CRUD + version control |
+| Skill Repository | ✅ | Enterprise extensions + market + dependencies |
 | Execution Engine | ✅ | State machine with checkpoints |
 | Approval Gate | ✅ | Human-in-the-loop for high-risk ops |
 | Skill Generator | ✅ | SOP document → YAML spec |
@@ -590,6 +742,10 @@ managing-up/
 | Data Pagination | ✅ | LoadMore on Executions/Tasks/Evaluations |
 | Data Formatters | ✅ | Relative time, duration, text truncation |
 | Skeleton Loading | ✅ | ListSkeleton/CardGridSkeleton + keepPreviousData |
+| MCP Router Dashboard | ✅ | /mcp-router 路由概览仪表盘 |
+| MCP Router Metrics | ✅ | /mcp-router/metrics Prometheus 监控 |
+| Skill Market | ✅ | /skills/market 市场浏览 |
+| My Skills | ✅ | /skills/my-skills 我的 Skills |
 
 ---
 
