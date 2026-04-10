@@ -127,6 +127,14 @@ managing-up 是一个 AI 系统的**质检部门 + 照妖镜**。
 
 > 有数据才能拒绝不切实际的需求。没有数据，你拒绝不了PPT。
 
+### 架构图
+
+![Architecture](docs/architecture.png)
+
+### 部署图
+
+![Deployment](docs/deployment.png)
+
 ---
 
 ## 快速开始 Quick Start
