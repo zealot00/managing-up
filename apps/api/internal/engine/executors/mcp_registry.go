@@ -177,7 +177,7 @@ func ValidateMCPServer(ctx context.Context, srv MCPServerConfig) MCPServerValida
 	if srv.TransportType == "stdio" {
 		return validateStdioServer(ctx, srv)
 	}
-	if srv.TransportType == "http" || srv.TransportType == "https" {
+	if srv.TransportType == "http" || srv.TransportType == "https" || srv.TransportType == "sse" {
 		return validateHTTPServer(ctx, srv)
 	}
 	return MCPServerValidationResult{
