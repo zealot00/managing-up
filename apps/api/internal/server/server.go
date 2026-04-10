@@ -18,6 +18,7 @@ import (
 	"github.com/zealot/managing-up/apps/api/internal/config"
 	"github.com/zealot/managing-up/apps/api/internal/engine/executors"
 	"github.com/zealot/managing-up/apps/api/internal/gateway"
+	"github.com/zealot/managing-up/apps/api/internal/llm"
 	"github.com/zealot/managing-up/apps/api/internal/orchestrator"
 	"github.com/zealot/managing-up/apps/api/internal/seh"
 	"github.com/zealot/managing-up/apps/api/internal/server/handlers"
@@ -672,11 +673,57 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	} else {
 		budgetChecker = &gateway.NoOpBudgetChecker{}
 	}
+
+	var circuitBreaker gateway.CircuitBreaker
+	if redisEnabled() {
+		redisClient := newRedisClient()
+		circuitBreaker = gateway.NewRedisCircuitBreaker(
+			redisClient,
+			"gateway:cb",
+			5,
+			2,
+			60*time.Second,
+		)
+	} else {
+		circuitBreaker = gateway.NewInMemoryCircuitBreaker(5, 2, 60*time.Second)
+	}
 	metricsCollector := service.NewMetricsCollector()
 	mcpRouterRepo := newInMemoryMCPRouterRepo()
 	mcpRouterHandler := handlers.NewMCPRouterHandler(service.NewMCPRouterService(mcpRouterRepo, metricsCollector), metricsCollector)
 	mcpRouterSvc := service.NewMCPRouterService(mcpRouterRepo, metricsCollector)
 	mcpServersHandler := handlers.NewMCPServersHandler(repoToMCPServersRepoAdapter{repo: repo}, mcpRouterSvc)
+
+	fallbackRouter := gateway.NewFallbackRouter(circuitBreaker)
+	providerKeys := map[llm.Provider]string{
+		llm.ProviderOpenAI:    os.Getenv("GATEWAY_OPENAI_API_KEY"),
+		llm.ProviderAnthropic: os.Getenv("GATEWAY_ANTHROPIC_API_KEY"),
+		llm.ProviderGoogle:    os.Getenv("GATEWAY_GOOGLE_API_KEY"),
+		llm.ProviderAzure:     os.Getenv("GATEWAY_AZURE_API_KEY"),
+		llm.ProviderOllama:    os.Getenv("GATEWAY_OLLAMA_API_KEY"),
+		llm.ProviderMinimax:   os.Getenv("GATEWAY_MINIMAX_API_KEY"),
+		llm.ProviderZhipuAI:   os.Getenv("GATEWAY_ZHIPUAI_API_KEY"),
+		llm.ProviderDeepSeek:  os.Getenv("GATEWAY_DEEPSEEK_API_KEY"),
+		llm.ProviderBaidu:     os.Getenv("GATEWAY_BAIDU_API_KEY"),
+		llm.ProviderAlibaba:   os.Getenv("GATEWAY_ALIBABA_API_KEY"),
+	}
+	priority := 0
+	for provider, apiKey := range providerKeys {
+		if apiKey == "" {
+			continue
+		}
+		client, err := llm.NewClient(provider, "", apiKey)
+		if err != nil {
+			slog.Warn("failed to create LLM client", "provider", provider, "error", err)
+			continue
+		}
+		fallbackRouter.RegisterProvider(gateway.ProviderConfig{
+			Provider: provider,
+			Client:   client,
+			Priority: priority,
+		})
+		priority++
+	}
+
 	srv := &Server{
 		repo:          repo,
 		closeFn:       closeFn,
@@ -689,6 +736,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 			gateway.WithAPIKeyValidator(gatewayValidator),
 			gateway.WithUsageRecorder(gatewayRecorder),
 			gateway.WithProviderKeyResolver(gatewayProviderKeyResolver),
+			gateway.WithRouter(fallbackRouter),
 		),
 		gatewayLimiter:     gatewayLimiter,
 		orchestrator:       orchestratorServer,
