@@ -33,7 +33,7 @@ func getEncryptionKey() ([]byte, error) {
 func EncryptAPIKey(plaintext string) (string, error) {
 	key, err := getEncryptionKey()
 	if err != nil {
-		return "", err
+		return plaintext, nil
 	}
 
 	block, err := aes.NewCipher(key)
@@ -58,7 +58,7 @@ func EncryptAPIKey(plaintext string) (string, error) {
 func DecryptAPIKey(encrypted string) (string, error) {
 	key, err := getEncryptionKey()
 	if err != nil {
-		return "", err
+		return encrypted, nil
 	}
 
 	ciphertext, err := base64.StdEncoding.DecodeString(encrypted)

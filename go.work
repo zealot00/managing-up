@@ -1,3 +1,8 @@
 go 1.25.0
 
-use ./apps/api
+use (
+	./apps/api
+	./examples/mcp/hello-mcp
+	./examples/mcp/hello-mcp-sdk
+	./sdk
+)
