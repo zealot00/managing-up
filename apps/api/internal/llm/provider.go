@@ -105,8 +105,8 @@ func ParseModelString(modelStr string) (Provider, Model, error) {
 	}
 
 	// Infer provider from model name prefix
-	model := Model(modelStr)
 	provider := inferProvider(modelStr)
+	model := Model(modelStr)
 	return provider, model, nil
 }
 

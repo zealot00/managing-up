@@ -22,8 +22,15 @@ type minimaxStreamReader struct {
 }
 
 func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
+	slog.Info("minimax stream: Recv() called, starting scan")
 	for r.scanner.Scan() {
 		line := r.scanner.Text()
+		slog.Info("minimax stream: line received", "line_len", len(line), "line_prefix", func() string {
+			if len(line) > 100 {
+				return line[:100]
+			}
+			return line
+		}())
 		if line == "" {
 			continue
 		}
@@ -32,6 +39,12 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 		}
 
 		data := strings.TrimPrefix(line, "data: ")
+		slog.Info("minimax stream: trimmed data", "data", func() string {
+			if len(data) > 100 {
+				return data[:100]
+			}
+			return data
+		}())
 		if data == "[DONE]" {
 			slog.Info("minimax stream: received [DONE]")
 			return &StreamChunk{
@@ -61,8 +74,8 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 				"error", err,
 				"data_len", len(data),
 				"data_prefix", func() string {
-					if len(data) > 100 {
-						return data[:100]
+					if len(data) > 200 {
+						return data[:200]
 					}
 					return data
 				}())
@@ -110,8 +123,13 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 		return nil, err
 	}
 
-	slog.Warn("minimax stream: ended without [DONE]")
-	return nil, fmt.Errorf("stream ended without [DONE]")
+	slog.Warn("minimax stream: ended without [DONE], treating as stop")
+	return &StreamChunk{
+		Done:         true,
+		FinishReason: "stop",
+		Usage:        &r.usage,
+		Model:        r.model,
+	}, nil
 }
 
 type MinimaxClient struct {
@@ -165,6 +183,11 @@ func (c *MinimaxClient) Generate(ctx context.Context, messages []Message, opts .
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("MiniMax API returned status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
 	var miniResp struct {
 		Choices []struct {
 			Message struct {
@@ -206,6 +229,7 @@ func (c *MinimaxClient) Model() Model {
 }
 
 func (c *MinimaxClient) GenerateStream(ctx context.Context, messages []Message, opts ...Option) (StreamReader, error) {
+	slog.Info("MinimaxClient: GenerateStream called", "model", c.model, "messages_count", len(messages))
 	var options GenerateOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -236,12 +260,15 @@ func (c *MinimaxClient) GenerateStream(ctx context.Context, messages []Message, 
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
+	slog.Info("MinimaxClient: HTTP response", "status", resp.StatusCode, "err", err)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call MiniMax API: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		slog.Error("MinimaxClient: non-200 response", "status", resp.StatusCode, "body", string(bodyBytes))
 		return nil, fmt.Errorf("MiniMax API returned status %d", resp.StatusCode)
 	}
 

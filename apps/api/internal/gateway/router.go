@@ -2,10 +2,12 @@ package gateway
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 )
 
 func (s *Server) handleLLMGateway(w http.ResponseWriter, r *http.Request) {
+	slog.Info("handleLLMGateway: request received", "method", r.Method, "path", r.URL.Path, "remote_addr", r.RemoteAddr)
 	path := r.URL.Path
 
 	switch {

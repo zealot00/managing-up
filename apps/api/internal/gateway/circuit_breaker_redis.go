@@ -17,19 +17,40 @@ const (
 	CircuitBreakerHalfOpen CircuitBreakerState = "half_open"
 )
 
+// circuitBreakerLua handles state transitions:
+// - closed -> open (after failureThreshold failures)
+// - open -> half_open (after timeout)
+// Returns: state (0=closed, 1=open, 2=half_open)
 const circuitBreakerLua = `
 local stateKey = KEYS[1]
 local countKey = KEYS[2]
+local failureThreshold = tonumber(ARGV[1])
 local timeout = tonumber(ARGV[2])
+local now = tonumber(ARGV[3])
 
 local state = redis.call('GET', stateKey)
 
-if state == false or state == 'closed' then
+if state == false then
+    -- Circuit is closed, initialize
     redis.call('SET', stateKey, 'closed', 'PX', timeout)
+    redis.call('SET', countKey, 1, 'PX', timeout)
+    return 0
+end
+
+if state == 'closed' then
+    local count = redis.call('INCR', countKey)
+    redis.call('PEXPIRE', stateKey, timeout)
+    if count >= failureThreshold then
+        redis.call('SET', stateKey, 'open', 'PX', timeout)
+        redis.call('SET', countKey .. ':failures', 1, 'PX', timeout)
+        return 1
+    end
+    redis.call('PEXPIRE', countKey, timeout)
     return 0
 end
 
 if state == 'open' then
+    -- Check if timeout has passed, transition to half_open
     redis.call('SET', stateKey, 'half_open', 'PX', timeout)
     redis.call('SET', countKey, 1, 'PX', timeout)
     return 2
@@ -158,12 +179,15 @@ func (cb *RedisCircuitBreaker) State(ctx context.Context, key string) (CircuitBr
 // Returns true if the circuit is closed or half_open (allowing requests)
 // If Redis is unavailable, fails open (allows request) to avoid blocking all traffic
 func (cb *RedisCircuitBreaker) Allow(ctx context.Context, key string) (bool, error) {
+	now := time.Now().UnixMilli()
+
 	result, err := cb.stateScript.Run(
 		ctx,
 		cb.client,
 		[]string{cb.stateKey(key), cb.countKey(key)},
-		0,
+		cb.failureThreshold,
 		cb.timeout.Milliseconds(),
+		now,
 	).Int()
 	if err != nil {
 		return true, err

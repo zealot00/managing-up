@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 )
@@ -30,6 +31,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 func AuthMiddlewareWithValidator(validator APIKeyValidator, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("AuthMiddleware: request received", "path", r.URL.Path, "method", r.Method, "content_length", r.ContentLength)
 		path := r.URL.Path
 
 		// Check if endpoint is public (no auth required)

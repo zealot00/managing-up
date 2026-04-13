@@ -87,10 +87,10 @@ func serveStdio(s *server.MCPServer) {
 
 func serveHTTP(s *server.MCPServer) {
 	httpServer := server.NewStreamableHTTPServer(s)
-	addr := ":" + *httpPort
+	addr := "0.0.0.0:" + *httpPort
 
 	log.Printf("Starting HTTP MCP server on %s", addr)
-	log.Printf("MCP endpoint: http://localhost%s/mcp", addr)
+	log.Printf("MCP endpoint: http://%s/mcp", addr)
 
 	if err := httpServer.Start(addr); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)

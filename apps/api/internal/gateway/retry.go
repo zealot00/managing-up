@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/llm"
@@ -76,34 +77,28 @@ func GenerateWithRetry(ctx context.Context, client llm.Client, messages []llm.Me
 }
 
 func isNonRetryableError(err error) bool {
-	errStr := err.Error()
+	errStr := strings.ToLower(err.Error())
 
 	nonRetryableErrors := []string{
-		"invalid API key",
+		"invalid api key",
 		"authentication failed",
 		"invalid model",
 		"invalid request",
+		"unauthorized",
+		"forbidden",
+		"status 400",
+		"status 401",
+		"status 403",
+		"status 404",
+		"status 422",
 	}
 
 	for _, nonRetryable := range nonRetryableErrors {
-		if contains(errStr, nonRetryable) {
+		if strings.Contains(errStr, nonRetryable) {
 			return true
 		}
 	}
 
-	return false
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsMiddle(s, substr)))
-}
-
-func containsMiddle(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
 	return false
 }
 

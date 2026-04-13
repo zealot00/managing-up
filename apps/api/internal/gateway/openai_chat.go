@@ -54,6 +54,11 @@ type usage struct {
 
 // HandleOpenAIChat processes OpenAI /v1/chat/completions requests
 func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
+	slog.Info("HandleOpenAIChat: request received",
+		"method", r.Method,
+		"content_length", r.ContentLength,
+		"header_content_type", r.Header.Get("Content-Type"))
+
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST method is allowed")
 		return
@@ -61,6 +66,7 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 
 	// Read body
 	body, err := io.ReadAll(r.Body)
+	slog.Info("HandleOpenAIChat: body read", "body_len", len(body), "err", err)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "Failed to read request body")
 		return
@@ -69,9 +75,17 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	// Parse request
 	var req openAIChatRequest
 	if err := json.Unmarshal(body, &req); err != nil {
+		slog.Error("HandleOpenAIChat: JSON parse failed", "err", err, "body_prefix", func() string {
+			if len(body) > 200 {
+				return string(body[:200])
+			}
+			return string(body)
+		}())
 		writeError(w, http.StatusBadRequest, "invalid_request", fmt.Sprintf("Failed to parse request: %v", err))
 		return
 	}
+
+	slog.Info("HandleOpenAIChat: parsed request", "model", req.Model, "stream", req.Stream, "messages_count", len(req.Messages))
 
 	// Validate model
 	if req.Model == "" {
@@ -115,6 +129,7 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Stream {
+		slog.Info("HandleOpenAIChat: calling handleOpenAIChatStream")
 		s.handleOpenAIChatStream(w, r, apiKey, provider, model, messages, opts)
 		return
 	}
@@ -123,7 +138,23 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	err = error(nil)
 
 	if s.router != nil {
-		resp, err = GenerateWithRouterRetry(r.Context(), s.router, messages, opts, DefaultRetryConfig())
+		upstreamAPIKey := apiKey
+		if s.providerKeyResolver != nil {
+			principal := GetPrincipalFromContext(r.Context())
+			userID := ""
+			if principal != nil {
+				userID = principal.UserID
+			}
+			if resolved := s.providerKeyResolver.KeyFor(userID, provider); resolved != "" {
+				upstreamAPIKey = resolved
+			}
+		}
+		llmClient, createErr := llm.NewClient(provider, model, upstreamAPIKey)
+		if createErr != nil {
+			writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", createErr))
+			return
+		}
+		resp, err = GenerateWithRetry(r.Context(), llmClient, messages, opts, DefaultRetryConfig())
 	} else {
 		upstreamAPIKey := apiKey
 		if s.providerKeyResolver != nil {
@@ -214,6 +245,7 @@ func generateID() string {
 }
 
 func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, apiKey string, provider llm.Provider, model llm.Model, messages []llm.Message, opts []llm.Option) {
+	slog.Info("handleOpenAIChatStream: started", "provider", provider, "model", model, "messages_count", len(messages))
 	upstreamAPIKey := apiKey
 	if s.providerKeyResolver != nil {
 		principal := GetPrincipalFromContext(r.Context())
@@ -233,6 +265,7 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 	}
 
 	streamReader, err := llmClient.GenerateStream(r.Context(), messages, opts...)
+	slog.Info("handleOpenAIChatStream: GenerateStream called", "err", err)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "stream_failed", fmt.Sprintf("Failed to start stream: %v", err))
 		return
