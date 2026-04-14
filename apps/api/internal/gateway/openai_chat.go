@@ -18,11 +18,15 @@ type openAIChatRequest struct {
 	Temperature *float32        `json:"temperature"`
 	MaxTokens   *int            `json:"max_tokens"`
 	Stream      bool            `json:"stream"`
+	Tools       []llm.Tool      `json:"tools,omitempty"` // 新增：工具列表
 }
 
 type openAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string         `json:"role"`
+	Content    string         `json:"content"`
+	Name       string         `json:"name,omitempty"`         // 【新增】
+	ToolCallID string         `json:"tool_call_id,omitempty"` // 【新增】：关键，接收客户端传来的 ID
+	ToolCalls  []llm.ToolCall `json:"tool_calls,omitempty"`
 }
 
 // OpenAI chat completions response
@@ -42,8 +46,9 @@ type choice struct {
 }
 
 type message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string         `json:"role"`
+	Content   string         `json:"content"`
+	ToolCalls []llm.ToolCall `json:"tool_calls,omitempty"` // 新增：工具调用
 }
 
 type usage struct {
@@ -114,8 +119,11 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	messages := make([]llm.Message, len(req.Messages))
 	for i, msg := range req.Messages {
 		messages[i] = llm.Message{
-			Role:    msg.Role,
-			Content: msg.Content,
+			Role:       msg.Role,
+			Content:    msg.Content,
+			Name:       msg.Name,       // 【新增】
+			ToolCallID: msg.ToolCallID, // 【新增】：透传 ID 给大模型
+			ToolCalls:  msg.ToolCalls,  // 【新增】：透传多轮历史
 		}
 	}
 
@@ -126,6 +134,10 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.MaxTokens != nil {
 		opts = append(opts, llm.WithMaxTokens(*req.MaxTokens))
+	}
+
+	if len(req.Tools) > 0 {
+		opts = append(opts, llm.WithTools(req.Tools))
 	}
 
 	if req.Stream {
@@ -192,8 +204,9 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 			{
 				Index: 0,
 				Message: message{
-					Role:    "assistant",
-					Content: resp.Content,
+					Role:      "assistant",
+					Content:   resp.Content,
+					ToolCalls: resp.ToolCalls,
 				},
 				FinishReason: resp.FinishReason,
 			},
@@ -308,7 +321,15 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 				totalCompletionTokens = chunk.Usage.OutputTokens
 			}
 
-			if len(chunk.Content) > 0 {
+			if len(chunk.Content) > 0 || len(chunk.ToolCalls) > 0 {
+				delta := map[string]any{}
+				if chunk.Content != "" {
+					delta["content"] = chunk.Content
+				}
+				if len(chunk.ToolCalls) > 0 {
+					delta["tool_calls"] = chunk.ToolCalls
+				}
+
 				finalChunk := map[string]any{
 					"id":      id,
 					"object":  "chat.completion.chunk",
@@ -317,10 +338,12 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 					"choices": []map[string]any{
 						{
 							"index": 0,
-							"delta": map[string]any{
-								"content": chunk.Content,
-							},
-							"finish_reason": chunk.FinishReason,
+							//"delta": map[string]any{
+							//	"content": chunk.Content,
+							//},
+							"delta": delta,
+							//"finish_reason": chunk.FinishReason,
+							"finish_reason": nil,
 						},
 					},
 				}
@@ -354,6 +377,19 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 		}
 
 		totalContentLen += len(chunk.Content)
+		// 【修复】：流式返回过程中的 chunk 构建
+		delta := map[string]any{}
+		if chunk.Content != "" {
+			delta["content"] = chunk.Content
+		}
+		if len(chunk.ToolCalls) > 0 {
+			delta["tool_calls"] = chunk.ToolCalls
+		}
+
+		var finishReason any = chunk.FinishReason
+		if chunk.FinishReason == "" {
+			finishReason = nil
+		}
 
 		streamChunk := map[string]any{
 			"id":      id,
@@ -363,10 +399,13 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 			"choices": []map[string]any{
 				{
 					"index": 0,
-					"delta": map[string]any{
-						"content": chunk.Content,
-					},
-					"finish_reason": nil,
+					//"delta": map[string]any{
+					//	"content": chunk.Content,
+					//},
+
+					"delta": delta,
+					//"finish_reason": chunk.FinishReason,
+					"finish_reason": finishReason,
 				},
 			},
 		}

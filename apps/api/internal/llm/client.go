@@ -49,7 +49,8 @@ type StreamChunk struct {
 	// Usage contains token usage information (only in the final chunk)
 	Usage *Usage `json:"usage,omitempty"`
 	// Model contains the model used
-	Model Model `json:"model,omitempty"`
+	Model     Model      `json:"model,omitempty"`
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"` // 新增
 }
 
 // Option 是生成选项
@@ -61,11 +62,18 @@ type GenerateOptions struct {
 	TopP        float32
 	StopWords   []string
 	JSONMode    bool
+	Tools       []Tool
 }
 
 func WithTemperature(t float32) Option {
 	return func(o *GenerateOptions) {
 		o.Temperature = t
+	}
+}
+
+func WithTools(tools []Tool) Option {
+	return func(o *GenerateOptions) {
+		o.Tools = tools
 	}
 }
 

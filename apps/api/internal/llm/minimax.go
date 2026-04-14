@@ -35,6 +35,23 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 			continue
 		}
 		if !strings.HasPrefix(line, "data: ") {
+			// 【修复】：拦截并解析 Minimax 的纯 JSON 错误格式
+			var errResp struct {
+				BaseResp struct {
+					StatusCode int    `json:"status_code"`
+					StatusMsg  string `json:"status_msg"`
+				} `json:"base_resp"`
+			}
+			// 尝试解析，如果有 base_resp 且 status_code 非 0，说明 API 报错了
+			if err := json.Unmarshal([]byte(line), &errResp); err == nil && errResp.BaseResp.StatusCode != 0 {
+				slog.Error("minimax stream: api error received",
+					"status_code", errResp.BaseResp.StatusCode,
+					"status_msg", errResp.BaseResp.StatusMsg)
+				// 向上层抛出明确的错误，而不是静默停止
+				return nil, fmt.Errorf("minimax api error: [%d] %s", errResp.BaseResp.StatusCode, errResp.BaseResp.StatusMsg)
+			}
+
+			// 如果不是错误 JSON，再 continue 跳过
 			continue
 		}
 
@@ -58,7 +75,8 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 		var chunk struct {
 			Choices []struct {
 				Delta struct {
-					Content string `json:"content"`
+					Content   string     `json:"content"`
+					ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 				} `json:"delta"`
 				FinishReason string `json:"finish_reason"`
 			} `json:"choices"`
@@ -84,10 +102,29 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 
 		if len(chunk.Choices) > 0 {
 			content := chunk.Choices[0].Delta.Content
+			toolCalls := chunk.Choices[0].Delta.ToolCalls
 			finishReason := chunk.Choices[0].FinishReason
+
+			// 【新增逻辑】：强制兜底，确保返回给前端的 ToolCall 始终带有 index
+			for i := range toolCalls {
+				if toolCalls[i].Index == nil {
+					idx := i // 防止闭包变量地址问题
+					toolCalls[i].Index = &idx
+				}
+
+				if toolCalls[i].Function != nil && toolCalls[i].Function.Name != "" {
+					if toolCalls[i].ID == "" {
+						toolCalls[i].ID = fmt.Sprintf("call_mm_%d_%d", time.Now().UnixNano(), i)
+					}
+					if toolCalls[i].Type == "" {
+						toolCalls[i].Type = "function"
+					}
+				}
+			}
 
 			slog.Debug("minimax stream: chunk",
 				"content_len", len(content),
+				"tool_calls_len", len(toolCalls),
 				"finish_reason", finishReason)
 
 			if chunk.Usage != nil {
@@ -101,6 +138,7 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 			if finishReason != "" {
 				return &StreamChunk{
 					Content:      content,
+					ToolCalls:    toolCalls,
 					Done:         true,
 					FinishReason: finishReason,
 					Usage:        &r.usage,
@@ -108,10 +146,11 @@ func (r *minimaxStreamReader) Recv() (*StreamChunk, error) {
 				}, nil
 			}
 
-			if content != "" {
+			if content != "" || len(toolCalls) > 0 {
 				return &StreamChunk{
-					Content: content,
-					Done:    false,
+					Content:   content,
+					ToolCalls: toolCalls,
+					Done:      false,
 				}, nil
 			}
 		}
@@ -165,6 +204,10 @@ func (c *MinimaxClient) Generate(ctx context.Context, messages []Message, opts .
 		reqBody["max_tokens"] = options.MaxTokens
 	}
 
+	if len(options.Tools) > 0 {
+		reqBody["tools"] = options.Tools
+	}
+
 	reqJSON, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -191,7 +234,8 @@ func (c *MinimaxClient) Generate(ctx context.Context, messages []Message, opts .
 	var miniResp struct {
 		Choices []struct {
 			Message struct {
-				Content string `json:"content"`
+				Content   string     `json:"content"`
+				ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 			} `json:"message"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
@@ -213,6 +257,7 @@ func (c *MinimaxClient) Generate(ctx context.Context, messages []Message, opts .
 
 	return &Response{
 		Content:      miniResp.Choices[0].Message.Content,
+		ToolCalls:    miniResp.Choices[0].Message.ToolCalls,
 		Model:        Model(miniResp.Model),
 		Provider:     c.Provider(),
 		Usage:        Usage{InputTokens: miniResp.Usage.PromptTokens, OutputTokens: miniResp.Usage.CompletionTokens, TotalTokens: miniResp.Usage.TotalTokens},
@@ -245,6 +290,10 @@ func (c *MinimaxClient) GenerateStream(ctx context.Context, messages []Message, 
 	}
 	if options.MaxTokens > 0 {
 		reqBody["max_tokens"] = options.MaxTokens
+	}
+
+	if len(options.Tools) > 0 {
+		reqBody["tools"] = options.Tools
 	}
 
 	reqJSON, err := json.Marshal(reqBody)

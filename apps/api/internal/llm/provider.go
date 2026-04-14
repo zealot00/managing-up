@@ -71,18 +71,44 @@ const (
 )
 
 // Message 是对话消息
+type Tool struct {
+	Type     string       `json:"type"` // "function"
+	Function ToolFunction `json:"function"`
+}
+
+type ToolFunction struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Parameters  any    `json:"parameters,omitempty"`
+}
+
+type ToolCall struct {
+	Index    *int          `json:"index,omitempty"`    // 【关键修复】：流式拼接必须依赖的索引
+	ID       string        `json:"id,omitempty"`       // 加上 omitempty
+	Type     string        `json:"type,omitempty"`     // 加上 omitempty
+	Function *FunctionCall `json:"function,omitempty"` // 【关键修复】：改为指针以便能完全忽略空对象
+}
+
+type FunctionCall struct {
+	Name      string `json:"name,omitempty"`      // 加上 omitempty
+	Arguments string `json:"arguments,omitempty"` // 加上 omitempty
+}
 type Message struct {
-	Role    string `json:"role"` // "user", "assistant", "system"
-	Content string `json:"content"`
+	Role       string     `json:"role"` // "user", "assistant", "system"
+	Content    string     `json:"content"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Name       string     `json:"name,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 }
 
 // Response 是 LLM 响应
 type Response struct {
-	Content      string   `json:"content"`
-	Model        Model    `json:"model"`
-	Provider     Provider `json:"provider"`
-	Usage        Usage    `json:"usage"`
-	FinishReason string   `json:"finish_reason"`
+	Content      string     `json:"content"`
+	Model        Model      `json:"model"`
+	Provider     Provider   `json:"provider"`
+	Usage        Usage      `json:"usage"`
+	FinishReason string     `json:"finish_reason"`
+	ToolCalls    []ToolCall `json:"tool_calls,omitempty"` // 新增：工具调用
 }
 
 // Usage 是 token 使用量
