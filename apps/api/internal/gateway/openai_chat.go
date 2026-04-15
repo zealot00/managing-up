@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/llm"
@@ -299,11 +300,81 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 	var totalPromptTokens, totalCompletionTokens int
 	var totalContentLen int
 
+	const (
+		flushTimeThreshold = 50 * time.Millisecond
+		flushSizeThreshold = 20
+	)
+
+	var textBuffer strings.Builder
+	lastFlushTime := time.Now()
+	isFirstToken := true
+
+	flushBuffer := func(content string, toolCalls []llm.ToolCall, finishReason string) {
+		delta := map[string]any{}
+		if content != "" {
+			delta["content"] = content
+		}
+		if len(toolCalls) > 0 {
+			delta["tool_calls"] = toolCalls
+		}
+
+		if len(delta) == 0 && finishReason == "" {
+			return
+		}
+
+		var fr any = finishReason
+		if finishReason == "" {
+			fr = nil
+		}
+
+		chunk := map[string]any{
+			"id":      id,
+			"object":  "chat.completion.chunk",
+			"created": time.Now().Unix(),
+			"model":   string(model),
+			"choices": []map[string]any{
+				{
+					"index":         0,
+					"delta":         delta,
+					"finish_reason": fr,
+				},
+			},
+		}
+
+		chunkJSON, _ := json.Marshal(chunk)
+		fmt.Fprintf(w, "data: %s\n\n", chunkJSON)
+		flusher.Flush()
+		lastFlushTime = time.Now()
+	}
+
+	sendDone := func(finishReason string) {
+		doneData := map[string]any{
+			"id":      id,
+			"object":  "chat.completion.chunk",
+			"created": time.Now().Unix(),
+			"model":   string(model),
+			"choices": []map[string]any{
+				{
+					"index":         0,
+					"delta":         map[string]any{},
+					"finish_reason": finishReason,
+				},
+			},
+		}
+		doneJSON, _ := json.Marshal(doneData)
+		fmt.Fprintf(w, "data: %s\n\n", doneJSON)
+		fmt.Fprintf(w, "data: [DONE]\n\n")
+		flusher.Flush()
+	}
+
 	for {
 		chunk, err := streamReader.Recv()
 		if err != nil {
 			slog.Warn("handleOpenAIChatStream: streamReader.Recv error",
 				"error", err)
+			if textBuffer.Len() > 0 {
+				flushBuffer(textBuffer.String(), nil, "")
+			}
 			break
 		}
 
@@ -311,6 +382,7 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 			"content_len", len(chunk.Content),
 			"done", chunk.Done,
 			"finish_reason", chunk.FinishReason,
+			"tool_calls_len", len(chunk.ToolCalls),
 			"total_content_len_so_far", totalContentLen)
 
 		if chunk.Done {
@@ -321,53 +393,10 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 				totalCompletionTokens = chunk.Usage.OutputTokens
 			}
 
-			if len(chunk.Content) > 0 || len(chunk.ToolCalls) > 0 {
-				delta := map[string]any{}
-				if chunk.Content != "" {
-					delta["content"] = chunk.Content
-				}
-				if len(chunk.ToolCalls) > 0 {
-					delta["tool_calls"] = chunk.ToolCalls
-				}
-
-				finalChunk := map[string]any{
-					"id":      id,
-					"object":  "chat.completion.chunk",
-					"created": time.Now().Unix(),
-					"model":   string(model),
-					"choices": []map[string]any{
-						{
-							"index": 0,
-							//"delta": map[string]any{
-							//	"content": chunk.Content,
-							//},
-							"delta": delta,
-							//"finish_reason": chunk.FinishReason,
-							"finish_reason": nil,
-						},
-					},
-				}
-				finalJSON, _ := json.Marshal(finalChunk)
-				fmt.Fprintf(w, "data: %s\n\n", finalJSON)
+			if textBuffer.Len() > 0 || len(chunk.ToolCalls) > 0 {
+				flushBuffer(textBuffer.String(), chunk.ToolCalls, "")
 			}
-
-			doneData := map[string]any{
-				"id":      id,
-				"object":  "chat.completion.chunk",
-				"created": time.Now().Unix(),
-				"model":   string(model),
-				"choices": []map[string]any{
-					{
-						"index":         0,
-						"delta":         map[string]any{},
-						"finish_reason": chunk.FinishReason,
-					},
-				},
-			}
-			doneJSON, _ := json.Marshal(doneData)
-			fmt.Fprintf(w, "data: %s\n\n", doneJSON)
-			fmt.Fprintf(w, "data: [DONE]\n\n")
-			flusher.Flush()
+			sendDone(chunk.FinishReason)
 
 			slog.Info("handleOpenAIChatStream: stream completed",
 				"total_content_len", totalContentLen,
@@ -377,41 +406,25 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 		}
 
 		totalContentLen += len(chunk.Content)
-		// 【修复】：流式返回过程中的 chunk 构建
-		delta := map[string]any{}
+
+		hasToolCalls := len(chunk.ToolCalls) > 0
+		isDone := chunk.Done || chunk.FinishReason != ""
+		timeReached := time.Since(lastFlushTime) > flushTimeThreshold
+		sizeReached := textBuffer.Len() > flushSizeThreshold
+
 		if chunk.Content != "" {
-			delta["content"] = chunk.Content
-		}
-		if len(chunk.ToolCalls) > 0 {
-			delta["tool_calls"] = chunk.ToolCalls
+			textBuffer.WriteString(chunk.Content)
 		}
 
-		var finishReason any = chunk.FinishReason
-		if chunk.FinishReason == "" {
-			finishReason = nil
-		}
+		shouldFlush := isFirstToken || hasToolCalls || isDone || timeReached || sizeReached
 
-		streamChunk := map[string]any{
-			"id":      id,
-			"object":  "chat.completion.chunk",
-			"created": time.Now().Unix(),
-			"model":   string(model),
-			"choices": []map[string]any{
-				{
-					"index": 0,
-					//"delta": map[string]any{
-					//	"content": chunk.Content,
-					//},
-
-					"delta": delta,
-					//"finish_reason": chunk.FinishReason,
-					"finish_reason": finishReason,
-				},
-			},
+		if shouldFlush && textBuffer.Len() > 0 {
+			flushBuffer(textBuffer.String(), chunk.ToolCalls, "")
+			textBuffer.Reset()
+			isFirstToken = false
+		} else if hasToolCalls {
+			flushBuffer("", chunk.ToolCalls, "")
 		}
-		chunkJSON, _ := json.Marshal(streamChunk)
-		fmt.Fprintf(w, "data: %s\n\n", chunkJSON)
-		flusher.Flush()
 	}
 
 	if s.usageRecorder != nil {
