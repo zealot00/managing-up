@@ -471,6 +471,21 @@ type RateSkillRequest struct {
 	Comment string `json:"comment,omitempty"`
 }
 
+type SkillCapabilitySnapshot struct {
+	ID            string             `json:"id"`
+	SkillID      string             `json:"skill_id"`
+	Version      string             `json:"version"`
+	SnapshotType string             `json:"snapshot_type"`
+	DatasetID    string             `json:"dataset_id,omitempty"`
+	RunID        string             `json:"run_id,omitempty"`
+	Metrics      map[string]float64 `json:"metrics"`
+	OverallScore float64            `json:"overall_score"`
+	Passed       bool               `json:"passed"`
+	GatePolicyID string             `json:"gate_policy_id,omitempty"`
+	EvaluatedAt  time.Time          `json:"evaluated_at"`
+	CreatedAt    time.Time          `json:"created_at"`
+}
+
 type GatewaySession struct {
 	ID             string                 `json:"id"`
 	SessionType    string                 `json:"session_type"`

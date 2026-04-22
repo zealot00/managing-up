@@ -2119,3 +2119,182 @@ func (r *Repository) ListGatewaySessions(ctx context.Context, agentID string, li
 	}
 	return items, rows.Err()
 }
+
+func (r *Repository) CreateCapabilitySnapshot(ctx context.Context, snap *server.SkillCapabilitySnapshot) error {
+	if snap.ID == "" {
+		snap.ID = fmt.Sprintf("snap_%d", time.Now().UnixNano())
+	}
+	metricsJSON, _ := json.Marshal(snap.Metrics)
+
+	query := `
+		INSERT INTO skill_capability_snapshots (id, skill_id, version, snapshot_type, dataset_id, run_id, metrics, overall_score, passed, gate_policy_id, evaluated_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		snap.ID,
+		snap.SkillID,
+		snap.Version,
+		snap.SnapshotType,
+		snap.DatasetID,
+		snap.RunID,
+		metricsJSON,
+		snap.OverallScore,
+		snap.Passed,
+		snap.GatePolicyID,
+		snap.EvaluatedAt,
+		snap.CreatedAt,
+	)
+	return err
+}
+
+func (r *Repository) GetLatestSnapshot(ctx context.Context, skillID, version string) (*server.SkillCapabilitySnapshot, error) {
+	query := `
+		SELECT id, skill_id, version, snapshot_type, dataset_id, run_id, metrics, overall_score, passed, gate_policy_id, evaluated_at, created_at
+		FROM skill_capability_snapshots
+		WHERE skill_id = $1 AND version = $2
+		ORDER BY evaluated_at DESC
+		LIMIT 1
+	`
+	var snap server.SkillCapabilitySnapshot
+	var metricsJSON []byte
+	var datasetID, runID, gatePolicyID sql.NullString
+
+	err := r.db.QueryRowContext(ctx, query, skillID, version).Scan(
+		&snap.ID,
+		&snap.SkillID,
+		&snap.Version,
+		&snap.SnapshotType,
+		&datasetID,
+		&runID,
+		&metricsJSON,
+		&snap.OverallScore,
+		&snap.Passed,
+		&gatePolicyID,
+		&snap.EvaluatedAt,
+		&snap.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if datasetID.Valid {
+		snap.DatasetID = datasetID.String
+	}
+	if runID.Valid {
+		snap.RunID = runID.String
+	}
+	if gatePolicyID.Valid {
+		snap.GatePolicyID = gatePolicyID.String
+	}
+	if err := json.Unmarshal(metricsJSON, &snap.Metrics); err != nil {
+		slog.Error("GetLatestSnapshot: failed to unmarshal metrics", "error", err)
+		snap.Metrics = map[string]float64{}
+	}
+
+	return &snap, nil
+}
+
+func (r *Repository) ListSnapshots(ctx context.Context, skillID string, limit int) ([]server.SkillCapabilitySnapshot, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	query := `
+		SELECT id, skill_id, version, snapshot_type, dataset_id, run_id, metrics, overall_score, passed, gate_policy_id, evaluated_at, created_at
+		FROM skill_capability_snapshots
+		WHERE skill_id = $1
+		ORDER BY evaluated_at DESC
+		LIMIT $2
+	`
+	rows, err := r.db.QueryContext(ctx, query, skillID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]server.SkillCapabilitySnapshot, 0)
+	for rows.Next() {
+		var snap server.SkillCapabilitySnapshot
+		var metricsJSON []byte
+		var datasetID, runID, gatePolicyID sql.NullString
+
+		if err := rows.Scan(
+			&snap.ID,
+			&snap.SkillID,
+			&snap.Version,
+			&snap.SnapshotType,
+			&datasetID,
+			&runID,
+			&metricsJSON,
+			&snap.OverallScore,
+			&snap.Passed,
+			&gatePolicyID,
+			&snap.EvaluatedAt,
+			&snap.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("ListSnapshots: scan row: %w", err)
+		}
+
+		if datasetID.Valid {
+			snap.DatasetID = datasetID.String
+		}
+		if runID.Valid {
+			snap.RunID = runID.String
+		}
+		if gatePolicyID.Valid {
+			snap.GatePolicyID = gatePolicyID.String
+		}
+		if err := json.Unmarshal(metricsJSON, &snap.Metrics); err != nil {
+			slog.Error("ListSnapshots: failed to unmarshal metrics", "error", err)
+			snap.Metrics = map[string]float64{}
+		}
+		items = append(items, snap)
+	}
+	return items, rows.Err()
+}
+
+func (r *Repository) GetLatestPassedSnapshot(ctx context.Context, skillID, version string) (*server.SkillCapabilitySnapshot, error) {
+	query := `
+		SELECT id, skill_id, version, snapshot_type, dataset_id, run_id, metrics, overall_score, passed, gate_policy_id, evaluated_at, created_at
+		FROM skill_capability_snapshots
+		WHERE skill_id = $1 AND version = $2 AND passed = true
+		ORDER BY evaluated_at DESC
+		LIMIT 1
+	`
+	var snap server.SkillCapabilitySnapshot
+	var metricsJSON []byte
+	var datasetID, runID, gatePolicyID sql.NullString
+
+	err := r.db.QueryRowContext(ctx, query, skillID, version).Scan(
+		&snap.ID,
+		&snap.SkillID,
+		&snap.Version,
+		&snap.SnapshotType,
+		&datasetID,
+		&runID,
+		&metricsJSON,
+		&snap.OverallScore,
+		&snap.Passed,
+		&gatePolicyID,
+		&snap.EvaluatedAt,
+		&snap.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if datasetID.Valid {
+		snap.DatasetID = datasetID.String
+	}
+	if runID.Valid {
+		snap.RunID = runID.String
+	}
+	if gatePolicyID.Valid {
+		snap.GatePolicyID = gatePolicyID.String
+	}
+	if err := json.Unmarshal(metricsJSON, &snap.Metrics); err != nil {
+		slog.Error("GetLatestPassedSnapshot: failed to unmarshal metrics", "error", err)
+		snap.Metrics = map[string]float64{}
+	}
+
+	return &snap, nil
+}

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -595,6 +596,14 @@ func cleanupGatewaySession(t *testing.T, repo *Repository, id string) {
 	}
 }
 
+func cleanupCapabilitySnapshot(t *testing.T, repo *Repository, id string) {
+	t.Helper()
+	_, err := repo.db.Exec(`DELETE FROM skill_capability_snapshots WHERE id = $1`, id)
+	if err != nil {
+		t.Logf("warning: failed to cleanup capability snapshot %s: %v", id, err)
+	}
+}
+
 func TestCreateGatewaySession(t *testing.T) {
 	t.Parallel()
 	repo, cleanup := setupRepo(t)
@@ -831,5 +840,294 @@ func TestListGatewaySessions(t *testing.T) {
 
 	if sessions[0].CorrelationID != session2.CorrelationID && sessions[1].CorrelationID != session2.CorrelationID {
 		t.Errorf("expected sessions to be ordered by started_at DESC, got %+v", sessions)
+	}
+}
+
+func TestCreateCapabilitySnapshot(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	skill := createTestSkill(t, repo, "test_skill_snap_create", "test_team", "low")
+	defer cleanupSkill(t, repo, skill.ID)
+
+	snap := &server.SkillCapabilitySnapshot{
+		ID:            "snap_test_create",
+		SkillID:      skill.ID,
+		Version:      "v1.0.0",
+		SnapshotType: "regression_gate",
+		DatasetID:    "dataset_123",
+		RunID:        "run_456",
+		Metrics:      map[string]float64{"accuracy": 0.95, "latency": 120.5},
+		OverallScore: 0.95,
+		Passed:       true,
+		GatePolicyID: "policy_abc",
+		EvaluatedAt:  time.Now(),
+		CreatedAt:    time.Now(),
+	}
+
+	if err := repo.CreateCapabilitySnapshot(ctx, snap); err != nil {
+		t.Fatalf("expected CreateCapabilitySnapshot to succeed: %v", err)
+	}
+	defer cleanupCapabilitySnapshot(t, repo, snap.ID)
+
+	retrieved, err := repo.GetLatestSnapshot(ctx, skill.ID, "v1.0.0")
+	if err != nil {
+		t.Fatalf("expected GetLatestSnapshot to succeed: %v", err)
+	}
+	if retrieved.SkillID != snap.SkillID {
+		t.Errorf("expected skill ID %q, got %q", snap.SkillID, retrieved.SkillID)
+	}
+	if retrieved.Version != snap.Version {
+		t.Errorf("expected version %q, got %q", snap.Version, retrieved.Version)
+	}
+	if retrieved.SnapshotType != snap.SnapshotType {
+		t.Errorf("expected snapshot type %q, got %q", snap.SnapshotType, retrieved.SnapshotType)
+	}
+	if retrieved.DatasetID != snap.DatasetID {
+		t.Errorf("expected dataset ID %q, got %q", snap.DatasetID, retrieved.DatasetID)
+	}
+	if retrieved.RunID != snap.RunID {
+		t.Errorf("expected run ID %q, got %q", snap.RunID, retrieved.RunID)
+	}
+	if retrieved.Passed != snap.Passed {
+		t.Errorf("expected passed=%v, got %v", snap.Passed, retrieved.Passed)
+	}
+	if retrieved.OverallScore != snap.OverallScore {
+		t.Errorf("expected overall score %v, got %v", snap.OverallScore, retrieved.OverallScore)
+	}
+	if retrieved.Metrics["accuracy"] != 0.95 {
+		t.Errorf("expected metrics[accuracy]=0.95, got %v", retrieved.Metrics["accuracy"])
+	}
+}
+
+func TestCreateCapabilitySnapshotAutoID(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	skill := createTestSkill(t, repo, "test_skill_snap_autoid", "test_team", "low")
+	defer cleanupSkill(t, repo, skill.ID)
+
+	snap := &server.SkillCapabilitySnapshot{
+		SkillID:      skill.ID,
+		Version:      "v1.0.0",
+		SnapshotType: "regression_gate",
+		Metrics:      map[string]float64{"accuracy": 0.90},
+		OverallScore: 0.90,
+		Passed:       false,
+		EvaluatedAt:  time.Now(),
+		CreatedAt:    time.Now(),
+	}
+
+	if err := repo.CreateCapabilitySnapshot(ctx, snap); err != nil {
+		t.Fatalf("expected CreateCapabilitySnapshot with auto ID to succeed: %v", err)
+	}
+	defer cleanupCapabilitySnapshot(t, repo, snap.ID)
+
+	if snap.ID == "" {
+		t.Errorf("expected auto-generated ID, got empty string")
+	}
+}
+
+func TestGetLatestSnapshotNotFound(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	_, err := repo.GetLatestSnapshot(ctx, "nonexistent_skill", "v1.0.0")
+	if err == nil {
+		t.Fatalf("expected GetLatestSnapshot to return error for nonexistent snapshot")
+	}
+}
+
+func TestListSnapshots(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	skill := createTestSkill(t, repo, "test_skill_snap_list", "test_team", "low")
+	defer cleanupSkill(t, repo, skill.ID)
+
+	snap1 := &server.SkillCapabilitySnapshot{
+		ID:            "snap_test_list_1",
+		SkillID:      skill.ID,
+		Version:      "v1.0.0",
+		SnapshotType: "regression_gate",
+		Metrics:      map[string]float64{"accuracy": 0.85},
+		OverallScore: 0.85,
+		Passed:       false,
+		EvaluatedAt:  time.Now().Add(-1 * time.Hour),
+		CreatedAt:    time.Now().Add(-1 * time.Hour),
+	}
+	snap2 := &server.SkillCapabilitySnapshot{
+		ID:            "snap_test_list_2",
+		SkillID:      skill.ID,
+		Version:      "v1.0.0",
+		SnapshotType: "regression_gate",
+		Metrics:      map[string]float64{"accuracy": 0.92},
+		OverallScore: 0.92,
+		Passed:       true,
+		EvaluatedAt:  time.Now(),
+		CreatedAt:    time.Now(),
+	}
+
+	for _, s := range []*server.SkillCapabilitySnapshot{snap1, snap2} {
+		if err := repo.CreateCapabilitySnapshot(ctx, s); err != nil {
+			t.Fatalf("expected CreateCapabilitySnapshot to succeed: %v", err)
+		}
+		defer cleanupCapabilitySnapshot(t, repo, s.ID)
+	}
+
+	snapshots, err := repo.ListSnapshots(ctx, skill.ID, 10)
+	if err != nil {
+		t.Fatalf("expected ListSnapshots to succeed: %v", err)
+	}
+	if len(snapshots) != 2 {
+		t.Errorf("expected 2 snapshots, got %d", len(snapshots))
+	}
+
+	if snapshots[0].ID != snap2.ID {
+		t.Errorf("expected first snapshot to be %q (most recent), got %q", snap2.ID, snapshots[0].ID)
+	}
+}
+
+func TestListSnapshotsWithLimit(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	skill := createTestSkill(t, repo, "test_skill_snap_limit", "test_team", "low")
+	defer cleanupSkill(t, repo, skill.ID)
+
+	for i := 0; i < 5; i++ {
+		snap := &server.SkillCapabilitySnapshot{
+			ID:            fmt.Sprintf("snap_test_limit_%d", i),
+			SkillID:      skill.ID,
+			Version:      "v1.0.0",
+			SnapshotType: "regression_gate",
+			Metrics:      map[string]float64{"accuracy": float64(i) * 0.1},
+			OverallScore: float64(i) * 0.1,
+			Passed:       i > 2,
+			EvaluatedAt:  time.Now().Add(time.Duration(i) * time.Minute),
+			CreatedAt:    time.Now().Add(time.Duration(i) * time.Minute),
+		}
+		if err := repo.CreateCapabilitySnapshot(ctx, snap); err != nil {
+			t.Fatalf("expected CreateCapabilitySnapshot to succeed: %v", err)
+		}
+		defer cleanupCapabilitySnapshot(t, repo, snap.ID)
+	}
+
+	snapshots, err := repo.ListSnapshots(ctx, skill.ID, 3)
+	if err != nil {
+		t.Fatalf("expected ListSnapshots with limit to succeed: %v", err)
+	}
+	if len(snapshots) != 3 {
+		t.Errorf("expected 3 snapshots with limit, got %d", len(snapshots))
+	}
+}
+
+func TestGetLatestPassedSnapshot(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	skill := createTestSkill(t, repo, "test_skill_snap_passed", "test_team", "low")
+	defer cleanupSkill(t, repo, skill.ID)
+
+	snapFailed := &server.SkillCapabilitySnapshot{
+		ID:            "snap_test_passed_fail",
+		SkillID:      skill.ID,
+		Version:      "v1.0.0",
+		SnapshotType: "regression_gate",
+		Metrics:      map[string]float64{"accuracy": 0.70},
+		OverallScore: 0.70,
+		Passed:       false,
+		EvaluatedAt:  time.Now().Add(-2 * time.Hour),
+		CreatedAt:    time.Now().Add(-2 * time.Hour),
+	}
+	snapPassed := &server.SkillCapabilitySnapshot{
+		ID:            "snap_test_passed_pass",
+		SkillID:      skill.ID,
+		Version:      "v1.0.0",
+		SnapshotType: "regression_gate",
+		Metrics:      map[string]float64{"accuracy": 0.95},
+		OverallScore: 0.95,
+		Passed:       true,
+		EvaluatedAt:  time.Now().Add(-1 * time.Hour),
+		CreatedAt:    time.Now().Add(-1 * time.Hour),
+	}
+
+	if err := repo.CreateCapabilitySnapshot(ctx, snapFailed); err != nil {
+		t.Fatalf("expected CreateCapabilitySnapshot to succeed: %v", err)
+	}
+	defer cleanupCapabilitySnapshot(t, repo, snapFailed.ID)
+
+	if err := repo.CreateCapabilitySnapshot(ctx, snapPassed); err != nil {
+		t.Fatalf("expected CreateCapabilitySnapshot to succeed: %v", err)
+	}
+	defer cleanupCapabilitySnapshot(t, repo, snapPassed.ID)
+
+	retrieved, err := repo.GetLatestPassedSnapshot(ctx, skill.ID, "v1.0.0")
+	if err != nil {
+		t.Fatalf("expected GetLatestPassedSnapshot to succeed: %v", err)
+	}
+	if retrieved.ID != snapPassed.ID {
+		t.Errorf("expected latest passed snapshot ID %q, got %q", snapPassed.ID, retrieved.ID)
+	}
+	if !retrieved.Passed {
+		t.Errorf("expected passed=true, got %v", retrieved.Passed)
+	}
+}
+
+func TestGetLatestPassedSnapshotNotFound(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	skill := createTestSkill(t, repo, "test_skill_snap_no_passed", "test_team", "low")
+	defer cleanupSkill(t, repo, skill.ID)
+
+	snap := &server.SkillCapabilitySnapshot{
+		ID:            "snap_test_no_passed",
+		SkillID:      skill.ID,
+		Version:      "v1.0.0",
+		SnapshotType: "regression_gate",
+		Metrics:      map[string]float64{"accuracy": 0.50},
+		OverallScore: 0.50,
+		Passed:       false,
+		EvaluatedAt:  time.Now(),
+		CreatedAt:    time.Now(),
+	}
+	if err := repo.CreateCapabilitySnapshot(ctx, snap); err != nil {
+		t.Fatalf("expected CreateCapabilitySnapshot to succeed: %v", err)
+	}
+	defer cleanupCapabilitySnapshot(t, repo, snap.ID)
+
+	_, err := repo.GetLatestPassedSnapshot(ctx, skill.ID, "v1.0.0")
+	if err == nil {
+		t.Fatalf("expected GetLatestPassedSnapshot to return error when no passed snapshot exists")
+	}
+}
+
+func TestListSnapshotsEmptySkill(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	snapshots, err := repo.ListSnapshots(ctx, "nonexistent_skill", 10)
+	if err != nil {
+		t.Fatalf("expected ListSnapshots with nonexistent skill to succeed: %v", err)
+	}
+	if len(snapshots) != 0 {
+		t.Errorf("expected 0 snapshots for nonexistent skill, got %d", len(snapshots))
 	}
 }
