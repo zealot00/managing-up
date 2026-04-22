@@ -181,3 +181,71 @@ export async function updateBudget(data: {
     body: JSON.stringify(data),
   });
 }
+
+// Gateway Session Types
+export type GatewaySession = {
+  id: string;
+  session_type: string;
+  agent_id: string;
+  correlation_id: string;
+  task_intent: Record<string, unknown>;
+  risk_level: string;
+  policy_decision: Record<string, unknown> | null;
+  status: string;
+  started_at: string;
+  ended_at: string | null;
+  metadata: Record<string, unknown>;
+};
+
+// Snapshot Types
+export type SkillCapabilitySnapshot = {
+  id: string;
+  skill_id: string;
+  version: string;
+  snapshot_type: string;
+  dataset_id: string | null;
+  run_id: string | null;
+  metrics: Record<string, number>;
+  overall_score: number;
+  passed: boolean;
+  gate_policy_id: string | null;
+  evaluated_at: string;
+  created_at: string;
+};
+
+// Gateway Session APIs
+export async function listGatewaySessions(params?: {
+  agent_id?: string;
+  limit?: number;
+}): Promise<{ items: GatewaySession[] }> {
+  const query = new URLSearchParams();
+  if (params?.agent_id) query.set("agent_id", params.agent_id);
+  if (params?.limit) query.set("limit", String(params.limit));
+  const qs = query.toString();
+  return request<{ items: GatewaySession[] }>(`/api/v1/gateway/sessions${qs ? `?${qs}` : ""}`);
+}
+
+export async function getGatewaySession(id: string): Promise<{ item: GatewaySession }> {
+  return request<{ item: GatewaySession }>(`/api/v1/gateway/sessions/${id}`);
+}
+
+// Snapshot APIs
+export async function getSnapshot(params: {
+  skill_id: string;
+  version: string;
+}): Promise<{ found: boolean; snapshot: SkillCapabilitySnapshot | null }> {
+  const query = new URLSearchParams();
+  query.set("skill_id", params.skill_id);
+  query.set("version", params.version);
+  return request<{ found: boolean; snapshot: SkillCapabilitySnapshot | null }>(`/api/v1/snapshots?${query.toString()}`);
+}
+
+export async function listSnapshots(params: {
+  skill_id: string;
+  limit?: number;
+}): Promise<{ items: SkillCapabilitySnapshot[] }> {
+  const query = new URLSearchParams();
+  query.set("skill_id", params.skill_id);
+  if (params?.limit) query.set("limit", String(params.limit));
+  return request<{ items: SkillCapabilitySnapshot[] }>(`/api/v1/snapshots/list?${query.toString()}`);
+}
