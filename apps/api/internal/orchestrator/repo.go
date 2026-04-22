@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -347,6 +348,26 @@ func (r *Repo) UpdateSkillVersionPromoted(skillID, version string, promoted bool
 	`
 	_, err := r.db.Exec(query, skillID, version, promoted)
 	return err
+}
+
+func (r *Repo) GetLatestPassedSnapshot(ctx context.Context, skillID, version string) (passed bool, overallScore float64, err error) {
+	query := `
+		SELECT overall_score, passed
+		FROM skill_capability_snapshots
+		WHERE skill_id = $1 AND version = $2 AND passed = true
+		ORDER BY evaluated_at DESC
+		LIMIT 1
+	`
+	var score float64
+	var isPassed bool
+	err = r.db.QueryRowContext(ctx, query, skillID, version).Scan(&score, &isPassed)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, 0, nil
+		}
+		return false, 0, err
+	}
+	return isPassed, score, nil
 }
 
 func (r *Repo) CreateTestRun(req CreateTestRunRequest) (*TestRun, error) {

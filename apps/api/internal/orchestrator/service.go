@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"time"
 )
+
+var ErrNoPassedSnapshot = errors.New("no passed snapshot found for this skill version")
 
 type OrchestrationService struct {
 	cliPath    string
@@ -453,16 +456,25 @@ func (s *OrchestrationService) Rollback(skillID string, req RollbackRequest) Act
 	}
 }
 
-func (s *OrchestrationService) Promote(skillID string, req PromoteRequest) ActionAccepted {
+func (s *OrchestrationService) Promote(skillID string, req PromoteRequest) (ActionAccepted, error) {
 	if s.repo != nil {
-		s.repo.UpdateSkillVersionPromoted(skillID, req.Version, true)
+		passed, score, err := s.repo.GetLatestPassedSnapshot(context.Background(), skillID, req.Version)
+		if err != nil {
+			return ActionAccepted{}, fmt.Errorf("failed to get snapshot: %w", err)
+		}
+		if !passed {
+			return ActionAccepted{}, fmt.Errorf("skill version %s did not pass regression gate (score: %.2f)", req.Version, score)
+		}
+		if err := s.repo.UpdateSkillVersionPromoted(skillID, req.Version, true); err != nil {
+			return ActionAccepted{}, fmt.Errorf("failed to promote skill version: %w", err)
+		}
 	}
 
 	return ActionAccepted{
 		ActionID:   fmt.Sprintf("action_%d", time.Now().UnixNano()),
 		Status:     "accepted",
 		AcceptedAt: time.Now().UTC(),
-	}
+	}, nil
 }
 
 func (s *OrchestrationService) CreateTestRun(req CreateTestRunRequest) TestRunAccepted {

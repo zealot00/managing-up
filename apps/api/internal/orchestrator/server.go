@@ -309,7 +309,11 @@ func (s *Server) HandlePromoteSkill(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "BAD_REQUEST", err.Error())
 		return
 	}
-	resp := s.svc.Promote(skillID, req)
+	resp, err := s.svc.Promote(skillID, req)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "PROMOTION_FAILED", err.Error())
+		return
+	}
 	if idempKey != "" && s.svc.idempStore != nil {
 		s.svc.idempStore.Set(idempKey, resp, http.StatusAccepted)
 	}
