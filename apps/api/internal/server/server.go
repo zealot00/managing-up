@@ -852,6 +852,9 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/router/mcp/catalog", srv.mcpRouterHandler.Catalog)
 	mux.HandleFunc("/api/v1/router/mcp/match", srv.mcpRouterHandler.Match)
 
+	sessionHistoryHandler := handlers.NewSessionHistoryHandler(gatewaySessionSvc)
+	mux.HandleFunc("/api/v1/gateway/sessions", sessionHistoryHandler.ListSessions)
+
 	mux.Handle("/metrics", promhttp.Handler())
 
 	mux.Handle("/v1/chat/completions", gateway.AuthMiddlewareWithValidator(gatewayValidator, gateway.BudgetMiddleware(budgetChecker, gateway.RateLimitMiddleware(gatewayLimiter, http.HandlerFunc(srv.gatewayServer.HandleOpenAIChat)))))

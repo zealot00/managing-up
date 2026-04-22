@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/models"
@@ -157,6 +158,34 @@ func splitTags(s string) []string {
 		tags = append(tags, trimSpace(t))
 	}
 	return tags
+}
+
+type SessionHistoryHandler struct {
+	sessionSvc *service.GatewaySessionService
+}
+
+func NewSessionHistoryHandler(sessionSvc *service.GatewaySessionService) *SessionHistoryHandler {
+	return &SessionHistoryHandler{sessionSvc: sessionSvc}
+}
+
+func (h *SessionHistoryHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
+	agentID := r.URL.Query().Get("agent_id")
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil {
+			limit = l
+		}
+	}
+
+	ctx := r.Context()
+	sessions, err := h.sessionSvc.ListSessions(ctx, agentID, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+		return
+	}
+
+	writeEnvelope(w, http.StatusOK, "session_history", sessions)
 }
 
 func splitString(s, sep string) []string {

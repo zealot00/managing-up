@@ -25,6 +25,11 @@ type GatewaySession struct {
 type GatewaySessionRepository interface {
 	CreateGatewaySession(ctx context.Context, session *GatewaySession) error
 	UpdatePolicyDecision(ctx context.Context, sessionID string, decision *models.PolicyDecision) error
+	ListGatewaySessions(ctx context.Context, agentID string, limit int) ([]*GatewaySession, error)
+}
+
+func (s *GatewaySessionService) ListSessions(ctx context.Context, agentID string, limit int) ([]*GatewaySession, error) {
+	return s.repo.ListGatewaySessions(ctx, agentID, limit)
 }
 
 type GatewaySessionService struct {

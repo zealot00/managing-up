@@ -128,3 +128,19 @@ func (r *inMemoryGatewaySessionRepo) UpdatePolicyDecision(ctx context.Context, s
 	}
 	return nil
 }
+
+func (r *inMemoryGatewaySessionRepo) ListGatewaySessions(ctx context.Context, agentID string, limit int) ([]*service.GatewaySession, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var result []*service.GatewaySession
+	for _, session := range r.sessions {
+		if agentID == "" || session.AgentID == agentID {
+			result = append(result, session)
+		}
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+	}
+	return result, nil
+}
