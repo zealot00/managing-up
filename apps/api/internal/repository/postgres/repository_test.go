@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zealot/managing-up/apps/api/internal/models"
 	"github.com/zealot/managing-up/apps/api/internal/server"
 )
 
@@ -1129,5 +1130,228 @@ func TestListSnapshotsEmptySkill(t *testing.T) {
 	}
 	if len(snapshots) != 0 {
 		t.Errorf("expected 0 snapshots for nonexistent skill, got %d", len(snapshots))
+	}
+}
+
+func cleanupMemoryCell(t *testing.T, repo *Repository, id string) {
+	t.Helper()
+	_, err := repo.db.Exec(`DELETE FROM memory_cells WHERE id = $1`, id)
+	if err != nil {
+		t.Logf("warning: failed to cleanup memory_cell %s: %v", id, err)
+	}
+}
+
+func TestCreateMemoryCell(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	cell := &models.MemoryCell{
+		ID:        "test_memory_cell_1",
+		Scope:     "session",
+		AgentID:   "agent_001",
+		SessionID: "11111111-1111-1111-1111-111111111111",
+		Key:       "test_key",
+		Value:     map[string]interface{}{"data": "test_value"},
+		ValueType: "text",
+		Metadata:  map[string]interface{}{"source": "test"},
+		Tags:      []string{"test", "unit"},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	err := repo.CreateMemoryCell(ctx, cell)
+	if err != nil {
+		t.Fatalf("expected CreateMemoryCell to succeed: %v", err)
+	}
+	defer cleanupMemoryCell(t, repo, cell.ID)
+
+	retrieved, err := repo.GetMemoryCell(ctx, cell.ID)
+	if err != nil {
+		t.Fatalf("expected GetMemoryCell to succeed: %v", err)
+	}
+
+	if retrieved.Scope != cell.Scope {
+		t.Errorf("expected scope %q, got %q", cell.Scope, retrieved.Scope)
+	}
+	if retrieved.AgentID != cell.AgentID {
+		t.Errorf("expected agent_id %q, got %q", cell.AgentID, retrieved.AgentID)
+	}
+	if retrieved.SessionID != cell.SessionID {
+		t.Errorf("expected session_id %q, got %q", cell.SessionID, retrieved.SessionID)
+	}
+	if retrieved.Key != cell.Key {
+		t.Errorf("expected key %q, got %q", cell.Key, retrieved.Key)
+	}
+	if retrieved.ValueType != cell.ValueType {
+		t.Errorf("expected value_type %q, got %q", cell.ValueType, retrieved.ValueType)
+	}
+}
+
+func TestGetMemoryCellNotFound(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	_, err := repo.GetMemoryCell(ctx, "nonexistent_memory_cell")
+	if err == nil {
+		t.Fatalf("expected GetMemoryCell to return error for nonexistent cell")
+	}
+}
+
+func TestGetMemoryCellsBySession(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	sessionID := "22222222-2222-2222-2222-222222222222"
+
+	for i := 0; i < 3; i++ {
+		cell := &models.MemoryCell{
+			ID:        fmt.Sprintf("test_memory_session_%d", i),
+			Scope:     "session",
+			AgentID:   "agent_002",
+			SessionID: sessionID,
+			Key:       fmt.Sprintf("key_%d", i),
+			Value:     map[string]interface{}{"index": i},
+			ValueType: "json",
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := repo.CreateMemoryCell(ctx, cell); err != nil {
+			t.Fatalf("expected CreateMemoryCell to succeed: %v", err)
+		}
+		defer cleanupMemoryCell(t, repo, cell.ID)
+	}
+
+	cells, err := repo.GetMemoryCellsBySession(ctx, sessionID, 10)
+	if err != nil {
+		t.Fatalf("expected GetMemoryCellsBySession to succeed: %v", err)
+	}
+
+	if len(cells) != 3 {
+		t.Errorf("expected 3 cells, got %d", len(cells))
+	}
+}
+
+func TestGetMemoryCellsByAgent(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+	agentID := "agent_003"
+
+	for i := 0; i < 5; i++ {
+		cell := &models.MemoryCell{
+			ID:        fmt.Sprintf("test_memory_agent_%d", i),
+			Scope:     "agent",
+			AgentID:   agentID,
+			Key:       fmt.Sprintf("agent_key_%d", i),
+			Value:     map[string]interface{}{"count": i},
+			ValueType: "text",
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := repo.CreateMemoryCell(ctx, cell); err != nil {
+			t.Fatalf("expected CreateMemoryCell to succeed: %v", err)
+		}
+		defer cleanupMemoryCell(t, repo, cell.ID)
+	}
+
+	cells, err := repo.GetMemoryCellsByAgent(ctx, agentID, 10)
+	if err != nil {
+		t.Fatalf("expected GetMemoryCellsByAgent to succeed: %v", err)
+	}
+
+	if len(cells) != 5 {
+		t.Errorf("expected 5 cells, got %d", len(cells))
+	}
+}
+
+func TestUpdateMemoryCell(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	cell := &models.MemoryCell{
+		ID:        "test_memory_update",
+		Scope:     "execution",
+		AgentID:   "agent_004",
+		ExecutionID: "exec_001",
+		Key:       "original_key",
+		Value:     map[string]interface{}{"original": true},
+		ValueType: "text",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	err := repo.CreateMemoryCell(ctx, cell)
+	if err != nil {
+		t.Fatalf("expected CreateMemoryCell to succeed: %v", err)
+	}
+	defer cleanupMemoryCell(t, repo, cell.ID)
+
+	cell.Key = "updated_key"
+	cell.Value = map[string]interface{}{"updated": true, "new_field": 123}
+	cell.UpdatedAt = time.Now().UTC()
+
+	err = repo.UpdateMemoryCell(ctx, cell)
+	if err != nil {
+		t.Fatalf("expected UpdateMemoryCell to succeed: %v", err)
+	}
+
+	updated, err := repo.GetMemoryCell(ctx, cell.ID)
+	if err != nil {
+		t.Fatalf("expected GetMemoryCell to succeed: %v", err)
+	}
+
+	if updated.Key != "updated_key" {
+		t.Errorf("expected key 'updated_key', got %q", updated.Key)
+	}
+}
+
+func TestDeleteMemoryCell(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	cell := &models.MemoryCell{
+		ID:        "test_memory_delete",
+		Scope:     "session",
+		AgentID:   "agent_005",
+		Key:       "delete_me",
+		Value:     map[string]interface{}{"to_delete": true},
+		ValueType: "text",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	err := repo.CreateMemoryCell(ctx, cell)
+	if err != nil {
+		t.Fatalf("expected CreateMemoryCell to succeed: %v", err)
+	}
+
+	err = repo.DeleteMemoryCell(ctx, cell.ID)
+	if err != nil {
+		t.Fatalf("expected DeleteMemoryCell to succeed: %v", err)
+	}
+
+	_, err = repo.GetMemoryCell(ctx, cell.ID)
+	if err == nil {
+		t.Fatalf("expected GetMemoryCell to fail after deletion")
 	}
 }

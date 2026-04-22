@@ -2311,10 +2311,216 @@ func (r *Repository) GetLatestPassedSnapshot(ctx context.Context, skillID, versi
 	if gatePolicyID.Valid {
 		snap.GatePolicyID = gatePolicyID.String
 	}
-	if err := json.Unmarshal(metricsJSON, &snap.Metrics); err != nil {
-		slog.Error("GetLatestPassedSnapshot: failed to unmarshal metrics", "error", err)
-		snap.Metrics = map[string]float64{}
+	return &snap, nil
+}
+
+func (r *Repository) CreateMemoryCell(ctx context.Context, cell *models.MemoryCell) error {
+	if cell.ID == "" {
+		cell.ID = uuid.New().String()
 	}
 
-	return &snap, nil
+	valueJSON, err := json.Marshal(cell.Value)
+	if err != nil {
+		return fmt.Errorf("marshal value: %w", err)
+	}
+	metadataJSON, err := json.Marshal(cell.Metadata)
+	if err != nil {
+		return fmt.Errorf("marshal metadata: %w", err)
+	}
+
+	query := `
+		INSERT INTO memory_cells (id, scope, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+	`
+	_, err = r.db.ExecContext(ctx, query,
+		cell.ID,
+		cell.Scope,
+		cell.AgentID,
+		nullString(cell.SessionID),
+		nullString(cell.ExecutionID),
+		cell.Key,
+		valueJSON,
+		cell.ValueType,
+		metadataJSON,
+		cell.Tags,
+		cell.CreatedAt,
+		cell.UpdatedAt,
+		cell.ExpiresAt,
+	)
+	return err
+}
+
+func (r *Repository) GetMemoryCell(ctx context.Context, id string) (*models.MemoryCell, error) {
+	query := `
+		SELECT id, scope, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at
+		FROM memory_cells
+		WHERE id = $1
+	`
+	var cell models.MemoryCell
+	var sessionID, executionID sql.NullString
+	var valueJSON, metadataJSON []byte
+	var expiresAt sql.NullTime
+
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&cell.ID,
+		&cell.Scope,
+		&cell.AgentID,
+		&sessionID,
+		&executionID,
+		&cell.Key,
+		&valueJSON,
+		&cell.ValueType,
+		&metadataJSON,
+		&cell.Tags,
+		&cell.CreatedAt,
+		&cell.UpdatedAt,
+		&expiresAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if sessionID.Valid {
+		cell.SessionID = sessionID.String
+	}
+	if executionID.Valid {
+		cell.ExecutionID = executionID.String
+	}
+	if err := json.Unmarshal(valueJSON, &cell.Value); err != nil {
+		cell.Value = map[string]interface{}{}
+	}
+	if err := json.Unmarshal(metadataJSON, &cell.Metadata); err != nil {
+		cell.Metadata = map[string]interface{}{}
+	}
+	if expiresAt.Valid {
+		cell.ExpiresAt = &expiresAt.Time
+	}
+
+	return &cell, nil
+}
+
+func (r *Repository) GetMemoryCellsBySession(ctx context.Context, sessionID string, limit int) ([]models.MemoryCell, error) {
+	if limit <= 0 {
+		limit = defaultSnapshotLimit
+	}
+	query := `
+		SELECT id, scope, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at
+		FROM memory_cells
+		WHERE session_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`
+	return r.queryMemoryCells(ctx, query, sessionID, limit)
+}
+
+func (r *Repository) GetMemoryCellsByAgent(ctx context.Context, agentID string, limit int) ([]models.MemoryCell, error) {
+	if limit <= 0 {
+		limit = defaultSnapshotLimit
+	}
+	query := `
+		SELECT id, scope, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at
+		FROM memory_cells
+		WHERE agent_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`
+	return r.queryMemoryCells(ctx, query, agentID, limit)
+}
+
+func (r *Repository) queryMemoryCells(ctx context.Context, query string, args ...interface{}) ([]models.MemoryCell, error) {
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]models.MemoryCell, 0)
+	for rows.Next() {
+		var cell models.MemoryCell
+		var sessionID, executionID sql.NullString
+		var valueJSON, metadataJSON []byte
+		var expiresAt sql.NullTime
+
+		if err := rows.Scan(
+			&cell.ID,
+			&cell.Scope,
+			&cell.AgentID,
+			&sessionID,
+			&executionID,
+			&cell.Key,
+			&valueJSON,
+			&cell.ValueType,
+			&metadataJSON,
+			&cell.Tags,
+			&cell.CreatedAt,
+			&cell.UpdatedAt,
+			&expiresAt,
+		); err != nil {
+			return nil, err
+		}
+
+		if sessionID.Valid {
+			cell.SessionID = sessionID.String
+		}
+		if executionID.Valid {
+			cell.ExecutionID = executionID.String
+		}
+		if err := json.Unmarshal(valueJSON, &cell.Value); err != nil {
+			cell.Value = map[string]interface{}{}
+		}
+		if err := json.Unmarshal(metadataJSON, &cell.Metadata); err != nil {
+			cell.Metadata = map[string]interface{}{}
+		}
+		if expiresAt.Valid {
+			cell.ExpiresAt = &expiresAt.Time
+		}
+
+		items = append(items, cell)
+	}
+	return items, rows.Err()
+}
+
+func (r *Repository) UpdateMemoryCell(ctx context.Context, cell *models.MemoryCell) error {
+	valueJSON, err := json.Marshal(cell.Value)
+	if err != nil {
+		return fmt.Errorf("marshal value: %w", err)
+	}
+	metadataJSON, err := json.Marshal(cell.Metadata)
+	if err != nil {
+		return fmt.Errorf("marshal metadata: %w", err)
+	}
+
+	query := `
+		UPDATE memory_cells
+		SET scope = $2, agent_id = $3, session_id = $4, execution_id = $5, key = $6, value = $7, value_type = $8, metadata_ = $9, tags = $10, updated_at = $11, expires_at = $12
+		WHERE id = $1
+	`
+	_, err = r.db.ExecContext(ctx, query,
+		cell.ID,
+		cell.Scope,
+		cell.AgentID,
+		nullString(cell.SessionID),
+		nullString(cell.ExecutionID),
+		cell.Key,
+		valueJSON,
+		cell.ValueType,
+		metadataJSON,
+		cell.Tags,
+		cell.UpdatedAt,
+		cell.ExpiresAt,
+	)
+	return err
+}
+
+func (r *Repository) DeleteMemoryCell(ctx context.Context, id string) error {
+	query := `DELETE FROM memory_cells WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}
+
+func nullString(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: s, Valid: true}
 }
