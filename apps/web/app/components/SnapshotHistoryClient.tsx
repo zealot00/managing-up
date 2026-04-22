@@ -137,7 +137,7 @@ export default function SnapshotHistoryClient() {
     enabled: !!skillFilter,
   });
 
-  const snapshots = snapshotsData?.items ?? [];
+  const snapshots = Array.isArray(snapshotsData) ? snapshotsData : snapshotsData?.items ?? [];
 
   const displayedSnapshots = snapshots.slice(0, displayCount);
   const hasMore = displayCount < snapshots.length;

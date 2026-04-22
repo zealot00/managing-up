@@ -81,7 +81,7 @@ export default function SessionHistoryClient() {
     queryFn: () => listGatewaySessions({ agent_id: agentFilter || undefined, limit: 100 }),
   });
 
-  const sessions = sessionsData?.items ?? [];
+  const sessions = Array.isArray(sessionsData) ? sessionsData : sessionsData?.items ?? [];
 
   const displayedSessions = sessions.slice(0, displayCount);
   const hasMore = displayCount < sessions.length;
