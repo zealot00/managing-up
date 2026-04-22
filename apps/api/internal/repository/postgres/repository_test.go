@@ -1,8 +1,10 @@
 package postgres
 
 import (
+	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/server"
 )
@@ -66,6 +68,42 @@ func cleanupSkill(t *testing.T, repo *Repository, id string) {
 	_, err := repo.db.Exec(`DELETE FROM skills WHERE id = $1`, id)
 	if err != nil {
 		t.Logf("warning: failed to cleanup skill %s: %v", id, err)
+	}
+}
+
+func cleanupSkillDependency(t *testing.T, repo *Repository, id string) {
+	t.Helper()
+	_, err := repo.db.Exec(`DELETE FROM skill_dependencies WHERE id = $1`, id)
+	if err != nil {
+		t.Logf("warning: failed to cleanup skill dependency %s: %v", id, err)
+	}
+}
+
+func cleanupSkillInstall(t *testing.T, repo *Repository, id string) {
+	t.Helper()
+	_, err := repo.db.Exec(`DELETE FROM skill_installs WHERE id = $1`, id)
+	if err != nil {
+		t.Logf("warning: failed to cleanup skill install %s: %v", id, err)
+	}
+}
+
+func cleanupSkillRating(t *testing.T, repo *Repository, skillID, userID string) {
+	t.Helper()
+	_, err := repo.db.Exec(`DELETE FROM skill_ratings WHERE skill_id = $1 AND user_id = $2`, skillID, userID)
+	if err != nil {
+		t.Logf("warning: failed to cleanup skill rating for skill %s user %s: %v", skillID, userID, err)
+	}
+}
+
+func ensureTestUser(t *testing.T, repo *Repository, id string) {
+	t.Helper()
+	_, err := repo.db.Exec(`
+		INSERT INTO users (id, username, password_hash, role, created_at, updated_at)
+		VALUES ($1, $2, 'hash', 'user', NOW(), NOW())
+		ON CONFLICT (id) DO NOTHING
+	`, id, id)
+	if err != nil {
+		t.Fatalf("failed to ensure test user %s: %v", id, err)
 	}
 }
 
@@ -445,5 +483,353 @@ func TestCreateExecutionWithValidSkill(t *testing.T) {
 	}
 	if exec.TriggeredBy != "test_operator" {
 		t.Errorf("expected triggered by 'test_operator', got '%s'", exec.TriggeredBy)
+	}
+}
+
+func TestSkillEnterpriseQueries(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	skillA := createTestSkill(t, repo, "test_skill_enterprise_a", "team_a", "medium")
+	skillB := createTestSkill(t, repo, "test_skill_enterprise_b", "team_b", "low")
+	defer cleanupSkill(t, repo, skillA.ID)
+	defer cleanupSkill(t, repo, skillB.ID)
+
+	ensureTestUser(t, repo, "enterprise-user")
+
+	_, err := repo.db.Exec(`
+		UPDATE skills
+		SET status = 'published', current_version = 'v1', category = 'operations', trust_score = 0.93
+		WHERE id = $1
+	`, skillA.ID)
+	if err != nil {
+		t.Fatalf("failed to update skillA enterprise fields: %v", err)
+	}
+	_, err = repo.db.Exec(`
+		UPDATE skills
+		SET status = 'published', current_version = 'v2', category = 'observability', trust_score = 0.81
+		WHERE id = $1
+	`, skillB.ID)
+	if err != nil {
+		t.Fatalf("failed to update skillB enterprise fields: %v", err)
+	}
+
+	depID := "dep_enterprise_test"
+	installID := "install_enterprise_test"
+	defer cleanupSkillDependency(t, repo, depID)
+	defer cleanupSkillInstall(t, repo, installID)
+	defer cleanupSkillRating(t, repo, skillA.ID, "enterprise-user")
+
+	_, err = repo.db.Exec(`
+		INSERT INTO skill_dependencies (id, skill_id, dependency_skill_id, version_constraint, created_at)
+		VALUES ($1, $2, $3, '>=v2', NOW())
+	`, depID, skillA.ID, skillB.ID)
+	if err != nil {
+		t.Fatalf("failed to insert skill dependency: %v", err)
+	}
+
+	_, err = repo.db.Exec(`
+		INSERT INTO skill_installs (id, skill_id, user_id, version, environment, installed_at, skill_snapshot)
+		VALUES ($1, $2, $3, 'v1', 'production', NOW(), '{}'::jsonb)
+	`, installID, skillA.ID, "enterprise-user")
+	if err != nil {
+		t.Fatalf("failed to insert skill install: %v", err)
+	}
+
+	if err := repo.UpsertRating(ctx, skillA.ID, "enterprise-user", 5, "excellent"); err != nil {
+		t.Fatalf("failed to upsert rating: %v", err)
+	}
+
+	deps, err := repo.ListDependencies(ctx, skillA.ID)
+	if err != nil {
+		t.Fatalf("expected dependencies query to succeed: %v", err)
+	}
+	if len(deps) != 1 || deps[0].DependencySkillID != skillB.ID {
+		t.Fatalf("expected dependency on %s, got %+v", skillB.ID, deps)
+	}
+
+	market, err := repo.ListSkillsByCategory(ctx, "operations", "enterprise")
+	if err != nil {
+		t.Fatalf("expected market query to succeed: %v", err)
+	}
+	if len(market) != 1 || market[0].ID != skillA.ID {
+		t.Fatalf("expected market result for %s, got %+v", skillA.ID, market)
+	}
+
+	avg, count, err := repo.GetRatingStats(ctx, skillA.ID)
+	if err != nil {
+		t.Fatalf("expected rating stats query to succeed: %v", err)
+	}
+	if count != 1 || avg != 5 {
+		t.Fatalf("expected avg=5 count=1, got avg=%v count=%d", avg, count)
+	}
+
+	installs, err := repo.GetInstallCount(ctx, skillA.ID)
+	if err != nil {
+		t.Fatalf("expected install count query to succeed: %v", err)
+	}
+	if installs != 1 {
+		t.Fatalf("expected install count 1, got %d", installs)
+	}
+
+	tree, err := repo.ResolveDepTree(ctx, skillA.ID)
+	if err != nil {
+		t.Fatalf("expected dependency tree query to succeed: %v", err)
+	}
+	if len(tree) != 1 || tree[0].SkillID != skillB.ID {
+		t.Fatalf("expected dependency tree root %s, got %+v", skillB.ID, tree)
+	}
+
+	if _, err := time.Parse(time.RFC3339, deps[0].CreatedAt); err != nil {
+		t.Fatalf("expected dependency created_at to be RFC3339, got %q", deps[0].CreatedAt)
+	}
+}
+
+func cleanupGatewaySession(t *testing.T, repo *Repository, id string) {
+	t.Helper()
+	_, err := repo.db.Exec(`DELETE FROM mcp_gateway_sessions WHERE id = $1`, id)
+	if err != nil {
+		t.Logf("warning: failed to cleanup gateway session %s: %v", id, err)
+	}
+}
+
+func TestCreateGatewaySession(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	session := &server.GatewaySession{
+		ID:             "gs_test_create",
+		SessionType:    "router",
+		AgentID:        "agent_test",
+		CorrelationID:  "corr_test_123",
+		TaskIntent:     map[string]any{"task": "test_task"},
+		RiskLevel:      "medium",
+		PolicyDecision: map[string]any{"allowed": true},
+		Status:         "active",
+		StartedAt:      time.Now(),
+		Metadata:       map[string]any{"key": "value"},
+	}
+
+	if err := repo.CreateGatewaySession(ctx, session); err != nil {
+		t.Fatalf("expected CreateGatewaySession to succeed: %v", err)
+	}
+	defer cleanupGatewaySession(t, repo, session.ID)
+
+	retrieved, err := repo.GetGatewaySession(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("expected GetGatewaySession to succeed: %v", err)
+	}
+	if retrieved.SessionType != session.SessionType {
+		t.Errorf("expected session type %q, got %q", session.SessionType, retrieved.SessionType)
+	}
+	if retrieved.AgentID != session.AgentID {
+		t.Errorf("expected agent ID %q, got %q", session.AgentID, retrieved.AgentID)
+	}
+	if retrieved.CorrelationID != session.CorrelationID {
+		t.Errorf("expected correlation ID %q, got %q", session.CorrelationID, retrieved.CorrelationID)
+	}
+	if retrieved.RiskLevel != session.RiskLevel {
+		t.Errorf("expected risk level %q, got %q", session.RiskLevel, retrieved.RiskLevel)
+	}
+	if retrieved.Status != session.Status {
+		t.Errorf("expected status %q, got %q", session.Status, retrieved.Status)
+	}
+}
+
+func TestCreateGatewaySessionWithNilPolicyDecision(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	session := &server.GatewaySession{
+		ID:            "gs_test_nil_policy",
+		SessionType:   "router",
+		AgentID:       "agent_test",
+		CorrelationID: "corr_nil_policy",
+		TaskIntent:    map[string]any{"task": "test"},
+		RiskLevel:     "low",
+		Status:        "active",
+		StartedAt:     time.Now(),
+		Metadata:      map[string]any{},
+	}
+
+	if err := repo.CreateGatewaySession(ctx, session); err != nil {
+		t.Fatalf("expected CreateGatewaySession with nil policy decision to succeed: %v", err)
+	}
+	defer cleanupGatewaySession(t, repo, session.ID)
+
+	retrieved, err := repo.GetGatewaySession(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("expected GetGatewaySession to succeed: %v", err)
+	}
+	if retrieved.PolicyDecision != nil {
+		t.Errorf("expected nil policy decision, got %+v", retrieved.PolicyDecision)
+	}
+}
+
+func TestGetGatewaySessionNotFound(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	_, err := repo.GetGatewaySession(ctx, "nonexistent_session")
+	if err == nil {
+		t.Fatalf("expected GetGatewaySession to return error for nonexistent session")
+	}
+}
+
+func TestEndGatewaySession(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	session := &server.GatewaySession{
+		ID:            "gs_test_end",
+		SessionType:   "router",
+		AgentID:       "agent_test",
+		CorrelationID:  "corr_end_123",
+		TaskIntent:    map[string]any{},
+		RiskLevel:     "low",
+		Status:        "active",
+		StartedAt:     time.Now(),
+		Metadata:      map[string]any{},
+	}
+
+	if err := repo.CreateGatewaySession(ctx, session); err != nil {
+		t.Fatalf("expected CreateGatewaySession to succeed: %v", err)
+	}
+	defer cleanupGatewaySession(t, repo, session.ID)
+
+	if err := repo.EndGatewaySession(ctx, session.ID); err != nil {
+		t.Fatalf("expected EndGatewaySession to succeed: %v", err)
+	}
+
+	retrieved, err := repo.GetGatewaySession(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("expected GetGatewaySession to succeed: %v", err)
+	}
+	if retrieved.Status != "completed" {
+		t.Errorf("expected status 'completed', got %q", retrieved.Status)
+	}
+	if retrieved.EndedAt == nil {
+		t.Errorf("expected ended_at to be set, got nil")
+	}
+}
+
+func TestUpdateGatewaySessionPolicyDecision(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	session := &server.GatewaySession{
+		ID:            "gs_test_update_policy",
+		SessionType:   "router",
+		AgentID:       "agent_test",
+		CorrelationID:  "corr_policy_123",
+		TaskIntent:    map[string]any{},
+		RiskLevel:     "medium",
+		Status:        "active",
+		StartedAt:     time.Now(),
+		Metadata:      map[string]any{},
+	}
+
+	if err := repo.CreateGatewaySession(ctx, session); err != nil {
+		t.Fatalf("expected CreateGatewaySession to succeed: %v", err)
+	}
+	defer cleanupGatewaySession(t, repo, session.ID)
+
+	newDecision := map[string]any{"allowed": true, "reason": "approved by policy"}
+	if err := repo.UpdateGatewaySessionPolicyDecision(ctx, session.ID, newDecision); err != nil {
+		t.Fatalf("expected UpdateGatewaySessionPolicyDecision to succeed: %v", err)
+	}
+
+	retrieved, err := repo.GetGatewaySession(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("expected GetGatewaySession to succeed: %v", err)
+	}
+	if retrieved.PolicyDecision == nil {
+		t.Fatalf("expected policy decision to be set, got nil")
+	}
+	allowed, ok := retrieved.PolicyDecision["allowed"].(bool)
+	if !ok || !allowed {
+		t.Errorf("expected policy decision allowed=true, got %+v", retrieved.PolicyDecision)
+	}
+}
+
+func TestListGatewaySessions(t *testing.T) {
+	t.Parallel()
+	repo, cleanup := setupRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	agentID := "agent_list_test"
+
+	session1 := &server.GatewaySession{
+		ID:            "gs_test_list_1",
+		SessionType:   "router",
+		AgentID:       agentID,
+		CorrelationID:  "corr_list_1",
+		TaskIntent:    map[string]any{"task": "test1"},
+		RiskLevel:     "low",
+		Status:        "active",
+		StartedAt:     time.Now().Add(-2 * time.Hour),
+		Metadata:      map[string]any{},
+	}
+	session2 := &server.GatewaySession{
+		ID:            "gs_test_list_2",
+		SessionType:   "router",
+		AgentID:       agentID,
+		CorrelationID:  "corr_list_2",
+		TaskIntent:    map[string]any{"task": "test2"},
+		RiskLevel:     "medium",
+		Status:        "completed",
+		StartedAt:     time.Now().Add(-1 * time.Hour),
+		Metadata:      map[string]any{},
+	}
+	session3 := &server.GatewaySession{
+		ID:            "gs_test_list_3",
+		SessionType:   "router",
+		AgentID:       "other_agent",
+		CorrelationID:  "corr_list_3",
+		TaskIntent:    map[string]any{"task": "test3"},
+		RiskLevel:     "high",
+		Status:        "active",
+		StartedAt:     time.Now(),
+		Metadata:      map[string]any{},
+	}
+
+	for _, s := range []*server.GatewaySession{session1, session2, session3} {
+		if err := repo.CreateGatewaySession(ctx, s); err != nil {
+			t.Fatalf("expected CreateGatewaySession to succeed: %v", err)
+		}
+		defer cleanupGatewaySession(t, repo, s.ID)
+	}
+
+	sessions, err := repo.ListGatewaySessions(ctx, agentID, 10)
+	if err != nil {
+		t.Fatalf("expected ListGatewaySessions to succeed: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Errorf("expected 2 sessions for agent %q, got %d", agentID, len(sessions))
+	}
+
+	allSessions, err := repo.ListGatewaySessions(ctx, "", 10)
+	if err != nil {
+		t.Fatalf("expected ListGatewaySessions with empty agent ID to succeed: %v", err)
+	}
+	if len(allSessions) < 3 {
+		t.Errorf("expected at least 3 sessions total, got %d", len(allSessions))
+	}
+
+	if sessions[0].CorrelationID != session2.CorrelationID && sessions[1].CorrelationID != session2.CorrelationID {
+		t.Errorf("expected sessions to be ordered by started_at DESC, got %+v", sessions)
 	}
 }

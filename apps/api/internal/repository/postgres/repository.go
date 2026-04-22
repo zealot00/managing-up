@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -1970,8 +1971,6 @@ func (r *Repository) CreateGatewaySession(ctx context.Context, session *server.G
 		if err != nil {
 			policyDecisionJSON = []byte("{}")
 		}
-	} else {
-		policyDecisionJSON = []byte("null")
 	}
 	metadataJSON, _ := json.Marshal(session.Metadata)
 
@@ -2026,14 +2025,17 @@ func (r *Repository) GetGatewaySession(ctx context.Context, id string) (*server.
 		session.EndedAt = &endedAt.Time
 	}
 	if err := json.Unmarshal(taskIntentJSON, &session.TaskIntent); err != nil {
+		slog.Error("GetGatewaySession: failed to unmarshal task_intent", "id", id, "error", err)
 		session.TaskIntent = map[string]any{}
 	}
 	if policyDecisionJSON != nil && string(policyDecisionJSON) != "null" {
 		if err := json.Unmarshal(policyDecisionJSON, &session.PolicyDecision); err != nil {
+			slog.Error("GetGatewaySession: failed to unmarshal policy_decision", "id", id, "error", err)
 			session.PolicyDecision = map[string]any{}
 		}
 	}
 	if err := json.Unmarshal(metadataJSON, &session.Metadata); err != nil {
+		slog.Error("GetGatewaySession: failed to unmarshal metadata_", "id", id, "error", err)
 		session.Metadata = map[string]any{}
 	}
 
@@ -2041,9 +2043,13 @@ func (r *Repository) GetGatewaySession(ctx context.Context, id string) (*server.
 }
 
 func (r *Repository) UpdateGatewaySessionPolicyDecision(ctx context.Context, id string, decision map[string]interface{}) error {
-	policyDecisionJSON, err := json.Marshal(decision)
-	if err != nil {
-		policyDecisionJSON = []byte("{}")
+	var policyDecisionJSON []byte
+	var err error
+	if decision != nil {
+		policyDecisionJSON, err = json.Marshal(decision)
+		if err != nil {
+			policyDecisionJSON = []byte("{}")
+		}
 	}
 	query := `UPDATE mcp_gateway_sessions SET policy_decision = $2 WHERE id = $1`
 	_, err = r.db.ExecContext(ctx, query, id, policyDecisionJSON)
@@ -2089,21 +2095,24 @@ func (r *Repository) ListGatewaySessions(ctx context.Context, agentID string, li
 			&endedAt,
 			&metadataJSON,
 		); err != nil {
-			continue
+			return nil, fmt.Errorf("ListGatewaySessions: scan row: %w", err)
 		}
 
 		if endedAt.Valid {
 			session.EndedAt = &endedAt.Time
 		}
 		if err := json.Unmarshal(taskIntentJSON, &session.TaskIntent); err != nil {
+			slog.Error("ListGatewaySessions: failed to unmarshal task_intent", "error", err)
 			session.TaskIntent = map[string]any{}
 		}
 		if policyDecisionJSON != nil && string(policyDecisionJSON) != "null" {
 			if err := json.Unmarshal(policyDecisionJSON, &session.PolicyDecision); err != nil {
+				slog.Error("ListGatewaySessions: failed to unmarshal policy_decision", "error", err)
 				session.PolicyDecision = map[string]any{}
 			}
 		}
 		if err := json.Unmarshal(metadataJSON, &session.Metadata); err != nil {
+			slog.Error("ListGatewaySessions: failed to unmarshal metadata_", "error", err)
 			session.Metadata = map[string]any{}
 		}
 		items = append(items, session)

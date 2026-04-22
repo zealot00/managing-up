@@ -16,3 +16,4 @@ CREATE TABLE mcp_gateway_sessions (
 CREATE INDEX idx_gateway_sessions_correlation ON mcp_gateway_sessions(correlation_id);
 CREATE INDEX idx_gateway_sessions_agent ON mcp_gateway_sessions(agent_id);
 CREATE INDEX idx_gateway_sessions_status ON mcp_gateway_sessions(status);
+CREATE INDEX idx_gateway_sessions_started_at ON mcp_gateway_sessions(started_at DESC);
