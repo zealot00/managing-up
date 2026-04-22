@@ -34,6 +34,7 @@ type MCPRouterRepository interface {
 	SyncServer(ctx context.Context, serverID string, approvedBy string) error
 	GetServerByID(ctx context.Context, serverID string) (*MCPServer, error)
 	LogRoute(ctx context.Context, log *RouteLogEntry) error
+	LogRouteWithSession(ctx context.Context, log *RouteLogEntry) error
 }
 
 type RouterCatalogEntry struct {
@@ -51,6 +52,7 @@ type RouterCatalogEntry struct {
 }
 
 type RouteLogEntry struct {
+	SessionID       string
 	CorrelationID   string
 	AgentID         string
 	TaskType        string
@@ -204,6 +206,22 @@ func (r *PostgresMCPRouterRepository) LogRoute(ctx context.Context, log *RouteLo
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		log.CorrelationID, log.AgentID, log.TaskType, log.TaskTags, log.RawDescription,
+		log.Matched, log.MatchedServerID, log.MatchScore, log.MatchLatencyMS,
+		log.Status, log.ErrorCode, log.ErrorMessage, log.DurationMS,
+	)
+	return err
+}
+
+func (r *PostgresMCPRouterRepository) LogRouteWithSession(ctx context.Context, log *RouteLogEntry) error {
+	query := `
+		INSERT INTO mcp_router_logs (
+			session_id, correlation_id, agent_id, task_type, task_tags, raw_description,
+			matched, matched_server_id, match_score, match_latency_ms,
+			status, error_code, error_message, duration_ms
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+	`
+	_, err := r.db.ExecContext(ctx, query,
+		log.SessionID, log.CorrelationID, log.AgentID, log.TaskType, log.TaskTags, log.RawDescription,
 		log.Matched, log.MatchedServerID, log.MatchScore, log.MatchLatencyMS,
 		log.Status, log.ErrorCode, log.ErrorMessage, log.DurationMS,
 	)

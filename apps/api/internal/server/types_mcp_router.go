@@ -26,6 +26,7 @@ type MCPRouterCatalog struct {
 
 type MCPRouterLog struct {
 	ID              string   `json:"id"`
+	SessionID       string   `json:"session_id,omitempty"`
 	CorrelationID   string   `json:"correlation_id"`
 	AgentID         string   `json:"agent_id,omitempty"`
 	TaskType        string   `json:"task_type,omitempty"`
