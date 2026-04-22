@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/zealot/managing-up/apps/api/internal/models"
 	"github.com/zealot/managing-up/apps/api/internal/service"
 )
 
@@ -90,4 +91,40 @@ func (r *inMemoryMCPRouterRepo) AddServer(server service.MCPServer) {
 		TransportType: server.TransportType,
 		URL:           server.URL,
 	})
+}
+
+type inMemoryGatewaySessionRepo struct {
+	mu       sync.RWMutex
+	sessions map[string]*service.GatewaySession
+}
+
+var _ service.GatewaySessionRepository = (*inMemoryGatewaySessionRepo)(nil)
+
+func newInMemoryGatewaySessionRepo() *inMemoryGatewaySessionRepo {
+	return &inMemoryGatewaySessionRepo{
+		sessions: make(map[string]*service.GatewaySession),
+	}
+}
+
+func (r *inMemoryGatewaySessionRepo) CreateGatewaySession(ctx context.Context, session *service.GatewaySession) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.sessions[session.ID] = session
+	return nil
+}
+
+func (r *inMemoryGatewaySessionRepo) UpdatePolicyDecision(ctx context.Context, sessionID string, decision *models.PolicyDecision) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if session, ok := r.sessions[sessionID]; ok {
+		session.PolicyDecision = map[string]interface{}{
+			"allowed":            decision.Allowed,
+			"required_approvals": decision.RequiredApprovals,
+			"policy_id":          decision.PolicyID,
+			"policy_version":     decision.PolicyVersion,
+			"reasons":            decision.Reasons,
+			"determined_at":      decision.DeterminedAt,
+		}
+	}
+	return nil
 }

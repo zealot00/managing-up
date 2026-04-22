@@ -734,9 +734,11 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	}
 	metricsCollector := service.NewMetricsCollector()
 	mcpRouterRepo := newInMemoryMCPRouterRepo()
+	gatewaySessionRepo := newInMemoryGatewaySessionRepo()
 	policyChecker := service.NewDefaultPolicyChecker(mcpRouterRepo)
-	mcpRouterHandler := handlers.NewMCPRouterHandler(service.NewMCPRouterService(mcpRouterRepo, metricsCollector, policyChecker), metricsCollector)
 	mcpRouterSvc := service.NewMCPRouterService(mcpRouterRepo, metricsCollector, policyChecker)
+	gatewaySessionSvc := service.NewGatewaySessionService(gatewaySessionRepo, mcpRouterSvc)
+	mcpRouterHandler := handlers.NewMCPRouterHandler(mcpRouterSvc, gatewaySessionSvc, metricsCollector)
 	mcpServersHandler := handlers.NewMCPServersHandler(repoToMCPServersRepoAdapter{repo: repo}, mcpRouterSvc)
 
 	fallbackRouter := gateway.NewFallbackRouter(circuitBreaker)

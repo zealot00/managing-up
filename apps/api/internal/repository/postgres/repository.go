@@ -2058,6 +2058,20 @@ func (r *Repository) UpdateGatewaySessionPolicyDecision(ctx context.Context, id 
 	return err
 }
 
+func (r *Repository) UpdatePolicyDecision(ctx context.Context, sessionID string, decision *models.PolicyDecision) error {
+	var policyDecisionJSON []byte
+	var err error
+	if decision != nil {
+		policyDecisionJSON, err = json.Marshal(decision)
+		if err != nil {
+			policyDecisionJSON = []byte("{}")
+		}
+	}
+	query := `UPDATE mcp_gateway_sessions SET policy_decision = $2 WHERE id = $1`
+	_, err = r.db.ExecContext(ctx, query, sessionID, policyDecisionJSON)
+	return err
+}
+
 func (r *Repository) EndGatewaySession(ctx context.Context, id string) error {
 	query := `UPDATE mcp_gateway_sessions SET status = 'completed', ended_at = NOW() WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, id)

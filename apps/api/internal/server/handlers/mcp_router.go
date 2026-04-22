@@ -6,16 +6,18 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/zealot/managing-up/apps/api/internal/models"
 	"github.com/zealot/managing-up/apps/api/internal/service"
 )
 
 type MCPRouterHandler struct {
-	routerSvc *service.MCPRouterService
-	metrics   *service.MetricsCollector
+	routerSvc   *service.MCPRouterService
+	sessionSvc  *service.GatewaySessionService
+	metrics     *service.MetricsCollector
 }
 
-func NewMCPRouterHandler(routerSvc *service.MCPRouterService, metrics *service.MetricsCollector) *MCPRouterHandler {
-	return &MCPRouterHandler{routerSvc: routerSvc, metrics: metrics}
+func NewMCPRouterHandler(routerSvc *service.MCPRouterService, sessionSvc *service.GatewaySessionService, metrics *service.MetricsCollector) *MCPRouterHandler {
+	return &MCPRouterHandler{routerSvc: routerSvc, sessionSvc: sessionSvc, metrics: metrics}
 }
 
 type RouteRequest struct {
@@ -57,26 +59,34 @@ func (h *MCPRouterHandler) Route(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	start := time.Now()
-
-	taskTypes := []string{}
-	tags := []string{}
-
-	if req.Task.Structured.TaskType != "" {
-		taskTypes = []string{req.Task.Structured.TaskType}
-	}
-	if len(req.Task.Structured.Tags) > 0 {
-		tags = req.Task.Structured.Tags
+	intent := models.TaskIntent{
+		TaskType: req.Task.Structured.TaskType,
+		Tags:     req.Task.Structured.Tags,
 	}
 
-	result, err := h.routerSvc.MatchTask(ctx, taskTypes, tags)
-	duration := time.Since(start).Seconds()
-
+	session, err := h.sessionSvc.CreateSession(ctx, req.AgentID, req.CorrelationID, intent)
 	if err != nil {
-		h.metrics.RecordRequest(req.AgentID, req.Task.Structured.TaskType, "failure", duration)
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to create session")
+		return
+	}
+
+	result, decision, err := h.routerSvc.MatchTaskWithPolicy(ctx, intent)
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
 		return
 	}
+
+	if decision != nil {
+		h.sessionSvc.RecordPolicyDecision(ctx, session.ID, decision)
+	}
+
+	if !decision.Allowed {
+		writeError(w, http.StatusForbidden, "POLICY_DENIED", "task not allowed by policy")
+		return
+	}
+
+	start := time.Now()
+	duration := time.Since(start).Seconds()
 
 	if !result.Matched {
 		h.metrics.RecordMatchFailure("no_matching_server")

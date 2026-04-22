@@ -24,6 +24,7 @@ type GatewaySession struct {
 
 type GatewaySessionRepository interface {
 	CreateGatewaySession(ctx context.Context, session *GatewaySession) error
+	UpdatePolicyDecision(ctx context.Context, sessionID string, decision *models.PolicyDecision) error
 }
 
 type GatewaySessionService struct {
@@ -60,6 +61,17 @@ func (s *GatewaySessionService) CreateSession(ctx context.Context, agentID, corr
 	}
 
 	return session, nil
+}
+
+func (s *GatewaySessionService) RecordPolicyDecision(ctx context.Context, sessionID string, decision *models.PolicyDecision) error {
+	policyDecisionMap := make(map[string]interface{})
+	policyDecisionMap["allowed"] = decision.Allowed
+	policyDecisionMap["required_approvals"] = decision.RequiredApprovals
+	policyDecisionMap["policy_id"] = decision.PolicyID
+	policyDecisionMap["policy_version"] = decision.PolicyVersion
+	policyDecisionMap["reasons"] = decision.Reasons
+	policyDecisionMap["determined_at"] = decision.DeterminedAt
+	return s.repo.UpdatePolicyDecision(ctx, sessionID, decision)
 }
 
 func (s *GatewaySessionService) assessRiskLevel(intent models.TaskIntent) models.RiskLevel {
