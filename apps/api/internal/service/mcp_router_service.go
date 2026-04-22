@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/zealot/managing-up/apps/api/internal/engine"
 )
 
 type MCPServer struct {
@@ -31,13 +33,36 @@ type MCPRouterRepository interface {
 	ListCatalog(ctx context.Context) ([]RouterCatalogEntry, error)
 }
 
+type PolicyChecker interface {
+	CheckPolicy(ctx context.Context, intent engine.TaskIntent) (*engine.PolicyDecision, error)
+}
+
 type MCPRouterService struct {
 	repo             MCPRouterRepository
 	metricsCollector *MetricsCollector
+	policyChecker    PolicyChecker
 }
 
-func NewMCPRouterService(repo MCPRouterRepository, mc *MetricsCollector) *MCPRouterService {
-	return &MCPRouterService{repo: repo, metricsCollector: mc}
+func NewMCPRouterService(repo MCPRouterRepository, mc *MetricsCollector, pc PolicyChecker) *MCPRouterService {
+	return &MCPRouterService{repo: repo, metricsCollector: mc, policyChecker: pc}
+}
+
+func (s *MCPRouterService) MatchTaskWithPolicy(ctx context.Context, intent engine.TaskIntent) (*MatchResult, *engine.PolicyDecision, error) {
+	decision, err := s.policyChecker.CheckPolicy(ctx, intent)
+	if err != nil {
+		return nil, nil, fmt.Errorf("policy check failed: %w", err)
+	}
+
+	if !decision.Allowed {
+		return &MatchResult{Matched: false}, decision, nil
+	}
+
+	result, err := s.MatchTask(ctx, []string{intent.TaskType}, intent.Tags)
+	if err != nil {
+		return nil, decision, err
+	}
+
+	return result, decision, nil
 }
 
 func (s *MCPRouterService) MatchTask(ctx context.Context, taskTypes []string, tags []string) (*MatchResult, error) {
