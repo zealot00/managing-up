@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,10 +16,11 @@ type MCPRouterHandler struct {
 	routerSvc   *service.MCPRouterService
 	sessionSvc  *service.GatewaySessionService
 	metrics     *service.MetricsCollector
+	memorySvc   *service.MemoryHubService
 }
 
-func NewMCPRouterHandler(routerSvc *service.MCPRouterService, sessionSvc *service.GatewaySessionService, metrics *service.MetricsCollector) *MCPRouterHandler {
-	return &MCPRouterHandler{routerSvc: routerSvc, sessionSvc: sessionSvc, metrics: metrics}
+func NewMCPRouterHandler(routerSvc *service.MCPRouterService, sessionSvc *service.GatewaySessionService, metrics *service.MetricsCollector, memorySvc *service.MemoryHubService) *MCPRouterHandler {
+	return &MCPRouterHandler{routerSvc: routerSvc, sessionSvc: sessionSvc, metrics: metrics, memorySvc: memorySvc}
 }
 
 type RouteRequest struct {
@@ -69,6 +71,13 @@ func (h *MCPRouterHandler) Route(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to create session")
 		return
+	}
+
+	memoryCtx, err := h.memorySvc.BuildMemoryContext(ctx, session.ID, req.AgentID)
+	if err != nil {
+		slog.Warn("failed to build memory context", "error", err)
+	} else {
+		intent.Metadata["memory_context"] = memoryCtx
 	}
 
 	result, decision, err := h.routerSvc.MatchTaskWithPolicy(ctx, intent)

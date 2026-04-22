@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/zealot/managing-up/apps/api/internal/models"
@@ -143,4 +144,77 @@ func (r *inMemoryGatewaySessionRepo) ListGatewaySessions(ctx context.Context, ag
 		}
 	}
 	return result, nil
+}
+
+type inMemoryMemoryRepo struct {
+	mu    sync.RWMutex
+	cells map[string]*models.MemoryCell
+}
+
+var _ service.MemoryRepository = (*inMemoryMemoryRepo)(nil)
+
+func newInMemoryMemoryRepo() *inMemoryMemoryRepo {
+	return &inMemoryMemoryRepo{
+		cells: make(map[string]*models.MemoryCell),
+	}
+}
+
+func (r *inMemoryMemoryRepo) CreateMemoryCell(ctx context.Context, cell *models.MemoryCell) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cells[cell.ID] = cell
+	return nil
+}
+
+func (r *inMemoryMemoryRepo) GetMemoryCell(ctx context.Context, id string) (*models.MemoryCell, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if cell, ok := r.cells[id]; ok {
+		return cell, nil
+	}
+	return nil, fmt.Errorf("memory cell not found: %s", id)
+}
+
+func (r *inMemoryMemoryRepo) GetMemoryCellsBySession(ctx context.Context, sessionID string, limit int) ([]models.MemoryCell, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var result []models.MemoryCell
+	for _, cell := range r.cells {
+		if cell.SessionID == sessionID {
+			result = append(result, *cell)
+		}
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+	}
+	return result, nil
+}
+
+func (r *inMemoryMemoryRepo) GetMemoryCellsByAgent(ctx context.Context, agentID string, limit int) ([]models.MemoryCell, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var result []models.MemoryCell
+	for _, cell := range r.cells {
+		if cell.AgentID == agentID {
+			result = append(result, *cell)
+		}
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+	}
+	return result, nil
+}
+
+func (r *inMemoryMemoryRepo) UpdateMemoryCell(ctx context.Context, cell *models.MemoryCell) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cells[cell.ID] = cell
+	return nil
+}
+
+func (r *inMemoryMemoryRepo) DeleteMemoryCell(ctx context.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.cells, id)
+	return nil
 }

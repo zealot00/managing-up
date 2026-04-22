@@ -73,6 +73,25 @@ func (s *MemoryHubService) DeleteMemory(ctx context.Context, id string) error {
 	return s.repo.DeleteMemoryCell(ctx, id)
 }
 
+func (s *MemoryHubService) BuildMemoryContext(ctx context.Context, sessionID, agentID string) (map[string]interface{}, error) {
+	cells, err := s.GetSessionMemory(ctx, sessionID, 20)
+	if err != nil {
+		return nil, err
+	}
+
+	memoryMap := make(map[string]interface{})
+	for _, cell := range cells {
+		memoryMap[cell.Key] = cell.Value
+	}
+
+	return map[string]interface{}{
+		"session_id": sessionID,
+		"agent_id": agentID,
+		"memory": memoryMap,
+		"count": len(cells),
+	}, nil
+}
+
 func generateID() string {
 	return fmt.Sprintf("mem_%d", time.Now().UnixNano())
 }

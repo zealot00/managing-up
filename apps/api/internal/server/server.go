@@ -780,10 +780,12 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	metricsCollector := service.NewMetricsCollector()
 	mcpRouterRepo := newInMemoryMCPRouterRepo()
 	gatewaySessionRepo := newInMemoryGatewaySessionRepo()
+	memoryHubRepo := newInMemoryMemoryRepo()
+	memoryHubSvc := service.NewMemoryHubService(memoryHubRepo)
 	policyChecker := service.NewDefaultPolicyChecker(mcpRouterRepo, service.DefaultPolicyRules)
 	mcpRouterSvc := service.NewMCPRouterService(mcpRouterRepo, metricsCollector, policyChecker)
 	gatewaySessionSvc := service.NewGatewaySessionService(gatewaySessionRepo, mcpRouterSvc)
-	mcpRouterHandler := handlers.NewMCPRouterHandler(mcpRouterSvc, gatewaySessionSvc, metricsCollector)
+	mcpRouterHandler := handlers.NewMCPRouterHandler(mcpRouterSvc, gatewaySessionSvc, metricsCollector, memoryHubSvc)
 	mcpServersHandler := handlers.NewMCPServersHandler(repoToMCPServersRepoAdapter{repo: repo}, mcpRouterSvc)
 	snapshotsHandler := handlers.NewSnapshotsHandler(repoToSnapshotsRepoAdapter{repo: repo})
 
