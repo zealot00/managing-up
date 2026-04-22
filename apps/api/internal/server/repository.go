@@ -80,6 +80,8 @@ type Repository interface {
 	CreateMCPServer(server MCPServer) (MCPServer, error)
 	UpdateMCPServer(server MCPServer) error
 	DeleteMCPServer(id string) error
+	GetLatestSnapshot(ctx context.Context, skillID, version string) (*SkillCapabilitySnapshot, error)
+	ListSnapshots(ctx context.Context, skillID string, limit int) ([]SkillCapabilitySnapshot, error)
 }
 
 // ExecutionRepository extends Repository with methods needed by the runtime engine.

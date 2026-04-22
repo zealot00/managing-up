@@ -598,6 +598,50 @@ func (a repoToMCPServersRepoAdapter) UpdateMCPServer(server handlers.MCPServerDT
 	return a.repo.UpdateMCPServer(toMCPServer(server))
 }
 
+type repoToSnapshotsRepoAdapter struct {
+	repo Repository
+}
+
+func (a repoToSnapshotsRepoAdapter) GetLatestSnapshot(ctx context.Context, skillID, version string) (*handlers.SnapshotDTO, error) {
+	snap, err := a.repo.GetLatestSnapshot(ctx, skillID, version)
+	if err != nil || snap == nil {
+		return nil, err
+	}
+	return toSnapshotDTO(snap), nil
+}
+
+func (a repoToSnapshotsRepoAdapter) ListSnapshots(ctx context.Context, skillID string, limit int) ([]handlers.SnapshotDTO, error) {
+	snaps, err := a.repo.ListSnapshots(ctx, skillID, limit)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]handlers.SnapshotDTO, len(snaps))
+	for i, s := range snaps {
+		result[i] = *toSnapshotDTO(&s)
+	}
+	return result, nil
+}
+
+func toSnapshotDTO(s *SkillCapabilitySnapshot) *handlers.SnapshotDTO {
+	if s == nil {
+		return nil
+	}
+	return &handlers.SnapshotDTO{
+		ID:           s.ID,
+		SkillID:      s.SkillID,
+		Version:      s.Version,
+		SnapshotType: s.SnapshotType,
+		DatasetID:    s.DatasetID,
+		RunID:        s.RunID,
+		Metrics:      s.Metrics,
+		OverallScore: s.OverallScore,
+		Passed:       s.Passed,
+		GatePolicyID: s.GatePolicyID,
+		EvaluatedAt:  s.EvaluatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:    s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
 func toMCPServerDTO(s MCPServer) handlers.MCPServerDTO {
 	return handlers.MCPServerDTO{
 		ID:              s.ID,
@@ -673,6 +717,7 @@ type Server struct {
 	authHandler        *handlers.AuthHandler
 	mcpRouterHandler   *handlers.MCPRouterHandler
 	mcpServersHandler  *handlers.MCPServersHandler
+	snapshotsHandler   *handlers.SnapshotsHandler
 	skillEnterpriseSvc *service.SkillEnterpriseService
 	closeFn            func() error
 }
@@ -740,6 +785,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	gatewaySessionSvc := service.NewGatewaySessionService(gatewaySessionRepo, mcpRouterSvc)
 	mcpRouterHandler := handlers.NewMCPRouterHandler(mcpRouterSvc, gatewaySessionSvc, metricsCollector)
 	mcpServersHandler := handlers.NewMCPServersHandler(repoToMCPServersRepoAdapter{repo: repo}, mcpRouterSvc)
+	snapshotsHandler := handlers.NewSnapshotsHandler(repoToSnapshotsRepoAdapter{repo: repo})
 
 	fallbackRouter := gateway.NewFallbackRouter(circuitBreaker)
 	providerKeys := map[llm.Provider]string{
@@ -792,6 +838,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		authHandler:        authHandler,
 		mcpRouterHandler:   mcpRouterHandler,
 		mcpServersHandler:  mcpServersHandler,
+		snapshotsHandler:   snapshotsHandler,
 		skillEnterpriseSvc: service.NewSkillEnterpriseService(repoToSkillRepoAdapter{repo}),
 	}
 
@@ -843,6 +890,9 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/mcp-servers", srv.handleMCPServers)
 	mux.HandleFunc("/api/v1/mcp-servers/{id}", srv.handleMCPServerByID)
 	mux.HandleFunc("/api/v1/mcp-servers/{id}/approve", srv.mcpServersHandler.Approve)
+
+	mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
+	mux.HandleFunc("/api/v1/snapshots/list", srv.snapshotsHandler.ListSnapshots)
 
 	mux.HandleFunc("/api/v1/capabilities", srv.handleCapabilities)
 	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)

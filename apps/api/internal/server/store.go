@@ -1195,3 +1195,11 @@ func (s *store) DecrementUserBudget(userID string, tokens int) (int, error) {
 	s.userBudgets[userID] = budget
 	return budget.UsedThisMonth, nil
 }
+
+func (s *store) GetLatestSnapshot(ctx context.Context, skillID, version string) (*SkillCapabilitySnapshot, error) {
+	return nil, nil
+}
+
+func (s *store) ListSnapshots(ctx context.Context, skillID string, limit int) ([]SkillCapabilitySnapshot, error) {
+	return []SkillCapabilitySnapshot{}, nil
+}
