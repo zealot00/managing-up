@@ -28,6 +28,13 @@ type PolicyDecision struct {
 	DeterminedAt     time.Time
 }
 
+type PolicyRule struct {
+	ID        string   `json:"id"`
+	Condition string   `json:"condition"`
+	Action    string   `json:"action"`
+	Reason    string   `json:"reason"`
+}
+
 type SessionStatus string
 
 const (
