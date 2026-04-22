@@ -1,9 +1,11 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -165,6 +167,146 @@ func (r *Repository) CreateSkill(req server.CreateSkillRequest) server.Skill {
 	}
 
 	return item
+}
+
+func (r *Repository) ListDependencies(ctx context.Context, skillID string) ([]server.SkillDependency, error) {
+	query := `
+		SELECT id, skill_id, dependency_skill_id, version_constraint, created_at
+		FROM skill_dependencies
+		WHERE skill_id = $1
+		ORDER BY created_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, skillID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]server.SkillDependency, 0)
+	for rows.Next() {
+		var item server.SkillDependency
+		var createdAt time.Time
+		if err := rows.Scan(&item.ID, &item.SkillID, &item.DependencySkillID, &item.VersionConstraint, &createdAt); err != nil {
+			return nil, err
+		}
+		item.CreatedAt = createdAt.Format(time.RFC3339)
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (r *Repository) UpsertRating(ctx context.Context, skillID, userID string, rating int, comment string) error {
+	query := `
+		INSERT INTO skill_ratings (id, skill_id, user_id, rating, comment, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+		ON CONFLICT (skill_id, user_id) DO UPDATE SET
+			rating = EXCLUDED.rating,
+			comment = EXCLUDED.comment,
+			updated_at = NOW()
+	`
+	_, err := r.db.ExecContext(ctx, query, fmt.Sprintf("rating_%d", time.Now().UnixNano()), skillID, userID, rating, comment)
+	return err
+}
+
+func (r *Repository) ListSkillsByCategory(ctx context.Context, category, search string) ([]server.Skill, error) {
+	category = strings.TrimSpace(category)
+	search = strings.TrimSpace(search)
+
+	query := `
+		SELECT
+			id, name, owner_team, risk_level, status, current_version,
+			COALESCE(created_by, ''), updated_at,
+			COALESCE(category, '')
+		FROM skills
+		WHERE status = 'published'
+		  AND ($1 = '' OR category = $1)
+		  AND (
+			$2 = ''
+			OR name ILIKE '%' || $2 || '%'
+			OR owner_team ILIKE '%' || $2 || '%'
+			OR COALESCE(category, '') ILIKE '%' || $2 || '%'
+		  )
+		ORDER BY trust_score DESC NULLS LAST, updated_at DESC, name ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, category, search)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]server.Skill, 0)
+	for rows.Next() {
+		var item server.Skill
+		if err := rows.Scan(
+			&item.ID, &item.Name, &item.OwnerTeam, &item.RiskLevel, &item.Status,
+			&item.CurrentVersion, &item.CreatedBy, &item.UpdatedAt, &item.Category,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (r *Repository) GetRatingStats(ctx context.Context, skillID string) (float64, int, error) {
+	query := `
+		SELECT COALESCE(AVG(rating::float8), 0), COUNT(*)
+		FROM skill_ratings
+		WHERE skill_id = $1
+	`
+	var avg float64
+	var count int
+	err := r.db.QueryRowContext(ctx, query, skillID).Scan(&avg, &count)
+	return avg, count, err
+}
+
+func (r *Repository) GetInstallCount(ctx context.Context, skillID string) (int, error) {
+	query := `SELECT COUNT(*) FROM skill_installs WHERE skill_id = $1`
+	var count int
+	err := r.db.QueryRowContext(ctx, query, skillID).Scan(&count)
+	return count, err
+}
+
+func (r *Repository) ResolveDepTree(ctx context.Context, skillID string) ([]server.DependencyNode, error) {
+	return r.resolveDepChildren(ctx, skillID, map[string]bool{})
+}
+
+func (r *Repository) resolveDepChildren(ctx context.Context, skillID string, visited map[string]bool) ([]server.DependencyNode, error) {
+	if visited[skillID] {
+		return nil, nil
+	}
+	visited[skillID] = true
+	defer delete(visited, skillID)
+
+	query := `
+		SELECT s.id, s.name, s.current_version
+		FROM skill_dependencies d
+		JOIN skills s ON s.id = d.dependency_skill_id
+		WHERE d.skill_id = $1
+		ORDER BY s.name ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query, skillID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	nodes := make([]server.DependencyNode, 0)
+	for rows.Next() {
+		var node server.DependencyNode
+		if err := rows.Scan(&node.SkillID, &node.Name, &node.Version); err != nil {
+			return nil, err
+		}
+		children, err := r.resolveDepChildren(ctx, node.SkillID, visited)
+		if err != nil {
+			return nil, err
+		}
+		node.Children = children
+		nodes = append(nodes, node)
+	}
+	return nodes, rows.Err()
 }
 
 // ListSkillVersions returns version rows.
@@ -1817,4 +1959,154 @@ func (r *Repository) DecrementUserBudget(userID string, tokens int) (int, error)
 	query := `UPDATE user_budgets SET used_this_month = used_this_month + $2, used_today = used_today + $2, updated_at = NOW() WHERE user_id = $1`
 	_, err := r.db.Exec(query, userID, tokens)
 	return 0, err
+}
+
+func (r *Repository) CreateGatewaySession(ctx context.Context, session *server.GatewaySession) error {
+	taskIntentJSON, _ := json.Marshal(session.TaskIntent)
+	var policyDecisionJSON []byte
+	var err error
+	if session.PolicyDecision != nil {
+		policyDecisionJSON, err = json.Marshal(session.PolicyDecision)
+		if err != nil {
+			policyDecisionJSON = []byte("{}")
+		}
+	} else {
+		policyDecisionJSON = []byte("null")
+	}
+	metadataJSON, _ := json.Marshal(session.Metadata)
+
+	query := `
+		INSERT INTO mcp_gateway_sessions (id, session_type, agent_id, correlation_id, task_intent, risk_level, policy_decision, status, started_at, ended_at, metadata_)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`
+	_, err = r.db.ExecContext(ctx, query,
+		session.ID,
+		session.SessionType,
+		session.AgentID,
+		session.CorrelationID,
+		taskIntentJSON,
+		session.RiskLevel,
+		policyDecisionJSON,
+		session.Status,
+		session.StartedAt,
+		session.EndedAt,
+		metadataJSON,
+	)
+	return err
+}
+
+func (r *Repository) GetGatewaySession(ctx context.Context, id string) (*server.GatewaySession, error) {
+	query := `
+		SELECT id, session_type, agent_id, correlation_id, task_intent, risk_level, policy_decision, status, started_at, ended_at, metadata_
+		FROM mcp_gateway_sessions
+		WHERE id = $1
+	`
+	var session server.GatewaySession
+	var taskIntentJSON, policyDecisionJSON, metadataJSON []byte
+	var endedAt sql.NullTime
+
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&session.ID,
+		&session.SessionType,
+		&session.AgentID,
+		&session.CorrelationID,
+		&taskIntentJSON,
+		&session.RiskLevel,
+		&policyDecisionJSON,
+		&session.Status,
+		&session.StartedAt,
+		&endedAt,
+		&metadataJSON,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if endedAt.Valid {
+		session.EndedAt = &endedAt.Time
+	}
+	if err := json.Unmarshal(taskIntentJSON, &session.TaskIntent); err != nil {
+		session.TaskIntent = map[string]any{}
+	}
+	if policyDecisionJSON != nil && string(policyDecisionJSON) != "null" {
+		if err := json.Unmarshal(policyDecisionJSON, &session.PolicyDecision); err != nil {
+			session.PolicyDecision = map[string]any{}
+		}
+	}
+	if err := json.Unmarshal(metadataJSON, &session.Metadata); err != nil {
+		session.Metadata = map[string]any{}
+	}
+
+	return &session, nil
+}
+
+func (r *Repository) UpdateGatewaySessionPolicyDecision(ctx context.Context, id string, decision map[string]interface{}) error {
+	policyDecisionJSON, err := json.Marshal(decision)
+	if err != nil {
+		policyDecisionJSON = []byte("{}")
+	}
+	query := `UPDATE mcp_gateway_sessions SET policy_decision = $2 WHERE id = $1`
+	_, err = r.db.ExecContext(ctx, query, id, policyDecisionJSON)
+	return err
+}
+
+func (r *Repository) EndGatewaySession(ctx context.Context, id string) error {
+	query := `UPDATE mcp_gateway_sessions SET status = 'completed', ended_at = NOW() WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}
+
+func (r *Repository) ListGatewaySessions(ctx context.Context, agentID string, limit int) ([]server.GatewaySession, error) {
+	query := `
+		SELECT id, session_type, agent_id, correlation_id, task_intent, risk_level, policy_decision, status, started_at, ended_at, metadata_
+		FROM mcp_gateway_sessions
+		WHERE ($1 = '' OR agent_id = $1)
+		ORDER BY started_at DESC
+		LIMIT $2
+	`
+	rows, err := r.db.QueryContext(ctx, query, agentID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]server.GatewaySession, 0)
+	for rows.Next() {
+		var session server.GatewaySession
+		var taskIntentJSON, policyDecisionJSON, metadataJSON []byte
+		var endedAt sql.NullTime
+
+		if err := rows.Scan(
+			&session.ID,
+			&session.SessionType,
+			&session.AgentID,
+			&session.CorrelationID,
+			&taskIntentJSON,
+			&session.RiskLevel,
+			&policyDecisionJSON,
+			&session.Status,
+			&session.StartedAt,
+			&endedAt,
+			&metadataJSON,
+		); err != nil {
+			continue
+		}
+
+		if endedAt.Valid {
+			session.EndedAt = &endedAt.Time
+		}
+		if err := json.Unmarshal(taskIntentJSON, &session.TaskIntent); err != nil {
+			session.TaskIntent = map[string]any{}
+		}
+		if policyDecisionJSON != nil && string(policyDecisionJSON) != "null" {
+			if err := json.Unmarshal(policyDecisionJSON, &session.PolicyDecision); err != nil {
+				session.PolicyDecision = map[string]any{}
+			}
+		}
+		if err := json.Unmarshal(metadataJSON, &session.Metadata); err != nil {
+			session.Metadata = map[string]any{}
+		}
+		items = append(items, session)
+	}
+	return items, rows.Err()
 }

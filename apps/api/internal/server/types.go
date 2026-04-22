@@ -470,3 +470,17 @@ type RateSkillRequest struct {
 	Rating  int    `json:"rating"`
 	Comment string `json:"comment,omitempty"`
 }
+
+type GatewaySession struct {
+	ID             string                 `json:"id"`
+	SessionType    string                 `json:"session_type"`
+	AgentID        string                 `json:"agent_id"`
+	CorrelationID  string                 `json:"correlation_id"`
+	TaskIntent     map[string]interface{} `json:"task_intent"`
+	RiskLevel      string                 `json:"risk_level"`
+	PolicyDecision map[string]interface{} `json:"policy_decision,omitempty"`
+	Status         string                 `json:"status"`
+	StartedAt      time.Time              `json:"started_at"`
+	EndedAt        *time.Time             `json:"ended_at,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+}
