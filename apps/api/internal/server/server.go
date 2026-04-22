@@ -124,27 +124,72 @@ func (a repoToSkillRepoAdapter) CreateSkill(req service.CreateSkillRequest) serv
 }
 
 func (a repoToSkillRepoAdapter) ListDependencies(ctx context.Context, skillID string) ([]service.SkillDependency, error) {
-	return nil, nil
+	deps, err := a.repo.ListDependencies(ctx, skillID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]service.SkillDependency, len(deps))
+	for i, dep := range deps {
+		result[i] = service.SkillDependency{
+			SkillID:      dep.SkillID,
+			DependencyID: dep.DependencySkillID,
+			Version:      dep.VersionConstraint,
+		}
+	}
+	return result, nil
 }
 
 func (a repoToSkillRepoAdapter) UpsertRating(ctx context.Context, skillID, userID string, rating int, comment string) error {
-	return nil
+	return a.repo.UpsertRating(ctx, skillID, userID, rating, comment)
 }
 
 func (a repoToSkillRepoAdapter) ListSkillsByCategory(ctx context.Context, category, search string) ([]service.Skill, error) {
-	return nil, nil
+	skills, err := a.repo.ListSkillsByCategory(ctx, category, search)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]service.Skill, len(skills))
+	for i, skill := range skills {
+		result[i] = service.Skill{
+			ID:             skill.ID,
+			Name:           skill.Name,
+			OwnerTeam:      skill.OwnerTeam,
+			RiskLevel:      skill.RiskLevel,
+			Status:         skill.Status,
+			CurrentVersion: skill.CurrentVersion,
+			CreatedBy:      skill.CreatedBy,
+		}
+	}
+	return result, nil
 }
 
 func (a repoToSkillRepoAdapter) GetRatingStats(ctx context.Context, skillID string) (float64, int, error) {
-	return 0, 0, nil
+	return a.repo.GetRatingStats(ctx, skillID)
 }
 
 func (a repoToSkillRepoAdapter) GetInstallCount(ctx context.Context, skillID string) (int, error) {
-	return 0, nil
+	return a.repo.GetInstallCount(ctx, skillID)
 }
 
 func (a repoToSkillRepoAdapter) ResolveDepTree(ctx context.Context, skillID string) ([]service.DependencyNode, error) {
-	return nil, nil
+	nodes, err := a.repo.ResolveDepTree(ctx, skillID)
+	if err != nil {
+		return nil, err
+	}
+	return toServiceDependencyNodes(nodes), nil
+}
+
+func toServiceDependencyNodes(nodes []DependencyNode) []service.DependencyNode {
+	result := make([]service.DependencyNode, len(nodes))
+	for i, node := range nodes {
+		result[i] = service.DependencyNode{
+			SkillID:  node.SkillID,
+			Name:     node.Name,
+			Version:  node.Version,
+			Children: toServiceDependencyNodes(node.Children),
+		}
+	}
+	return result
 }
 
 type repoToExecutionRepoAdapter struct {

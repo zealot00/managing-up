@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +27,9 @@ type store struct {
 	gatewayProviderKeys map[string]GatewayProviderKey
 	userBudgets         map[string]UserBudget
 	mcpServers          map[string]MCPServer
+	skillDependencies   []SkillDependency
+	skillRatings        []SkillRating
+	skillInstalls       []SkillInstall
 }
 
 var _ Repository = (*store)(nil)
@@ -42,6 +47,9 @@ func NewStore() *store {
 				RiskLevel:      "medium",
 				Status:         "published",
 				CurrentVersion: "v1",
+				Category:       "operations",
+				TrustScore:     0.95,
+				Verified:       true,
 			},
 			{
 				ID:             "skill_002",
@@ -50,6 +58,9 @@ func NewStore() *store {
 				RiskLevel:      "low",
 				Status:         "published",
 				CurrentVersion: "v3",
+				Category:       "observability",
+				TrustScore:     0.88,
+				Verified:       true,
 			},
 			{
 				ID:             "skill_003",
@@ -58,6 +69,8 @@ func NewStore() *store {
 				RiskLevel:      "high",
 				Status:         "draft",
 				CurrentVersion: "",
+				Category:       "operations",
+				TrustScore:     0.60,
 			},
 		},
 		skillVersions: []SkillVersion{
@@ -158,6 +171,51 @@ func NewStore() *store {
 		gatewayProviderKeys: make(map[string]GatewayProviderKey),
 		userBudgets:         make(map[string]UserBudget),
 		mcpServers:          make(map[string]MCPServer),
+		skillDependencies: []SkillDependency{
+			{
+				ID:                "dep_001",
+				SkillID:           "skill_001",
+				DependencySkillID: "skill_002",
+				VersionConstraint: ">=v3",
+				CreatedAt:         now.Add(-24 * time.Hour).Format(time.RFC3339),
+			},
+		},
+		skillRatings: []SkillRating{
+			{
+				ID:        "rating_001",
+				SkillID:   "skill_001",
+				UserID:    "demo-user",
+				Rating:    5,
+				Comment:   "Stable in production.",
+				CreatedAt: now.Add(-12 * time.Hour).Format(time.RFC3339),
+			},
+			{
+				ID:        "rating_002",
+				SkillID:   "skill_002",
+				UserID:    "demo-user",
+				Rating:    4,
+				Comment:   "Useful for incident triage.",
+				CreatedAt: now.Add(-6 * time.Hour).Format(time.RFC3339),
+			},
+		},
+		skillInstalls: []SkillInstall{
+			{
+				ID:          "install_001",
+				SkillID:     "skill_001",
+				UserID:      "demo-user",
+				Version:     "v1",
+				Environment: "production",
+				InstalledAt: now.Add(-36 * time.Hour).Format(time.RFC3339),
+			},
+			{
+				ID:          "install_002",
+				SkillID:     "skill_001",
+				UserID:      "platform-bot",
+				Version:     "v1",
+				Environment: "staging",
+				InstalledAt: now.Add(-10 * time.Hour).Format(time.RFC3339),
+			},
+		},
 	}
 }
 
@@ -207,6 +265,157 @@ func (s *store) CreateSkill(req CreateSkillRequest) Skill {
 
 	s.skills = append(s.skills, skill)
 	return skill
+}
+
+func (s *store) ListDependencies(ctx context.Context, skillID string) ([]SkillDependency, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	items := make([]SkillDependency, 0)
+	for _, dep := range s.skillDependencies {
+		if dep.SkillID == skillID {
+			items = append(items, dep)
+		}
+	}
+	return items, nil
+}
+
+func (s *store) UpsertRating(ctx context.Context, skillID, userID string, rating int, comment string) error {
+	_ = ctx
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if userID == "" {
+		userID = "anonymous"
+	}
+
+	for i, existing := range s.skillRatings {
+		if existing.SkillID == skillID && existing.UserID == userID {
+			s.skillRatings[i].Rating = rating
+			s.skillRatings[i].Comment = comment
+			s.skillRatings[i].CreatedAt = time.Now().UTC().Format(time.RFC3339)
+			return nil
+		}
+	}
+
+	s.skillRatings = append(s.skillRatings, SkillRating{
+		ID:        fmt.Sprintf("rating_%03d", len(s.skillRatings)+1),
+		SkillID:   skillID,
+		UserID:    userID,
+		Rating:    rating,
+		Comment:   comment,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	})
+	return nil
+}
+
+func (s *store) ListSkillsByCategory(ctx context.Context, category, search string) ([]Skill, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	category = strings.ToLower(strings.TrimSpace(category))
+	search = strings.ToLower(strings.TrimSpace(search))
+
+	items := make([]Skill, 0)
+	for _, skill := range s.skills {
+		if skill.Status != "published" {
+			continue
+		}
+		if category != "" && strings.ToLower(skill.Category) != category {
+			continue
+		}
+		if search != "" {
+			inName := strings.Contains(strings.ToLower(skill.Name), search)
+			inOwner := strings.Contains(strings.ToLower(skill.OwnerTeam), search)
+			inCategory := strings.Contains(strings.ToLower(skill.Category), search)
+			if !inName && !inOwner && !inCategory {
+				continue
+			}
+		}
+		items = append(items, skill)
+	}
+	return items, nil
+}
+
+func (s *store) GetRatingStats(ctx context.Context, skillID string) (float64, int, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var sum float64
+	var count int
+	for _, rating := range s.skillRatings {
+		if rating.SkillID != skillID {
+			continue
+		}
+		sum += float64(rating.Rating)
+		count++
+	}
+	if count == 0 {
+		return 0, 0, nil
+	}
+	return sum / float64(count), count, nil
+}
+
+func (s *store) GetInstallCount(ctx context.Context, skillID string) (int, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	count := 0
+	for _, install := range s.skillInstalls {
+		if install.SkillID == skillID {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (s *store) ResolveDepTree(ctx context.Context, skillID string) ([]DependencyNode, error) {
+	_ = ctx
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	visited := make(map[string]bool)
+	return s.resolveDependencyChildren(skillID, visited), nil
+}
+
+func (s *store) resolveDependencyChildren(skillID string, visited map[string]bool) []DependencyNode {
+	if visited[skillID] {
+		return nil
+	}
+	visited[skillID] = true
+	defer delete(visited, skillID)
+
+	nodes := make([]DependencyNode, 0)
+	for _, dep := range s.skillDependencies {
+		if dep.SkillID != skillID {
+			continue
+		}
+		child, ok := s.findSkill(dep.DependencySkillID)
+		if !ok {
+			continue
+		}
+		node := DependencyNode{
+			SkillID:  child.ID,
+			Name:     child.Name,
+			Version:  child.CurrentVersion,
+			Children: s.resolveDependencyChildren(child.ID, visited),
+		}
+		nodes = append(nodes, node)
+	}
+	return nodes
+}
+
+func (s *store) findSkill(id string) (Skill, bool) {
+	for _, skill := range s.skills {
+		if skill.ID == id {
+			return skill, true
+		}
+	}
+	return Skill{}, false
 }
 
 func (s *store) ListSkillVersions(skillID string) []SkillVersion {

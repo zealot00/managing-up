@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/models"
@@ -11,6 +12,12 @@ type Repository interface {
 	ListSkills(status string) []Skill
 	GetSkill(id string) (Skill, bool)
 	CreateSkill(req CreateSkillRequest) Skill
+	ListDependencies(ctx context.Context, skillID string) ([]SkillDependency, error)
+	UpsertRating(ctx context.Context, skillID, userID string, rating int, comment string) error
+	ListSkillsByCategory(ctx context.Context, category, search string) ([]Skill, error)
+	GetRatingStats(ctx context.Context, skillID string) (float64, int, error)
+	GetInstallCount(ctx context.Context, skillID string) (int, error)
+	ResolveDepTree(ctx context.Context, skillID string) ([]DependencyNode, error)
 	ListSkillVersions(skillID string) []SkillVersion
 	GetSkillVersionForExecution(skillID string) (SkillVersion, bool)
 	ListProcedureDrafts(status string) []ProcedureDraft
@@ -103,4 +110,11 @@ type ExecutionStep struct {
 	Output      map[string]any `json:"output,omitempty"`
 	Error       string         `json:"error,omitempty"`
 	AttemptNo   int            `json:"attempt_no"`
+}
+
+type DependencyNode struct {
+	SkillID  string           `json:"skill_id"`
+	Name     string           `json:"name"`
+	Version  string           `json:"version"`
+	Children []DependencyNode `json:"children,omitempty"`
 }

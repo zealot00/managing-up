@@ -158,6 +158,78 @@ func TestSkillVersionsEndpoint(t *testing.T) {
 	}
 }
 
+func TestSkillMarketEndpoint(t *testing.T) {
+	t.Parallel()
+
+	srv := New(config.Config{Port: "8080"})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/skills/market?category=operations", nil)
+	rec := httptest.NewRecorder()
+
+	srv.handleSkillMarket(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	var body Envelope
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("expected valid json response: %v", err)
+	}
+
+	items, ok := body.Data.([]any)
+	if !ok || len(items) == 0 {
+		t.Fatalf("expected non-empty skill market payload")
+	}
+}
+
+func TestSkillDependenciesEndpoint(t *testing.T) {
+	t.Parallel()
+
+	srv := New(config.Config{Port: "8080"})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/skills/skill_001/dependencies", nil)
+	rec := httptest.NewRecorder()
+
+	srv.handleSkillDependencies(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestRateSkillEndpoint(t *testing.T) {
+	t.Parallel()
+
+	srv := New(config.Config{Port: "8080"})
+	body := []byte(`{"rating":4,"comment":"useful"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/skills/skill_001/rate", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	srv.handleSkillRate(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestResolveSkillDepsEndpoint(t *testing.T) {
+	t.Parallel()
+
+	srv := New(config.Config{Port: "8080"})
+	body := []byte(`{"skill_id":"skill_001"}`)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/skills/resolve-deps", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	srv.handleSkillResolveDeps(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
 func TestApprovalsEndpoint(t *testing.T) {
 	t.Parallel()
 
