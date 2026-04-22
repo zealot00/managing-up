@@ -9,13 +9,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 
 	"github.com/zealot/managing-up/apps/api/internal/models"
 	"github.com/zealot/managing-up/apps/api/internal/server"
 )
 
-// Repository implements the server.Repository contract with PostgreSQL storage.
+const defaultSnapshotLimit = 10
+
 type Repository struct {
 	db *sql.DB
 }
@@ -2122,15 +2124,19 @@ func (r *Repository) ListGatewaySessions(ctx context.Context, agentID string, li
 
 func (r *Repository) CreateCapabilitySnapshot(ctx context.Context, snap *server.SkillCapabilitySnapshot) error {
 	if snap.ID == "" {
-		snap.ID = fmt.Sprintf("snap_%d", time.Now().UnixNano())
+		snap.ID = uuid.New().String()
 	}
-	metricsJSON, _ := json.Marshal(snap.Metrics)
+	metricsJSON, err := json.Marshal(snap.Metrics)
+	if err != nil {
+		slog.Error("CreateCapabilitySnapshot: failed to marshal metrics", "error", err)
+		return fmt.Errorf("marshal metrics: %w", err)
+	}
 
 	query := `
 		INSERT INTO skill_capability_snapshots (id, skill_id, version, snapshot_type, dataset_id, run_id, metrics, overall_score, passed, gate_policy_id, evaluated_at, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
-	_, err := r.db.ExecContext(ctx, query,
+	_, err = r.db.ExecContext(ctx, query,
 		snap.ID,
 		snap.SkillID,
 		snap.Version,
@@ -2196,7 +2202,7 @@ func (r *Repository) GetLatestSnapshot(ctx context.Context, skillID, version str
 
 func (r *Repository) ListSnapshots(ctx context.Context, skillID string, limit int) ([]server.SkillCapabilitySnapshot, error) {
 	if limit <= 0 {
-		limit = 10
+		limit = defaultSnapshotLimit
 	}
 	query := `
 		SELECT id, skill_id, version, snapshot_type, dataset_id, run_id, metrics, overall_score, passed, gate_policy_id, evaluated_at, created_at
