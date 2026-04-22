@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zealot/managing-up/apps/api/internal/engine"
+	"github.com/zealot/managing-up/apps/api/internal/models"
 )
 
 type MCPServer struct {
@@ -34,7 +34,7 @@ type MCPRouterRepository interface {
 }
 
 type PolicyChecker interface {
-	CheckPolicy(ctx context.Context, intent engine.TaskIntent) (*engine.PolicyDecision, error)
+	CheckPolicy(ctx context.Context, intent models.TaskIntent) (*models.PolicyDecision, error)
 }
 
 type MCPRouterService struct {
@@ -47,7 +47,7 @@ func NewMCPRouterService(repo MCPRouterRepository, mc *MetricsCollector, pc Poli
 	return &MCPRouterService{repo: repo, metricsCollector: mc, policyChecker: pc}
 }
 
-func (s *MCPRouterService) MatchTaskWithPolicy(ctx context.Context, intent engine.TaskIntent) (*MatchResult, *engine.PolicyDecision, error) {
+func (s *MCPRouterService) MatchTaskWithPolicy(ctx context.Context, intent models.TaskIntent) (*MatchResult, *models.PolicyDecision, error) {
 	decision, err := s.policyChecker.CheckPolicy(ctx, intent)
 	if err != nil {
 		return nil, nil, fmt.Errorf("policy check failed: %w", err)

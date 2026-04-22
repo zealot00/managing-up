@@ -1,17 +1,6 @@
-package engine
+package models
 
 import "time"
-
-type GatewaySession struct {
-	ID             string
-	AgentID        string
-	CorrelationID  string
-	TaskIntent     TaskIntent
-	RiskLevel      RiskLevel
-	PolicyDecision *PolicyDecision
-	Status         SessionStatus
-	StartedAt      time.Time
-}
 
 type TaskIntent struct {
 	TaskType       string

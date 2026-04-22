@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zealot/managing-up/apps/api/internal/engine"
+	"github.com/zealot/managing-up/apps/api/internal/models"
 )
 
 type DefaultPolicyChecker struct {
@@ -16,8 +16,8 @@ func NewDefaultPolicyChecker(repo MCPRouterRepository) *DefaultPolicyChecker {
 	return &DefaultPolicyChecker{repo: repo}
 }
 
-func (c *DefaultPolicyChecker) CheckPolicy(ctx context.Context, intent engine.TaskIntent) (*engine.PolicyDecision, error) {
-	decision := &engine.PolicyDecision{
+func (c *DefaultPolicyChecker) CheckPolicy(ctx context.Context, intent models.TaskIntent) (*models.PolicyDecision, error) {
+	decision := &models.PolicyDecision{
 		Allowed:     true,
 		DeterminedAt: time.Now(),
 	}
