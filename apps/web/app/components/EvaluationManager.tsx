@@ -8,8 +8,6 @@ import CreateMetricForm from "./CreateMetricForm";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { Badge } from "./ui/Badge";
-import { DataToolbar } from "./ui/DataToolbar";
-import { LoadMore } from "./ui/LoadMore";
 import { formatRelativeTime, formatDurationMs } from "../lib/format";
 
 const PAGE_SIZE = 20;
@@ -68,11 +66,18 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
   const hasMoreExec = execDisplayCount < filteredExecutions.length;
   const hasMoreTasks = taskDisplayCount < filteredTasks.length;
 
+  const stats = [
+    { label: t("taskExecutions", { count: executions.length }), value: executions.length, icon: "▶", color: "var(--primary)" },
+    { label: t("tasks", { count: tasks.length }), value: tasks.length, icon: "☐", color: "var(--ink)" },
+    { label: t("metrics", { count: metrics.length }), value: metrics.length, icon: "◆", color: "var(--success)" },
+    { label: "Running", value: executions.filter(e => e.status === "running").length, icon: "●", color: "var(--warning)" },
+  ];
+
   return (
     <>
       <PageHeader
-        eyebrow={t("taskExecutions", { count: executions.length })}
-        title=""
+        title={t("title")}
+        description={t("lede")}
         actions={
           <>
             <button className="btn btn-secondary" onClick={() => { setShowCreateMetric(!showCreateMetric); setShowRunEval(false); }}>
@@ -88,37 +93,43 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
       {showCreateMetric && <CreateMetricForm onCreated={() => setShowCreateMetric(false)} />}
       {showRunEval && <RunEvaluationForm tasks={tasks} onCreated={() => setShowRunEval(false)} />}
 
-      <section aria-label="Available metrics" style={{ marginTop: "var(--space-6)" }}>
-        <div className="panel">
-          <div className="panel-header">
-            <p className="section-kicker">{t("metrics")}</p>
-            <h2 className="panel-title">{t("availableMetrics", { count: metrics.length })}</h2>
-          </div>
-          {metrics.length > 0 ? (
-            <div className="tags">
-              {metrics.map((metric) => (
-                <span key={metric.id} className="tag">
-                  {metric.name} <span style={{ opacity: 0.6 }}>({metric.type})</span>
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-note">{t("noMetrics")}</p>
-          )}
-        </div>
-      </section>
+      <div className="dashboard-stats">
+        {stats.map((stat) => (
+          <article className="dashboard-stat-card" key={stat.label}>
+            <div className="dashboard-stat-icon" style={{ color: stat.color }}>{stat.icon}</div>
+            <div className="dashboard-stat-value">{stat.value}</div>
+            <div className="dashboard-stat-label">{stat.label}</div>
+          </article>
+        ))}
+      </div>
 
-      <section aria-label="Task executions" style={{ marginTop: "var(--space-6)" }}>
-        <DataToolbar
-          searchQuery={searchQuery}
-          onSearchChange={(v) => { setSearchQuery(v); setExecDisplayCount(PAGE_SIZE); }}
-          filters={
-            <>
+      {metrics.length > 0 && (
+        <div className="dashboard-section" style={{ marginBottom: "var(--space-6)" }}>
+          <div className="dashboard-section-header">
+            <h2 className="dashboard-section-title">{t("availableMetrics", { count: metrics.length })}</h2>
+          </div>
+          <div className="tags">
+            {metrics.map((metric) => (
+              <span key={metric.id} className="tag">
+                {metric.name} <span style={{ opacity: 0.6 }}>({metric.type})</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="content-grid">
+        <div className="dashboard-section">
+          <div className="dashboard-section-header">
+            <h2 className="dashboard-section-title">
+              {t("eyebrow")}
+            </h2>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
               <select
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setExecDisplayCount(PAGE_SIZE); }}
                 className="form-select"
-                style={{ minWidth: 140 }}
+                style={{ minWidth: 120, fontSize: "var(--text-sm)" }}
               >
                 <option value="all">All Status</option>
                 <option value="running">Running</option>
@@ -126,76 +137,68 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
                 <option value="completed">Completed</option>
                 <option value="failed">Failed</option>
               </select>
-            </>
-          }
-        />
-        <div className="panel">
-          <div className="panel-header">
-            <p className="section-kicker">{t("eyebrow")}</p>
-            <h2 className="panel-title">
-              {filteredExecutions.length === executions.length
-                ? t("taskExecutions", { count: executions.length })
-                : `${filteredExecutions.length} of ${executions.length} executions`}
-            </h2>
+            </div>
+          </div>
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <input
+              type="text"
+              placeholder="Search executions..."
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setExecDisplayCount(PAGE_SIZE); }}
+              className="form-input"
+              style={{ width: "100%" }}
+            />
           </div>
           {displayedExecutions.length > 0 ? (
             <>
-              <div className="list">
+              <div className="dashboard-list">
                 {displayedExecutions.map((exec) => (
                   <ExecutionRow key={exec.id} exec={exec} tasks={tasks} />
                 ))}
               </div>
-              <LoadMore
-                hasMore={hasMoreExec}
-                isLoading={false}
-                onLoadMore={() => setExecDisplayCount((c) => c + PAGE_SIZE)}
-                label="Load more executions"
-              />
+              {hasMoreExec && (
+                <button
+                  onClick={() => setExecDisplayCount((c) => c + PAGE_SIZE)}
+                  className="btn btn-ghost btn-sm"
+                  style={{ width: "100%", marginTop: "var(--space-3)" }}
+                >
+                  Load more ({filteredExecutions.length - execDisplayCount} remaining)
+                </button>
+              )}
             </>
-          ) : executions.length > 0 ? (
-            <EmptyState title="No matching executions" />
           ) : (
-            <EmptyState title={t("noExecutions")} description={t("noExecutionsDesc")} />
+            <EmptyState title={executions.length > 0 ? "No matching executions" : t("noExecutions")} />
           )}
         </div>
-      </section>
 
-      <section aria-label="Task overview" style={{ marginTop: "var(--space-6)" }}>
-        <DataToolbar
-          searchQuery={searchQuery}
-          onSearchChange={(v) => { setSearchQuery(v); setTaskDisplayCount(PAGE_SIZE); }}
-          filters={
-            <select
-              value={difficultyFilter}
-              onChange={(e) => { setDifficultyFilter(e.target.value); setTaskDisplayCount(PAGE_SIZE); }}
-              className="form-select"
-              style={{ minWidth: 140 }}
-            >
-              <option value="all">All Difficulties</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          }
-        />
-        <div className="panel">
-          <div className="panel-header">
-            <p className="section-kicker">Tasks</p>
-            <h2 className="panel-title">
-              {filteredTasks.length === tasks.length
-                ? t("taskOverview", { count: tasks.length })
-                : `${filteredTasks.length} of ${tasks.length} tasks`}
+        <div className="dashboard-section">
+          <div className="dashboard-section-header">
+            <h2 className="dashboard-section-title">
+              {t("taskOverview", { count: tasks.length })}
             </h2>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <select
+                value={difficultyFilter}
+                onChange={(e) => { setDifficultyFilter(e.target.value); setTaskDisplayCount(PAGE_SIZE); }}
+                className="form-select"
+                style={{ minWidth: 120, fontSize: "var(--text-sm)" }}
+              >
+                <option value="all">All Difficulties</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
           </div>
           {displayedTasks.length > 0 ? (
             <>
-              <div className="list">
+              <div className="dashboard-list">
                 {displayedTasks.map((task) => (
-                  <article className="list-card" key={task.id}>
-                    <div className="list-card-main">
-                      <h3 className="list-card-title">{task.name}</h3>
-                      <p className="list-card-meta">
-                        {task.test_cases.length} test cases · {task.difficulty} difficulty
+                  <article className="dashboard-list-item" key={task.id}>
+                    <div className="dashboard-list-main">
+                      <h3 className="dashboard-list-title">{task.name}</h3>
+                      <p className="dashboard-list-meta">
+                        {task.test_cases.length} test cases
                       </p>
                     </div>
                     <Badge variant={task.difficulty as "easy" | "medium" | "hard"}>
@@ -204,20 +207,21 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
                   </article>
                 ))}
               </div>
-              <LoadMore
-                hasMore={hasMoreTasks}
-                isLoading={false}
-                onLoadMore={() => setTaskDisplayCount((c) => c + PAGE_SIZE)}
-                label="Load more tasks"
-              />
+              {hasMoreTasks && (
+                <button
+                  onClick={() => setTaskDisplayCount((c) => c + PAGE_SIZE)}
+                  className="btn btn-ghost btn-sm"
+                  style={{ width: "100%", marginTop: "var(--space-3)" }}
+                >
+                  Load more ({filteredTasks.length - taskDisplayCount} remaining)
+                </button>
+              )}
             </>
-          ) : tasks.length > 0 ? (
-            <EmptyState title="No matching tasks" />
           ) : (
-            <p className="empty-note">{t("noTasksDesc")}</p>
+            <EmptyState title={tasks.length > 0 ? "No matching tasks" : t("noTasksDesc")} />
           )}
         </div>
-      </section>
+      </div>
     </>
   );
 }
