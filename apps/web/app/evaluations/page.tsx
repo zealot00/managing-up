@@ -19,12 +19,6 @@ async function EvaluationsContent() {
 
   return (
     <main className="shell">
-      <PageHeader
-        eyebrow={t("eyebrow")}
-        title={t("title")}
-        description={t("lede")}
-      />
-
       <EvaluationManager
         executions={execItems}
         tasks={taskItems}
