@@ -155,6 +155,61 @@ Act: 调整优先级，下一轮 Sprint
 | SDK Languages | 2 (Python, TypeScript) |
 | Phase 1 完成 | 6/6 items ✅ |
 
+## v2.0 核心功能完成状态
+
+> 更新日期: 2026-04-23
+
+### ✅ Phase 0: 架构收敛与补债 (已完成)
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| Gateway Sessions 数据模型 | ✅ | `mcp_gateway_sessions` 表 + CRUD |
+| Skill Capability Snapshots | ✅ | `skill_capability_snapshots` 表 + CRUD |
+| Pre-flight Policy Hook | ✅ | `DefaultPolicyChecker` + 规则引擎 |
+| GatewaySessionService | ✅ | Session 创建、Policy 决策记录 |
+| MCPRouterHandler 集成 Session | ✅ | 请求自动创建 Session |
+| Regression Gate (Promote 检查) | ✅ | `OrchestratorService.Promote()` 检查 Snapshot |
+
+### ✅ Phase 1: Unified Governance Kernel (已完成)
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| Gateway Session 创建与追踪 | ✅ | `/api/v1/gateway/sessions` |
+| Policy Checker 实现 | ✅ | 支持 task_type/tag/risk_level 条件匹配 |
+| Policy 决策记录 | ✅ | Session 关联 PolicyDecision |
+| Snapshot API | ✅ | `/api/v1/snapshots`, `/api/v1/snapshots/list` |
+| Promote 前 Gate 检查 | ✅ | 未通过 Snapshot 不可 Promote |
+| 前端 Session 历史页面 | ✅ | `/gateway/sessions` |
+| 前端 Snapshot 页面 | ✅ | `/skills/snapshots` |
+
+### ✅ Phase 2: Memory Hub MVP (已完成)
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| Memory Cells 数据模型 | ✅ | `memory_cells` 表 + CRUD |
+| MemoryHubService | ✅ | 多 Scope 支持 (execution/session/agent/tenant) |
+| Gateway 内存注入 | ✅ | `BuildMemoryContext` 自动注入 |
+| In-Memory Repository | ✅ | `inMemoryMemoryRepo` 实现 |
+
+### ✅ Phase 3: Bridge Adapter MVP (已完成)
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| OpenAPI Importer | ✅ | `OpenAPIImporter` 从 spec 生成模板 |
+| Response Optimizer | ✅ | pick/omit/truncate/summarize 规则 |
+| Adapter Template | ✅ | 结构化存储 endpoints + mapping |
+
+### 前端页面状态
+
+| 页面 | 路由 | 状态 |
+|------|------|------|
+| Gateway Sessions | `/gateway/sessions` | ✅ |
+| Snapshot History | `/skills/snapshots` | ✅ |
+| Evaluations Dashboard | `/evaluations` | ✅ (重新设计) |
+| MCP Router Dashboard | `/mcp-router` | ✅ |
+
+---
+
 ## Frontend Refactoring — 2026-04-08
 
 ### ✅ Completed

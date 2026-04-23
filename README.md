@@ -594,6 +594,234 @@ mcp_router_match_failures_total{reason="no_matching_server"} 23
 
 ---
 
+## Gateway Sessions & Policy Hook
+
+Gateway Sessions 提供请求追踪和策略决策能力，形成"请求 → Policy Check → 路由 → 执行 → 评测回填"的闭环。
+
+### 特性
+
+- **Session 追踪**: 每个请求创建唯一 Session，记录完整生命周期
+- **Pre-flight Policy**: 请求执行前进行风险/合规判定
+- **Policy 规则引擎**: 支持 task_type、tags、risk_level 条件匹配
+- **自动化决策**: 高风险任务自动标记为需要审批
+
+### API 端点
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/gateway/sessions` | 列出 Gateway Sessions |
+| GET | `/api/v1/gateway/sessions/{id}` | Session 详情 |
+
+### Session 数据结构
+
+```json
+{
+  "id": "sess_abc123",
+  "session_type": "router",
+  "agent_id": "openclaw-v1",
+  "correlation_id": "corr_xyz789",
+  "task_intent": {
+    "task_type": "code_review",
+    "tags": ["security", "python"],
+    "raw_description": "审查这段代码"
+  },
+  "risk_level": "medium",
+  "policy_decision": {
+    "allowed": true,
+    "policy_id": "default",
+    "reasons": []
+  },
+  "status": "active",
+  "started_at": "2026-04-22T10:30:00Z"
+}
+```
+
+### 风险等级
+
+| Level | 说明 | 默认行为 |
+|-------|------|---------|
+| `low` | 低风险操作 | 自动放行 |
+| `medium` | 中等风险 | 日志记录 |
+| `high` | 高风险操作 | 需要审批 |
+| `critical` | 极高风险 | 阻止执行 |
+
+### Policy 规则配置
+
+```bash
+# 环境变量配置默认策略规则
+DEFAULT_POLICY_RULES='[{"condition":"task_type:delete","action":"deny","reason":"Delete operations require approval"}]'
+```
+
+---
+
+## Capability Snapshots & Regression Gate
+
+Capability Snapshots 记录技能版本的能力评测结果，Regression Gate 确保只有通过评测的版本才能发布。
+
+### 特性
+
+- **自动化评测**: Skill 版本变更时自动触发回归测试
+- **阈值门禁**: 未通过阈值的版本不可 promote
+- **历史追踪**: 可查看任意版本的历史评测结果
+- **多指标评分**: 支持多种评测指标聚合
+
+### API 端点
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/snapshots` | 获取 Skill 最新 Snapshot |
+| GET | `/api/v1/snapshots/list` | 列出 Skill 的所有 Snapshots |
+
+### Snapshot 数据结构
+
+```json
+{
+  "id": "snap_xyz123",
+  "skill_id": "skill_code_review",
+  "version": "1.2.0",
+  "snapshot_type": "regression_gate",
+  "dataset_id": "ds_benchmark_v2",
+  "run_id": "run_456",
+  "metrics": {
+    "accuracy": 0.85,
+    "precision": 0.82,
+    "recall": 0.88,
+    "f1": 0.85
+  },
+  "overall_score": 0.85,
+  "passed": true,
+  "gate_policy_id": "default_gate",
+  "evaluated_at": "2026-04-22T12:00:00Z"
+}
+```
+
+### Regression Gate 工作流
+
+```
+版本提交 → 自动触发评测 → Snapshot 记录结果 → Promote 检查 Snapshot
+                                              ↓
+                                    passed=true? → 允许 Promote
+                                         ↓
+                                    passed=false → 拒绝 Promote
+```
+
+### 查看 Snapshot 页面
+
+前端页面: `/skills/snapshots?skill_id=your_skill_id`
+
+---
+
+## Memory Hub
+
+Memory Hub 提供跨会话的记忆能力，支持 Agent 在多轮对话中保持上下文。
+
+### 特性
+
+- **多 Scope 支持**: execution / session / agent / tenant
+- **CRUD 操作**: 创建、读取、更新、删除记忆单元
+- **自动注入**: Gateway 自动将 Memory Context 注入请求
+- **元数据检索**: 基于 tags、key 进行检索
+
+### Memory Cell 数据结构
+
+```json
+{
+  "id": "mem_abc123",
+  "scope": "session",
+  "agent_id": "openclaw-v1",
+  "session_id": "sess_xyz789",
+  "execution_id": "exec_123",
+  "key": "user_preferences",
+  "value": {"theme": "dark", "language": "zh-CN"},
+  "value_type": "json",
+  "tags": ["preferences", "ui"],
+  "created_at": "2026-04-22T10:30:00Z",
+  "updated_at": "2026-04-22T14:00:00Z"
+}
+```
+
+### 内存 Scope 说明
+
+| Scope | 生命周期 | 用途 |
+|-------|---------|------|
+| `execution` | 单次执行 | 步骤间传递中间结果 |
+| `session` | 会话期间 | 跨 Agent 调用保持上下文 |
+| `agent` | Agent 级别 | Agent 的长期偏好设置 |
+| `tenant` | 租户级别 | 组织级共享知识 |
+
+---
+
+## Bridge Adapter
+
+Bridge Adapter 提供 Any-to-MCP 的适配能力，支持将 REST API 快速转换为 MCP 工具。
+
+### 特性
+
+- **OpenAPI 导入**: 从 OpenAPI/Swagger spec 自动生成 Adapter 模板
+- **请求插值**: 支持输入参数映射到 REST 请求
+- **响应裁剪**: 字段白名单、大小限制、摘要生成
+- **多格式支持**: JSON selector、字段过滤、列表截断
+
+### OpenAPI 导入示例
+
+```bash
+# 导入 OpenAPI spec
+curl -X POST http://localhost:8080/api/v1/gateway/bridge/import \
+  -H "Content-Type: application/json" \
+  -d @openapi_spec.json
+
+# 返回 Adapter 模板
+{
+  "id": "adapter_123",
+  "name": "My REST API",
+  "base_url": "https://api.example.com",
+  "endpoints": [...],
+  "input_mapping": {...},
+  "output_rules": [...]
+}
+```
+
+### 响应优化规则
+
+| 规则类型 | 说明 | 示例 |
+|---------|------|------|
+| `pick` | 只返回指定字段 | `{"type":"pick","fields":["id","name"]}` |
+| `omit` | 排除指定字段 | `{"type":"omit","fields":["internal_id"]}` |
+| `truncate` | 截断字符串字段 | `{"type":"truncate","fields":["description"],"max_length":500}` |
+| `summarize` | 截断数组列表 | `{"type":"summarize","max_items":10}` |
+
+---
+
+## 前端页面说明
+
+### 页面路由
+
+| 路径 | 功能 | 说明 |
+|------|------|------|
+| `/gateway/sessions` | Session 历史 | 查看所有 Gateway Session 记录和 Policy 决策 |
+| `/skills/snapshots` | Snapshot 历史 | 查看 Skill 版本的评测结果和 Regression Gate 状态 |
+| `/evaluations` | 评估引擎 | 管理任务、执行、指标，可运行评估和查看结果 |
+| `/mcp-router` | MCP 路由仪表盘 | 查看路由目录、服务器状态、信任评分 |
+
+### 使用示例
+
+**查看 Session 历史:**
+1. 访问 `/gateway/sessions`
+2. 在搜索框输入 Agent ID 过滤
+3. 点击 Session 查看详情和 Policy 决策
+
+**查看 Snapshot:**
+1. 访问 `/skills/snapshots`
+2. 输入 Skill ID 查询
+3. 查看 PASSED/FAILED 状态和评分
+
+**运行评估:**
+1. 访问 `/evaluations`
+2. 点击"运行评估"选择任务
+3. 等待执行完成查看结果
+
+---
+
 ## Skill Repository (技能仓库)
 
 企业级 Skill 仓库，支持依赖管理、版本控制、市场发现和 SOP 参照。
@@ -846,6 +1074,11 @@ managing-up/
 | MCP Router Metrics | ✅ | /mcp-router/metrics Prometheus 监控 |
 | Skill Market | ✅ | /skills/market 市场浏览 |
 | My Skills | ✅ | /skills/my-skills 我的 Skills |
+| Gateway Sessions | ✅ | /gateway/sessions Session 历史 + Policy 决策 |
+| Skill Snapshots | ✅ | /skills/snapshots 评测结果 + Regression Gate |
+| Evaluations Dashboard | ✅ | /evaluations 评估引擎 Dashboard 布局 |
+| Memory Hub | ✅ | 跨会话记忆存储与检索 |
+| Bridge Adapter | ✅ | OpenAPI 导入 + 响应优化 |
 
 ---
 
