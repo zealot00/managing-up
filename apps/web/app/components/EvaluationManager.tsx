@@ -93,14 +93,16 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
       {showCreateMetric && <CreateMetricForm onCreated={() => setShowCreateMetric(false)} />}
       {showRunEval && <RunEvaluationForm tasks={tasks} onCreated={() => setShowRunEval(false)} />}
 
-      <div className="dashboard-stats">
-        {stats.map((stat) => (
-          <article className="dashboard-stat-card" key={stat.label}>
-            <div className="dashboard-stat-icon" style={{ color: stat.color }}>{stat.icon}</div>
-            <div className="dashboard-stat-value">{stat.value}</div>
-            <div className="dashboard-stat-label">{stat.label}</div>
-          </article>
-        ))}
+      <div className="eval-sticky-header">
+        <div className="dashboard-stats">
+          {stats.map((stat) => (
+            <article className="dashboard-stat-card" key={stat.label}>
+              <div className="dashboard-stat-icon" style={{ color: stat.color }}>{stat.icon}</div>
+              <div className="dashboard-stat-value">{stat.value}</div>
+              <div className="dashboard-stat-label">{stat.label}</div>
+            </article>
+          ))}
+        </div>
       </div>
 
       {metrics.length > 0 && (
