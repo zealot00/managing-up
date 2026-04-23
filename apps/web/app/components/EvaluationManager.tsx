@@ -140,9 +140,9 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
           </div>
           {displayedExecutions.length > 0 ? (
             <>
-              <div className="eval-grid">
+              <div className="list">
                 {displayedExecutions.map((exec) => (
-                  <ExecutionCard key={exec.id} exec={exec} tasks={tasks} />
+                  <ExecutionRow key={exec.id} exec={exec} tasks={tasks} />
                 ))}
               </div>
               <LoadMore
@@ -222,29 +222,25 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
   );
 }
 
-function ExecutionCard({ exec, tasks }: { exec: TaskExecution; tasks: Task[] }) {
+function ExecutionRow({ exec, tasks }: { exec: TaskExecution; tasks: Task[] }) {
   const t = useTranslations("evaluations");
   const task = tasks.find((t) => t.id === exec.task_id);
   const taskName = task?.name || exec.task_id;
 
   return (
-    <article className="eval-card">
-      <div className="eval-card-header">
-        <div>
-          <h3 className="eval-card-title">{taskName}</h3>
-          <p className="eval-card-meta">{t("agent")}: {exec.agent_id}</p>
-        </div>
+    <article className="list-card">
+      <div className="list-card-main">
+        <h3 className="list-card-title">{taskName}</h3>
+        <p className="list-card-meta">
+          {t("agent")}: {exec.agent_id}
+          {exec.duration_ms && ` · ${formatDurationMs(exec.duration_ms)}`}
+        </p>
+      </div>
+      <div className="list-card-actions">
+        <span>{formatRelativeTime(exec.created_at)}</span>
         <Badge variant={exec.status as "running" | "pending" | "completed" | "failed" | "muted"}>
           {exec.status}
         </Badge>
-      </div>
-      {exec.duration_ms && (
-        <p className="eval-card-body" style={{ marginTop: "var(--space-3)" }}>
-          {formatDurationMs(exec.duration_ms)}
-        </p>
-      )}
-      <div className="eval-card-footer">
-        <span>{t("createdAt")} {formatRelativeTime(exec.created_at)}</span>
       </div>
     </article>
   );
