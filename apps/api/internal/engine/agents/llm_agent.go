@@ -150,10 +150,22 @@ func (a *LLMAgent) Run(ctx context.Context, task server.Task, tools []engine.Too
 			step.ToolResults = append(step.ToolResults, tr)
 
 			// Append tool result message to conversation
-			resultJSON, _ := json.Marshal(execResult)
+			var content string
+			if execErr != nil {
+				// Inform LLM that tool execution failed
+				content = fmt.Sprintf(`{"error": "tool execution failed: %s"}`, execErr.Error())
+			} else {
+				resultJSON, err := json.Marshal(execResult)
+				if err != nil {
+					// JSON serialization failed - inform LLM rather than sending empty content
+					content = fmt.Sprintf(`{"error": "tool executed but output cannot be serialized: %s"}`, err.Error())
+				} else {
+					content = string(resultJSON)
+				}
+			}
 			messages = append(messages, engine.Message{
 				Role:       "tool",
-				Content:    string(resultJSON),
+				Content:    content,
 				ToolName:   tc.Name,
 				ToolResult: execResult,
 			})

@@ -2,6 +2,7 @@ package evaluator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -259,14 +260,7 @@ func (r *EvaluationRunner) EvaluateExecution(ctx context.Context, taskExecID, me
 
 	expected := ""
 	for _, tc := range task.TestCases {
-		match := true
-		for k, v := range tc.Input {
-			if fmt.Sprintf("%v", exec.Input[k]) != fmt.Sprintf("%v", v) {
-				match = false
-				break
-			}
-		}
-		if match {
+		if inputMatches(tc.Input, exec.Input) {
 			expected = fmt.Sprintf("%v", tc.Expected)
 			break
 		}
@@ -390,4 +384,35 @@ func joinLines(parts []string) string {
 		result += "\n" + p
 	}
 	return result
+}
+
+func inputMatches(tcInput, execInput map[string]any) bool {
+	if len(tcInput) != len(execInput) {
+		return false
+	}
+	for k, tv := range tcInput {
+		ev, exists := execInput[k]
+		if !exists {
+			return false
+		}
+		if !anyEqual(tv, ev) {
+			return false
+		}
+	}
+	return true
+}
+
+func anyEqual(a, b any) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	aj, err := json.Marshal(a)
+	if err != nil {
+		return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
+	}
+	bj, err := json.Marshal(b)
+	if err != nil {
+		return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
+	}
+	return string(aj) == string(bj)
 }

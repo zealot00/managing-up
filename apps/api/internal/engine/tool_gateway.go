@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -113,6 +114,7 @@ func (gw *ToolGateway) Invoke(ctx context.Context, inv GatewayToolInvocation) (*
 	// Find the tool by reference
 	// If no registry is configured, return mock result (backward compatibility)
 	if gw.toolReg == nil {
+		log.Printf("[WARNING] tool_gateway: toolReg is nil, returning mock result for tool=%s, executionID=%s", inv.ToolRef, inv.ExecutionID)
 		select {
 		case <-ctx.Done():
 			return &GatewayToolResult{
