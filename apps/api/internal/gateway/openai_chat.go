@@ -309,6 +309,44 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 	lastFlushTime := time.Now()
 	isFirstToken := true
 
+	recordUsage := func() {
+		if s.usageRecorder == nil {
+			return
+		}
+		principal := GetPrincipalFromContext(r.Context())
+		if principal == nil {
+			return
+		}
+
+		actualPrompt := totalPromptTokens
+		actualCompletion := totalCompletionTokens
+
+		if actualCompletion == 0 && totalContentLen > 0 {
+			estimatedCompletion := estimateOutputTokens(totalContentLen)
+			slog.Warn("handleOpenAIChatStream: estimated completion tokens due to early termination",
+				"model", model,
+				"content_len", totalContentLen,
+				"estimated_tokens", estimatedCompletion)
+			actualCompletion = estimatedCompletion
+		}
+
+		cost := CalculateCost(string(model), actualPrompt, actualCompletion)
+		_ = s.usageRecorder.RecordUsage(r.Context(), UsageRecord{
+			APIKeyID:         principal.APIKeyID,
+			UserID:           principal.UserID,
+			Username:         principal.Username,
+			Provider:         provider,
+			Model:            model,
+			Endpoint:         "/v1/chat/completions",
+			PromptTokens:     actualPrompt,
+			CompletionTokens: actualCompletion,
+			TotalTokens:      actualPrompt + actualCompletion,
+			Cost:             cost,
+		})
+	}
+
+	defer recordUsage()
+
 	flushBuffer := func(content string, toolCalls []llm.ToolCall, finishReason string) {
 		delta := map[string]any{}
 		if content != "" {
@@ -426,23 +464,8 @@ func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, 
 			flushBuffer("", chunk.ToolCalls, "")
 		}
 	}
+}
 
-	if s.usageRecorder != nil {
-		principal := GetPrincipalFromContext(r.Context())
-		if principal != nil {
-			cost := CalculateCost(string(model), totalPromptTokens, totalCompletionTokens)
-			_ = s.usageRecorder.RecordUsage(r.Context(), UsageRecord{
-				APIKeyID:         principal.APIKeyID,
-				UserID:           principal.UserID,
-				Username:         principal.Username,
-				Provider:         provider,
-				Model:            model,
-				Endpoint:         "/v1/chat/completions",
-				PromptTokens:     totalPromptTokens,
-				CompletionTokens: totalCompletionTokens,
-				TotalTokens:      totalPromptTokens + totalCompletionTokens,
-				Cost:             cost,
-			})
-		}
-	}
+func estimateOutputTokens(contentLen int) int {
+	return (contentLen + 3) / 4
 }
