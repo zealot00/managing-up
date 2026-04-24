@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2026-04-24]
+
+### Added
+
+#### v2.0 P3 Features
+
+**Sweep Engine (Hyperparameter Matrix)**
+- Backend: `SweepHandler` with full CRUD operations
+- PostgreSQL persistence for `sweep_configs` and `sweep_runs` tables
+- API endpoints: `GET/POST /api/v1/sweeps`, `DELETE /api/v1/sweeps/delete/{id}`, `GET /api/v1/sweeps/matrix/{id}`
+- Frontend: Form-based sweep creation UI with Model × Temperature × MaxTokens × Prompt matrix
+- Progress tracking and results visualization
+
+**MCP Server Permission Binding**
+- Backend: `MCPInvokeHandler` and `GrantMCPHandler` for permission-based MCP server access
+- Permission check before invoke (user/api_key → MCP server)
+- API endpoints: `POST /api/v1/mcp/invoke`, `POST /api/v1/mcp/grant`, `GET /api/v1/mcp/permissions`
+- Frontend: Permission grant form and MCP invoke interface
+
+**PolicyVersion UI**
+- Backend: `PoliciesHandler` wired to `/api/v1/policies`
+- Form-based policy creation with rules editor
+- Frontend: `PoliciesPageClient` with list/create/expand functionality
+
+**Unit Test Coverage**
+- 64 handler tests covering P0, P1, and P3 features
+- Test files: `sweeps_test.go`, `policies_test.go`, `mcp_permissions_test.go`, `snapshots_test.go`, `mcp_servers_test.go`
+- All tests passing
+
 ## [2026-04-08]
 
 ### Added

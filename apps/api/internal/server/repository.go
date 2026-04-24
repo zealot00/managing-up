@@ -82,6 +82,32 @@ type Repository interface {
 	DeleteMCPServer(id string) error
 	GetLatestSnapshot(ctx context.Context, skillID, version string) (*SkillCapabilitySnapshot, error)
 	ListSnapshots(ctx context.Context, skillID string, limit int) ([]SkillCapabilitySnapshot, error)
+	ListBridgeAdapterConfigs() []BridgeAdapterConfig
+	GetBridgeAdapterConfig(id string) (BridgeAdapterConfig, bool)
+	CreateBridgeAdapterConfig(config BridgeAdapterConfig) (BridgeAdapterConfig, error)
+	UpdateBridgeAdapterConfig(config BridgeAdapterConfig) error
+	DeleteBridgeAdapterConfig(id string) error
+	ListPolicyVersions() ([]models.PolicyVersion, error)
+	GetPolicyVersion(name string) (models.PolicyVersion, bool)
+	CreatePolicyVersion(pv models.PolicyVersion) (models.PolicyVersion, error)
+	UpdatePolicyVersion(pv models.PolicyVersion) error
+	DeletePolicyVersion(id string) error
+	ListMCPServerPermissions(mcpServerID string) ([]MCPServerPermission, error)
+	CreateMCPServerPermission(p MCPServerPermission) (MCPServerPermission, error)
+	CheckMCPPermission(mcpServerID, userID, apiKeyID, skillID string) (bool, error)
+	ListMCPRouterCatalog() ([]MCPRouterCatalogEntry, error)
+	UpsertMCPRouterCatalogEntry(e MCPRouterCatalogEntry) error
+	IncrementMCPRouterCatalogUseCount(serverID string) error
+
+	// Sweep-related methods
+	CreateSweepConfig(cfg SweepConfig) (SweepConfig, error)
+	GetSweepConfig(id string) (SweepConfig, bool)
+	ListSweepConfigs() ([]SweepConfig, error)
+	UpdateSweepConfig(cfg SweepConfig) error
+	DeleteSweepConfig(id string) error
+	CreateSweepRuns(runs []SweepRun) error
+	GetSweepRunsByConfigID(configID string) ([]SweepRun, error)
+	UpdateSweepRun(run SweepRun) error
 }
 
 // ExecutionRepository extends Repository with methods needed by the runtime engine.

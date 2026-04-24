@@ -397,6 +397,18 @@ type MCPServer struct {
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
+type BridgeAdapterConfig struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description,omitempty"`
+	AdapterType string            `json:"adapter_type"`
+	Config      map[string]any    `json:"config"`
+	Tools       []map[string]any  `json:"tools"`
+	Enabled     bool              `json:"enabled"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+}
+
 const (
 	MCPServerStatusPending  = "pending"
 	MCPServerStatusApproved = "approved"
@@ -498,4 +510,111 @@ type GatewaySession struct {
 	StartedAt      time.Time              `json:"started_at"`
 	EndedAt        *time.Time             `json:"ended_at,omitempty"`
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+}
+
+type MCPServerPermission struct {
+	ID              string     `json:"id"`
+	MCPServerID    string     `json:"mcp_server_id"`
+	UserID         string     `json:"user_id,omitempty"`
+	APIKeyID       string     `json:"api_key_id,omitempty"`
+	SkillID        string     `json:"skill_id,omitempty"`
+	PermissionType string     `json:"permission_type"`
+	IsGranted      bool       `json:"is_granted"`
+	GrantedBy      string     `json:"granted_by,omitempty"`
+	GrantedAt      time.Time  `json:"granted_at"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+}
+
+type MCPRouterCatalogEntry struct {
+	ID           string                 `json:"id"`
+	ServerID     string                 `json:"server_id"`
+	Name         string                 `json:"name"`
+	TrustScore   float64                `json:"trust_score"`
+	TransportType string               `json:"transport_type"`
+	URL          string                 `json:"url,omitempty"`
+	Headers      map[string]string     `json:"headers,omitempty"`
+	Enabled      bool                   `json:"enabled"`
+	ApprovedBy   string                 `json:"approved_by,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	UseCount    int                    `json:"use_count"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+type GrantMCPPermissionRequest struct {
+	MCPServerID    string     `json:"mcp_server_id"`
+	UserID         string    `json:"user_id,omitempty"`
+	APIKeyID       string    `json:"api_key_id,omitempty"`
+	SkillID        string    `json:"skill_id,omitempty"`
+	PermissionType string    `json:"permission_type"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+}
+
+type InvokeMCPRequest struct {
+	ServerID    string                 `json:"server_id"`
+	ToolName   string                 `json:"tool_name"`
+	Parameters map[string]interface{} `json:"parameters,omitempty"`
+}
+
+type SweepConfig struct {
+	ID          string            `json:"id"`
+	Name       string            `json:"name"`
+	Description string           `json:"description"`
+	TaskID      string            `json:"task_id"`
+	Parameters SweepParameters   `json:"parameters"`
+	Status     string            `json:"status"`
+	TotalRuns  int               `json:"total_runs"`
+	Completed  int               `json:"completed"`
+	CreatedBy  string            `json:"created_by"`
+	CreatedAt  time.Time        `json:"created_at"`
+	UpdatedAt  time.Time        `json:"updated_at"`
+}
+
+type SweepParameters struct {
+	Models       []string `json:"models"`
+	Temperatures []float64 `json:"temperatures"`
+	MaxTokens    []int     `json:"max_tokens"`
+	Prompts     []SweepPromptVariant `json:"prompts"`
+}
+
+type SweepPromptVariant struct {
+	ID       string `json:"id"`
+	Label    string `json:"label"`
+	Content  string `json:"content"`
+}
+
+type SweepRun struct {
+	ID             string            `json:"id"`
+	SweepConfigID  string            `json:"sweep_config_id"`
+	VariantIndex   int               `json:"variant_index"`
+	Model          string            `json:"model"`
+	Temperature    float64           `json:"temperature"`
+	MaxTokens      int               `json:"max_tokens"`
+	PromptID       string            `json:"prompt_id"`
+	PromptLabel    string            `json:"prompt_label"`
+	Status         string            `json:"status"`
+	TaskExecutionID string           `json:"task_execution_id,omitempty"`
+	Score          float64           `json:"score,omitempty"`
+	DurationMs     int64             `json:"duration_ms,omitempty"`
+	Error          string            `json:"error,omitempty"`
+	CreatedAt      time.Time         `json:"created_at"`
+	CompletedAt    *time.Time        `json:"completed_at,omitempty"`
+}
+
+type CreateSweepRequest struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	TaskID      string          `json:"task_id"`
+	Parameters  SweepParameters `json:"parameters"`
+}
+
+type SweepMatrixCell struct {
+	Model       string  `json:"model"`
+	Temperature float64 `json:"temperature"`
+	MaxTokens   int     `json:"max_tokens"`
+	PromptID    string  `json:"prompt_id"`
+	PromptLabel string  `json:"prompt_label"`
+	RunID       string  `json:"run_id,omitempty"`
+	Status      string  `json:"status"`
+	Score       float64 `json:"score,omitempty"`
 }

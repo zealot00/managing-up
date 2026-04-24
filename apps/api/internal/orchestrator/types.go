@@ -363,3 +363,19 @@ type Policy struct {
 	Name     string       `json:"name"`
 	Rules    []PolicyRule `json:"rules"`
 }
+
+// SkillCapabilitySnapshot represents a capability evaluation snapshot for a skill version.
+type SkillCapabilitySnapshot struct {
+	ID           string         `json:"id"`
+	SkillID      string         `json:"skillId"`
+	Version      string         `json:"version"`
+	SnapshotType string         `json:"snapshotType"`
+	DatasetID    string         `json:"datasetId"`
+	RunID        string         `json:"runId"`
+	Metrics      map[string]any `json:"metrics"`
+	OverallScore float64        `json:"overallScore"`
+	Passed       bool           `json:"passed"`
+	GatePolicyID string         `json:"gatePolicyId"`
+	EvaluatedAt  time.Time      `json:"evaluatedAt"`
+	CreatedAt    time.Time      `json:"createdAt"`
+}

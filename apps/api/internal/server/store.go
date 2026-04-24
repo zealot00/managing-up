@@ -32,7 +32,7 @@ type store struct {
 	skillInstalls       []SkillInstall
 }
 
-var _ Repository = (*store)(nil)
+var _ interface{} = (*store)(nil)
 
 // NewStore creates a new in-memory store.
 func NewStore() *store {
@@ -1202,4 +1202,116 @@ func (s *store) GetLatestSnapshot(ctx context.Context, skillID, version string) 
 
 func (s *store) ListSnapshots(ctx context.Context, skillID string, limit int) ([]SkillCapabilitySnapshot, error) {
 	return []SkillCapabilitySnapshot{}, nil
+}
+
+func (s *store) ListBridgeAdapterConfigs() []BridgeAdapterConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return []BridgeAdapterConfig{}
+}
+
+func (s *store) GetBridgeAdapterConfig(id string) (BridgeAdapterConfig, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return BridgeAdapterConfig{}, false
+}
+
+func (s *store) CreateBridgeAdapterConfig(cfg BridgeAdapterConfig) (BridgeAdapterConfig, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return cfg, nil
+}
+
+func (s *store) UpdateBridgeAdapterConfig(cfg BridgeAdapterConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return nil
+}
+
+func (s *store) DeleteBridgeAdapterConfig(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return nil
+}
+
+func (s *store) ListPolicyVersions() ([]models.PolicyVersion, error) {
+	return nil, nil
+}
+
+func (s *store) GetPolicyVersion(name string) (models.PolicyVersion, bool) {
+	return models.PolicyVersion{}, false
+}
+
+func (s *store) CreatePolicyVersion(pv models.PolicyVersion) (models.PolicyVersion, error) {
+	return pv, nil
+}
+
+func (s *store) UpdatePolicyVersion(pv models.PolicyVersion) error {
+	return nil
+}
+
+func (s *store) DeletePolicyVersion(id string) error {
+	return nil
+}
+
+func (s *store) CreateSweepConfig(cfg SweepConfig) (SweepConfig, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return cfg, nil
+}
+
+func (s *store) GetSweepConfig(id string) (SweepConfig, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return SweepConfig{}, false
+}
+
+func (s *store) ListSweepConfigs() ([]SweepConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return []SweepConfig{}, nil
+}
+
+func (s *store) UpdateSweepConfig(cfg SweepConfig) error {
+	return nil
+}
+
+func (s *store) DeleteSweepConfig(id string) error {
+	return nil
+}
+
+func (s *store) CreateSweepRuns(runs []SweepRun) error {
+	return nil
+}
+
+func (s *store) GetSweepRunsByConfigID(configID string) ([]SweepRun, error) {
+	return []SweepRun{}, nil
+}
+
+func (s *store) UpdateSweepRun(run SweepRun) error {
+	return nil
+}
+
+func (s *store) ListMCPServerPermissions(mcpServerID string) ([]MCPServerPermission, error) {
+	return nil, nil
+}
+
+func (s *store) CreateMCPServerPermission(p MCPServerPermission) (MCPServerPermission, error) {
+	return p, nil
+}
+
+func (s *store) CheckMCPPermission(mcpServerID, userID, apiKeyID, skillID string) (bool, error) {
+	return false, nil
+}
+
+func (s *store) ListMCPRouterCatalog() ([]MCPRouterCatalogEntry, error) {
+	return nil, nil
+}
+
+func (s *store) UpsertMCPRouterCatalogEntry(e MCPRouterCatalogEntry) error {
+	return nil
+}
+
+func (s *store) IncrementMCPRouterCatalogUseCount(serverID string) error {
+	return nil
 }

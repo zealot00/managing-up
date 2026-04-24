@@ -556,3 +556,151 @@ export async function rateSkill(skillId: string, rating: number, comment?: strin
 export async function getMySkills(): Promise<Skill[]> {
   return readEnvelope<Skill[]>("/api/v1/skills");
 }
+
+// Policies API
+export type PolicyRule = {
+  id: string;
+  version: string;
+  condition: string;
+  action: string;
+  reason: string;
+  priority: number;
+  is_active: boolean;
+};
+
+export type PolicyVersion = {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  is_default: boolean;
+  is_active: boolean;
+  rules: PolicyRule[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreatePolicyRequest = {
+  name: string;
+  version?: string;
+  description?: string;
+  is_default?: boolean;
+  rules: PolicyRule[];
+};
+
+export async function getPolicies(): Promise<{ items: PolicyVersion[] }> {
+  return readEnvelope<{ items: PolicyVersion[] }>("/api/v1/policies");
+}
+
+export async function getPolicy(id: string): Promise<PolicyVersion> {
+  return readEnvelope<PolicyVersion>(`/api/v1/policies/${id}`);
+}
+
+export async function createPolicy(req: CreatePolicyRequest): Promise<{ id: string; name: string }> {
+  return postEnvelope<CreatePolicyRequest, { id: string; name: string }>("/api/v1/policies", req);
+}
+
+export async function updatePolicy(id: string, req: CreatePolicyRequest): Promise<void> {
+  await postEnvelope<CreatePolicyRequest, void>(`/api/v1/policies/${id}`, req);
+}
+
+// Sweep Engine Types
+export type SweepPromptVariant = {
+  id: string;
+  label: string;
+  content: string;
+};
+
+export type SweepParameters = {
+  models: string[];
+  temperatures: number[];
+  max_tokens: number[];
+  prompts: SweepPromptVariant[];
+};
+
+export type SweepConfig = {
+  id: string;
+  name: string;
+  description: string;
+  task_id: string;
+  parameters: SweepParameters;
+  status: string;
+  total_runs: number;
+  completed: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SweepRun = {
+  id: string;
+  sweep_config_id: string;
+  variant_index: number;
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  prompt_id: string;
+  prompt_label: string;
+  status: string;
+  task_execution_id?: string;
+  score?: number;
+  duration_ms?: number;
+  error?: string;
+  created_at: string;
+  completed_at?: string;
+};
+
+export type SweepMatrixCell = {
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  prompt_id: string;
+  prompt_label: string;
+  run_id?: string;
+  status: string;
+  score?: number;
+};
+
+export type CreateSweepRequest = {
+  name: string;
+  description?: string;
+  task_id: string;
+  parameters: SweepParameters;
+};
+
+export async function getSweeps(): Promise<{ items: SweepConfig[] }> {
+  return readEnvelope<{ items: SweepConfig[] }>("/api/v1/sweeps");
+}
+
+export async function getSweep(id: string): Promise<SweepConfig> {
+  return readEnvelope<SweepConfig>(`/api/v1/sweeps/${id}`);
+}
+
+export async function createSweep(req: CreateSweepRequest): Promise<{ id: string; name: string; total_runs: number }> {
+  return postEnvelope<CreateSweepRequest, { id: string; name: string; total_runs: number }>("/api/v1/sweeps/create", req);
+}
+
+export async function deleteSweep(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/sweeps/delete/${id}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`API DELETE failed for /api/v1/sweeps/delete/${id}`);
+  }
+}
+
+export async function getSweepMatrix(id: string): Promise<{
+  sweep_id: string;
+  matrix: SweepMatrixCell[][];
+  summary: {
+    total: number;
+    completed: number;
+    pending: number;
+    avg_score: number;
+    max_score: number;
+    min_score: number;
+  };
+}> {
+  return readEnvelope(`/api/v1/sweeps/matrix/${id}`);
+}

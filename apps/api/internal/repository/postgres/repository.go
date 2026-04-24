@@ -2329,12 +2329,13 @@ func (r *Repository) CreateMemoryCell(ctx context.Context, cell *models.MemoryCe
 	}
 
 	query := `
-		INSERT INTO memory_cells (id, scope, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO memory_cells (id, scope, tenant_id, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
 	_, err = r.db.ExecContext(ctx, query,
 		cell.ID,
 		cell.Scope,
+		cell.TenantID,
 		cell.AgentID,
 		nullString(cell.SessionID),
 		nullString(cell.ExecutionID),
@@ -2352,7 +2353,7 @@ func (r *Repository) CreateMemoryCell(ctx context.Context, cell *models.MemoryCe
 
 func (r *Repository) GetMemoryCell(ctx context.Context, id string) (*models.MemoryCell, error) {
 	query := `
-		SELECT id, scope, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at
+		SELECT id, scope, tenant_id, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at
 		FROM memory_cells
 		WHERE id = $1
 	`
@@ -2364,6 +2365,7 @@ func (r *Repository) GetMemoryCell(ctx context.Context, id string) (*models.Memo
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&cell.ID,
 		&cell.Scope,
+		&cell.TenantID,
 		&cell.AgentID,
 		&sessionID,
 		&executionID,
@@ -2404,7 +2406,7 @@ func (r *Repository) GetMemoryCellsBySession(ctx context.Context, sessionID stri
 		limit = defaultSnapshotLimit
 	}
 	query := `
-		SELECT id, scope, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at
+		SELECT id, scope, tenant_id, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at
 		FROM memory_cells
 		WHERE session_id = $1
 		ORDER BY created_at DESC
@@ -2418,7 +2420,7 @@ func (r *Repository) GetMemoryCellsByAgent(ctx context.Context, agentID string, 
 		limit = defaultSnapshotLimit
 	}
 	query := `
-		SELECT id, scope, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at
+		SELECT id, scope, tenant_id, agent_id, session_id, execution_id, key, value, value_type, metadata_, tags, created_at, updated_at, expires_at
 		FROM memory_cells
 		WHERE agent_id = $1
 		ORDER BY created_at DESC
@@ -2444,6 +2446,7 @@ func (r *Repository) queryMemoryCells(ctx context.Context, query string, args ..
 		if err := rows.Scan(
 			&cell.ID,
 			&cell.Scope,
+			&cell.TenantID,
 			&cell.AgentID,
 			&sessionID,
 			&executionID,
@@ -2516,6 +2519,491 @@ func (r *Repository) DeleteMemoryCell(ctx context.Context, id string) error {
 	query := `DELETE FROM memory_cells WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
+}
+
+func (r *Repository) ListBridgeAdapterConfigs() []server.BridgeAdapterConfig {
+	query := `SELECT id, name, description, adapter_type, config, tools, enabled, created_at, updated_at FROM bridge_adapter_configs ORDER BY created_at DESC`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var configs []server.BridgeAdapterConfig
+	for rows.Next() {
+		var cfg server.BridgeAdapterConfig
+		var desc sql.NullString
+		var configJSON, toolsJSON []byte
+
+		if err := rows.Scan(&cfg.ID, &cfg.Name, &desc, &cfg.AdapterType, &configJSON, &toolsJSON, &cfg.Enabled, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
+			continue
+		}
+		if desc.Valid {
+			cfg.Description = desc.String
+		}
+		if configJSON != nil {
+			_ = json.Unmarshal(configJSON, &cfg.Config)
+		}
+		if toolsJSON != nil {
+			_ = json.Unmarshal(toolsJSON, &cfg.Tools)
+		}
+		configs = append(configs, cfg)
+	}
+	return configs
+}
+
+func (r *Repository) GetBridgeAdapterConfig(id string) (server.BridgeAdapterConfig, bool) {
+	query := `SELECT id, name, description, adapter_type, config, tools, enabled, created_at, updated_at FROM bridge_adapter_configs WHERE id = $1`
+	var cfg server.BridgeAdapterConfig
+	var desc sql.NullString
+	var configJSON, toolsJSON []byte
+
+	err := r.db.QueryRow(query, id).Scan(&cfg.ID, &cfg.Name, &desc, &cfg.AdapterType, &configJSON, &toolsJSON, &cfg.Enabled, &cfg.CreatedAt, &cfg.UpdatedAt)
+	if err != nil {
+		return server.BridgeAdapterConfig{}, false
+	}
+	if desc.Valid {
+		cfg.Description = desc.String
+	}
+	if configJSON != nil {
+		_ = json.Unmarshal(configJSON, &cfg.Config)
+	}
+	if toolsJSON != nil {
+		_ = json.Unmarshal(toolsJSON, &cfg.Tools)
+	}
+	return cfg, true
+}
+
+func (r *Repository) CreateBridgeAdapterConfig(cfg server.BridgeAdapterConfig) (server.BridgeAdapterConfig, error) {
+	configJSON, err := json.Marshal(cfg.Config)
+	if err != nil {
+		return cfg, fmt.Errorf("marshal config: %w", err)
+	}
+	toolsJSON, err := json.Marshal(cfg.Tools)
+	if err != nil {
+		return cfg, fmt.Errorf("marshal tools: %w", err)
+	}
+
+	query := `
+		INSERT INTO bridge_adapter_configs (id, name, description, adapter_type, config, tools, enabled, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+	_, err = r.db.Exec(query, cfg.ID, cfg.Name, nullString(cfg.Description), cfg.AdapterType, configJSON, toolsJSON, cfg.Enabled, cfg.CreatedAt, cfg.UpdatedAt)
+	return cfg, err
+}
+
+func (r *Repository) UpdateBridgeAdapterConfig(cfg server.BridgeAdapterConfig) error {
+	configJSON, err := json.Marshal(cfg.Config)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+	toolsJSON, err := json.Marshal(cfg.Tools)
+	if err != nil {
+		return fmt.Errorf("marshal tools: %w", err)
+	}
+
+	query := `
+		UPDATE bridge_adapter_configs
+		SET name = $2, description = $3, adapter_type = $4, config = $5, tools = $6, enabled = $7, updated_at = $8
+		WHERE id = $1
+	`
+	_, err = r.db.Exec(query, cfg.ID, cfg.Name, nullString(cfg.Description), cfg.AdapterType, configJSON, toolsJSON, cfg.Enabled, cfg.UpdatedAt)
+	return err
+}
+
+func (r *Repository) DeleteBridgeAdapterConfig(id string) error {
+	_, err := r.db.Exec("DELETE FROM bridge_adapter_configs WHERE id = $1", id)
+	return err
+}
+
+func (r *Repository) ListPolicyVersions() ([]models.PolicyVersion, error) {
+	query := `SELECT id, name, version, description, is_default, is_active, created_at, updated_at FROM policy_versions ORDER BY created_at DESC`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var versions []models.PolicyVersion
+	for rows.Next() {
+		var pv models.PolicyVersion
+		var desc sql.NullString
+		if err := rows.Scan(&pv.ID, &pv.Name, &pv.Version, &desc, &pv.IsDefault, &pv.IsActive, &pv.CreatedAt, &pv.UpdatedAt); err != nil {
+			continue
+		}
+		if desc.Valid {
+			pv.Description = desc.String
+		}
+		versions = append(versions, pv)
+	}
+	return versions, nil
+}
+
+func (r *Repository) GetPolicyVersion(name string) (models.PolicyVersion, bool) {
+	query := `SELECT id, name, version, description, is_default, is_active, created_at, updated_at FROM policy_versions WHERE name = $1 LIMIT 1`
+	var pv models.PolicyVersion
+	var desc sql.NullString
+	err := r.db.QueryRow(query, name).Scan(&pv.ID, &pv.Name, &pv.Version, &desc, &pv.IsDefault, &pv.IsActive, &pv.CreatedAt, &pv.UpdatedAt)
+	if err != nil {
+		return pv, false
+	}
+	if desc.Valid {
+		pv.Description = desc.String
+	}
+
+	rulesQuery := `SELECT id, rule_id, version, condition, action, reason, priority, is_active, created_at, updated_at FROM policy_rules WHERE policy_id = $1 ORDER BY priority DESC`
+	rows, err := r.db.Query(rulesQuery, pv.ID)
+	if err != nil {
+		return pv, true
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var rule models.PolicyRule
+		var reason sql.NullString
+		var pkID string
+		if err := rows.Scan(&pkID, &rule.ID, &rule.Version, &rule.Condition, &rule.Action, &reason, &rule.Priority, &rule.IsActive, &rule.CreatedAt, &rule.UpdatedAt); err != nil {
+			continue
+		}
+		if reason.Valid {
+			rule.Reason = reason.String
+		}
+		pv.Rules = append(pv.Rules, rule)
+	}
+
+	return pv, true
+}
+
+func (r *Repository) GetDefaultPolicyVersion() (*models.PolicyVersion, error) {
+	query := `SELECT id, name, version, description, is_default, is_active, created_at, updated_at FROM policy_versions WHERE is_default = true LIMIT 1`
+	var pv models.PolicyVersion
+	var desc sql.NullString
+	err := r.db.QueryRow(query).Scan(&pv.ID, &pv.Name, &pv.Version, &desc, &pv.IsDefault, &pv.IsActive, &pv.CreatedAt, &pv.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if desc.Valid {
+		pv.Description = desc.String
+	}
+	return &pv, nil
+}
+
+func (r *Repository) CreatePolicyVersion(pv models.PolicyVersion) (models.PolicyVersion, error) {
+	if pv.ID == "" {
+		pv.ID = uuid.New().String()
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return pv, err
+	}
+	defer tx.Rollback()
+
+	query := `INSERT INTO policy_versions (id, name, version, description, is_default, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+	_, err = tx.Exec(query, pv.ID, pv.Name, pv.Version, nullString(pv.Description), pv.IsDefault, pv.IsActive, pv.CreatedAt, pv.UpdatedAt)
+	if err != nil {
+		return pv, err
+	}
+
+	for _, rule := range pv.Rules {
+		ruleQuery := `INSERT INTO policy_rules (id, policy_id, rule_id, version, condition, action, reason, priority, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+		_, err = tx.Exec(ruleQuery, uuid.New().String(), pv.ID, rule.ID, rule.Version, rule.Condition, rule.Action, nullString(rule.Reason), rule.Priority, rule.IsActive, rule.CreatedAt, rule.UpdatedAt)
+		if err != nil {
+			return pv, err
+		}
+	}
+
+	return pv, tx.Commit()
+}
+
+func (r *Repository) UpdatePolicyVersion(pv models.PolicyVersion) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	query := `UPDATE policy_versions SET name = $2, version = $3, description = $4, is_default = $5, is_active = $6, updated_at = $7 WHERE id = $1`
+	_, err = tx.Exec(query, pv.ID, pv.Name, pv.Version, nullString(pv.Description), pv.IsDefault, pv.IsActive, pv.UpdatedAt)
+	if err != nil {
+		return err
+	}
+
+	deleteRulesQuery := `DELETE FROM policy_rules WHERE policy_id = $1`
+	_, err = tx.Exec(deleteRulesQuery, pv.ID)
+	if err != nil {
+		return err
+	}
+
+	for _, rule := range pv.Rules {
+		ruleQuery := `INSERT INTO policy_rules (id, policy_id, rule_id, version, condition, action, reason, priority, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+		_, err = tx.Exec(ruleQuery, uuid.New().String(), pv.ID, rule.ID, rule.Version, rule.Condition, rule.Action, nullString(rule.Reason), rule.Priority, rule.IsActive, rule.CreatedAt, rule.UpdatedAt)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (r *Repository) DeletePolicyVersion(id string) error {
+	_, err := r.db.Exec("DELETE FROM policy_versions WHERE id = $1", id)
+	return err
+}
+
+func (r *Repository) ListMCPServerPermissions(mcpServerID string) ([]server.MCPServerPermission, error) {
+	query := `SELECT id, mcp_server_id, user_id, api_key_id, skill_id, permission_type, is_granted, granted_by, granted_at, expires_at FROM mcp_server_permissions WHERE mcp_server_id = $1`
+	rows, err := r.db.Query(query, mcpServerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var permissions []server.MCPServerPermission
+	for rows.Next() {
+		var p server.MCPServerPermission
+		var userID, apiKeyID, skillID, grantedBy sql.NullString
+		var expiresAt sql.NullTime
+		if err := rows.Scan(&p.ID, &p.MCPServerID, &userID, &apiKeyID, &skillID, &p.PermissionType, &p.IsGranted, &grantedBy, &p.GrantedAt, &expiresAt); err != nil {
+			continue
+		}
+		if userID.Valid {
+			p.UserID = userID.String
+		}
+		if apiKeyID.Valid {
+			p.APIKeyID = apiKeyID.String
+		}
+		if skillID.Valid {
+			p.SkillID = skillID.String
+		}
+		if grantedBy.Valid {
+			p.GrantedBy = grantedBy.String
+		}
+		if expiresAt.Valid {
+			p.ExpiresAt = &expiresAt.Time
+		}
+		permissions = append(permissions, p)
+	}
+	return permissions, nil
+}
+
+func (r *Repository) CreateMCPServerPermission(p server.MCPServerPermission) (server.MCPServerPermission, error) {
+	if p.ID == "" {
+		p.ID = uuid.New().String()
+	}
+	query := `INSERT INTO mcp_server_permissions (id, mcp_server_id, user_id, api_key_id, skill_id, permission_type, is_granted, granted_by, granted_at, expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+	_, err := r.db.Exec(query, p.ID, p.MCPServerID, nullString(p.UserID), nullString(p.APIKeyID), nullString(p.SkillID), p.PermissionType, p.IsGranted, nullString(p.GrantedBy), p.GrantedAt, p.ExpiresAt)
+	return p, err
+}
+
+func (r *Repository) CheckMCPPermission(mcpServerID, userID, apiKeyID, skillID string) (bool, error) {
+	query := `SELECT is_granted FROM mcp_server_permissions WHERE mcp_server_id = $1 AND is_granted = true AND (expires_at IS NULL OR expires_at > NOW()) AND ((user_id = $2 AND $2 != '') OR (api_key_id = $3 AND $3 != '') OR (skill_id = $4 AND $4 != '')) LIMIT 1`
+	var isGranted bool
+	err := r.db.QueryRow(query, mcpServerID, nullString(userID), nullString(apiKeyID), nullString(skillID)).Scan(&isGranted)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return isGranted, err
+}
+
+func (r *Repository) ListMCPRouterCatalog() ([]server.MCPRouterCatalogEntry, error) {
+	query := `SELECT id, server_id, name, trust_score, transport_type, url, headers, enabled, approved_by, metadata_, use_count, created_at, updated_at FROM mcp_router_catalog WHERE enabled = true ORDER BY trust_score DESC, use_count DESC`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []server.MCPRouterCatalogEntry
+	for rows.Next() {
+		var e server.MCPRouterCatalogEntry
+		var url sql.NullString
+		var headers []byte
+		var approvedBy sql.NullString
+		var metadata []byte
+		if err := rows.Scan(&e.ID, &e.ServerID, &e.Name, &e.TrustScore, &e.TransportType, &url, &headers, &e.Enabled, &approvedBy, &metadata, &e.UseCount, &e.CreatedAt, &e.UpdatedAt); err != nil {
+			continue
+		}
+		if url.Valid {
+			e.URL = url.String
+		}
+		if approvedBy.Valid {
+			e.ApprovedBy = approvedBy.String
+		}
+		if headers != nil {
+			json.Unmarshal(headers, &e.Headers)
+		}
+		if metadata != nil {
+			json.Unmarshal(metadata, &e.Metadata)
+		}
+		entries = append(entries, e)
+	}
+	return entries, nil
+}
+
+func (r *Repository) UpsertMCPRouterCatalogEntry(e server.MCPRouterCatalogEntry) error {
+	headersJSON, _ := json.Marshal(e.Headers)
+	metadataJSON, _ := json.Marshal(e.Metadata)
+	query := `INSERT INTO mcp_router_catalog (id, server_id, name, trust_score, transport_type, url, headers, enabled, approved_by, metadata_, use_count, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (server_id) DO UPDATE SET name = $3, trust_score = $4, transport_type = $5, url = $6, headers = $7, enabled = $8, approved_by = $9, metadata_ = $10, updated_at = $13`
+	if e.ID == "" {
+		e.ID = uuid.New().String()
+	}
+	_, err := r.db.Exec(query, e.ID, e.ServerID, e.Name, e.TrustScore, e.TransportType, nullString(e.URL), headersJSON, e.Enabled, nullString(e.ApprovedBy), metadataJSON, e.UseCount, e.CreatedAt, e.UpdatedAt)
+	return err
+}
+
+func (r *Repository) IncrementMCPRouterCatalogUseCount(serverID string) error {
+	_, err := r.db.Exec("UPDATE mcp_router_catalog SET use_count = use_count + 1, updated_at = NOW() WHERE server_id = $1", serverID)
+	return err
+}
+
+func (r *Repository) CreateSweepConfig(cfg server.SweepConfig) (server.SweepConfig, error) {
+	if cfg.ID == "" {
+		cfg.ID = uuid.New().String()
+	}
+	paramsJSON, err := json.Marshal(cfg.Parameters)
+	if err != nil {
+		return cfg, err
+	}
+	query := `INSERT INTO sweep_configs (id, name, description, task_id, parameters_, status, total_runs, completed, created_by, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+	_, err = r.db.Exec(query, cfg.ID, cfg.Name, nullString(cfg.Description), cfg.TaskID, paramsJSON, cfg.Status, cfg.TotalRuns, cfg.Completed, nullString(cfg.CreatedBy), cfg.CreatedAt, cfg.UpdatedAt)
+	return cfg, err
+}
+
+func (r *Repository) GetSweepConfig(id string) (server.SweepConfig, bool) {
+	query := `SELECT id, name, description, task_id, parameters_, status, total_runs, completed, created_by, created_at, updated_at FROM sweep_configs WHERE id = $1`
+	row := r.db.QueryRow(query, id)
+	var cfg server.SweepConfig
+	var paramsJSON []byte
+	var description, createdBy sql.NullString
+	err := row.Scan(&cfg.ID, &cfg.Name, &description, &cfg.TaskID, &paramsJSON, &cfg.Status, &cfg.TotalRuns, &cfg.Completed, &createdBy, &cfg.CreatedAt, &cfg.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return server.SweepConfig{}, false
+	}
+	if err != nil {
+		return server.SweepConfig{}, false
+	}
+	cfg.Description = description.String
+	cfg.CreatedBy = createdBy.String
+	json.Unmarshal(paramsJSON, &cfg.Parameters)
+	return cfg, true
+}
+
+func (r *Repository) ListSweepConfigs() ([]server.SweepConfig, error) {
+	query := `SELECT id, name, description, task_id, parameters_, status, total_runs, completed, created_by, created_at, updated_at FROM sweep_configs ORDER BY created_at DESC`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var configs []server.SweepConfig
+	for rows.Next() {
+		var cfg server.SweepConfig
+		var paramsJSON []byte
+		var description, createdBy sql.NullString
+		if err := rows.Scan(&cfg.ID, &cfg.Name, &description, &cfg.TaskID, &paramsJSON, &cfg.Status, &cfg.TotalRuns, &cfg.Completed, &createdBy, &cfg.CreatedAt, &cfg.UpdatedAt); err != nil {
+			return nil, err
+		}
+		cfg.Description = description.String
+		cfg.CreatedBy = createdBy.String
+		json.Unmarshal(paramsJSON, &cfg.Parameters)
+		configs = append(configs, cfg)
+	}
+	return configs, nil
+}
+
+func (r *Repository) UpdateSweepConfig(cfg server.SweepConfig) error {
+	paramsJSON, err := json.Marshal(cfg.Parameters)
+	if err != nil {
+		return err
+	}
+	query := `UPDATE sweep_configs SET name = $2, description = $3, task_id = $4, parameters_ = $5, status = $6, total_runs = $7, completed = $8, updated_at = $9 WHERE id = $1`
+	_, err = r.db.Exec(query, cfg.ID, cfg.Name, nullString(cfg.Description), cfg.TaskID, paramsJSON, cfg.Status, cfg.TotalRuns, cfg.Completed, cfg.UpdatedAt)
+	return err
+}
+
+func (r *Repository) DeleteSweepConfig(id string) error {
+	_, err := r.db.Exec("DELETE FROM sweep_configs WHERE id = $1", id)
+	return err
+}
+
+func (r *Repository) CreateSweepRuns(runs []server.SweepRun) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare(`INSERT INTO sweep_runs (id, sweep_config_id, variant_index, model, temperature, max_tokens, prompt_id, prompt_label, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, run := range runs {
+		if run.ID == "" {
+			run.ID = uuid.New().String()
+		}
+		_, err := stmt.Exec(run.ID, run.SweepConfigID, run.VariantIndex, run.Model, run.Temperature, run.MaxTokens, run.PromptID, run.PromptLabel, run.Status, run.CreatedAt)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (r *Repository) GetSweepRunsByConfigID(configID string) ([]server.SweepRun, error) {
+	query := `SELECT id, sweep_config_id, variant_index, model, temperature, max_tokens, prompt_id, prompt_label, status, task_execution_id, score, duration_ms, error, created_at, completed_at FROM sweep_runs WHERE sweep_config_id = $1 ORDER BY variant_index`
+	rows, err := r.db.Query(query, configID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var runs []server.SweepRun
+	for rows.Next() {
+		var run server.SweepRun
+		var taskExecID, errorMsg sql.NullString
+		var score sql.NullFloat64
+		var durationMs sql.NullInt64
+		var completedAt sql.NullTime
+		if err := rows.Scan(&run.ID, &run.SweepConfigID, &run.VariantIndex, &run.Model, &run.Temperature, &run.MaxTokens, &run.PromptID, &run.PromptLabel, &run.Status, &taskExecID, &score, &durationMs, &errorMsg, &run.CreatedAt, &completedAt); err != nil {
+			return nil, err
+		}
+		if taskExecID.Valid {
+			run.TaskExecutionID = taskExecID.String
+		}
+		if score.Valid {
+			run.Score = score.Float64
+		}
+		if durationMs.Valid {
+			run.DurationMs = durationMs.Int64
+		}
+		if errorMsg.Valid {
+			run.Error = errorMsg.String
+		}
+		if completedAt.Valid {
+			run.CompletedAt = &completedAt.Time
+		}
+		runs = append(runs, run)
+	}
+	return runs, nil
+}
+
+func (r *Repository) UpdateSweepRun(run server.SweepRun) error {
+	query := `UPDATE sweep_runs SET status = $2, task_execution_id = $3, score = $4, duration_ms = $5, error = $6, completed_at = $7 WHERE id = $1`
+	_, err := r.db.Exec(query, run.ID, run.Status, nullString(run.TaskExecutionID), nullFloat64(run.Score), nullInt64(run.DurationMs), nullString(run.Error), run.CompletedAt)
+	return err
+}
+
+func nullFloat64(v float64) sql.NullFloat64 {
+	if v == 0 {
+		return sql.NullFloat64{}
+	}
+	return sql.NullFloat64{Float64: v, Valid: true}
+}
+
+func nullInt64(v int64) sql.NullInt64 {
+	if v == 0 {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: v, Valid: true}
 }
 
 func nullString(s string) sql.NullString {

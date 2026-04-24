@@ -15,6 +15,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
+	"github.com/zealot/managing-up/apps/api/internal/bridge"
 	"github.com/zealot/managing-up/apps/api/internal/config"
 	"github.com/zealot/managing-up/apps/api/internal/engine/executors"
 	"github.com/zealot/managing-up/apps/api/internal/gateway"
@@ -527,7 +528,33 @@ type repoToExperimentRunRepoAdapter struct {
 }
 
 func (a repoToExperimentRunRepoAdapter) CreateExperimentRun(run service.ExperimentRun) (service.ExperimentRun, error) {
-	return run, nil
+	created, err := a.repo.CreateExperimentRun(ExperimentRun{
+		ID:           run.ID,
+		ExperimentID: run.ExperimentID,
+		TaskID:       run.TaskID,
+		AgentID:      run.AgentID,
+		VariantID:    run.VariantID,
+		MetricScores: run.MetricScores,
+		OverallScore: run.OverallScore,
+		DurationMs:   run.DurationMs,
+		Status:       run.Status,
+		CreatedAt:    run.CreatedAt,
+	})
+	if err != nil {
+		return service.ExperimentRun{}, err
+	}
+	return service.ExperimentRun{
+		ID:           created.ID,
+		ExperimentID: created.ExperimentID,
+		TaskID:       created.TaskID,
+		AgentID:      created.AgentID,
+		VariantID:    created.VariantID,
+		MetricScores: created.MetricScores,
+		OverallScore: created.OverallScore,
+		DurationMs:   created.DurationMs,
+		Status:       created.Status,
+		CreatedAt:    created.CreatedAt,
+	}, nil
 }
 
 func (a repoToExperimentRunRepoAdapter) GetExperimentRun(id string) (service.ExperimentRun, bool) {
@@ -539,6 +566,7 @@ func (a repoToExperimentRunRepoAdapter) GetExperimentRun(id string) (service.Exp
 				ExperimentID: r.ExperimentID,
 				TaskID:       r.TaskID,
 				AgentID:      r.AgentID,
+				VariantID:    r.VariantID,
 				MetricScores: r.MetricScores,
 				OverallScore: r.OverallScore,
 				DurationMs:   r.DurationMs,
@@ -559,6 +587,7 @@ func (a repoToExperimentRunRepoAdapter) ListExperimentRuns(experimentID string) 
 			ExperimentID: r.ExperimentID,
 			TaskID:       r.TaskID,
 			AgentID:      r.AgentID,
+			VariantID:    r.VariantID,
 			MetricScores: r.MetricScores,
 			OverallScore: r.OverallScore,
 			DurationMs:   r.DurationMs,
@@ -570,16 +599,18 @@ func (a repoToExperimentRunRepoAdapter) ListExperimentRuns(experimentID string) 
 }
 
 func (a repoToExperimentRunRepoAdapter) UpdateExperimentRun(run service.ExperimentRun) error {
-	// Find and update - repo doesn't have UpdateExperimentRun
-	// This is a limitation we need to work around
-	runs := a.repo.ListExperimentRuns(run.ExperimentID)
-	for _, r := range runs {
-		if r.ID == run.ID {
-			// Cannot update directly, need new method
-			break
-		}
-	}
-	return nil
+	return a.repo.UpdateExperimentRun(ExperimentRun{
+		ID:           run.ID,
+		ExperimentID: run.ExperimentID,
+		TaskID:       run.TaskID,
+		AgentID:      run.AgentID,
+		VariantID:    run.VariantID,
+		MetricScores: run.MetricScores,
+		OverallScore: run.OverallScore,
+		DurationMs:   run.DurationMs,
+		Status:       run.Status,
+		CreatedAt:    run.CreatedAt,
+	})
 }
 
 type repoToMCPServersRepoAdapter struct {
@@ -684,6 +715,69 @@ func toMCPServer(dto handlers.MCPServerDTO) MCPServer {
 	}
 }
 
+type bridgeAdapterRepoAdapter struct {
+	repo Repository
+}
+
+func (a *bridgeAdapterRepoAdapter) ListBridgeAdapterConfigs() []bridge.BridgeAdapterConfig {
+	configs := a.repo.ListBridgeAdapterConfigs()
+	result := make([]bridge.BridgeAdapterConfig, len(configs))
+	for i, c := range configs {
+		result[i] = toBridgeAdapterConfig(c)
+	}
+	return result
+}
+
+func (a *bridgeAdapterRepoAdapter) GetBridgeAdapterConfig(id string) (bridge.BridgeAdapterConfig, bool) {
+	cfg, ok := a.repo.GetBridgeAdapterConfig(id)
+	if !ok {
+		return bridge.BridgeAdapterConfig{}, false
+	}
+	return toBridgeAdapterConfig(cfg), true
+}
+
+func (a *bridgeAdapterRepoAdapter) CreateBridgeAdapterConfig(cfg bridge.BridgeAdapterConfig) (bridge.BridgeAdapterConfig, error) {
+	serverCfg := toServerBridgeAdapterConfig(cfg)
+	result, err := a.repo.CreateBridgeAdapterConfig(serverCfg)
+	return toBridgeAdapterConfig(result), err
+}
+
+func (a *bridgeAdapterRepoAdapter) UpdateBridgeAdapterConfig(cfg bridge.BridgeAdapterConfig) error {
+	return a.repo.UpdateBridgeAdapterConfig(toServerBridgeAdapterConfig(cfg))
+}
+
+func (a *bridgeAdapterRepoAdapter) DeleteBridgeAdapterConfig(id string) error {
+	return a.repo.DeleteBridgeAdapterConfig(id)
+}
+
+func toBridgeAdapterConfig(s BridgeAdapterConfig) bridge.BridgeAdapterConfig {
+	return bridge.BridgeAdapterConfig{
+		ID:          s.ID,
+		Name:        s.Name,
+		Description: s.Description,
+		AdapterType: s.AdapterType,
+		Config:      s.Config,
+		Tools:       s.Tools,
+		Enabled:     s.Enabled,
+		CreatedAt:   s.CreatedAt,
+		UpdatedAt:   s.UpdatedAt,
+	}
+}
+
+func toServerBridgeAdapterConfig(b bridge.BridgeAdapterConfig) BridgeAdapterConfig {
+	return BridgeAdapterConfig{
+		ID:          b.ID,
+		Name:        b.Name,
+		Description: b.Description,
+		AdapterType: b.AdapterType,
+		Config:      b.Config,
+		Tools:       b.Tools,
+		Enabled:     b.Enabled,
+		CreatedAt:   b.CreatedAt,
+		UpdatedAt:   b.UpdatedAt,
+	}
+}
+
 // ExperimentRunService provides ExperimentRun persistence using the Repository.
 type ExperimentRunService struct {
 	repo Repository
@@ -694,35 +788,39 @@ func NewExperimentRunService(repo Repository) *ExperimentRunService {
 }
 
 func (s *ExperimentRunService) CreateExperimentRun(run ExperimentRun) (ExperimentRun, error) {
-	// Insert directly via raw query since repo.CreateExperimentRun doesn't exist
-	return run, nil
+	return s.repo.CreateExperimentRun(run)
 }
 
 func (s *ExperimentRunService) UpdateExperimentRun(run ExperimentRun) error {
-	return nil
+	return s.repo.UpdateExperimentRun(run)
 }
 
 // Server wraps the HTTP server and route registration for the API service.
 type Server struct {
-	httpServer         *http.Server
-	repo               Repository
-	skillSvc           *service.SkillService
-	execSvc            *service.ExecutionService
-	taskSvc            *service.TaskService
-	experimentSvc      *service.ExperimentService
-	gatewayServer      *gateway.Server
-	gatewayLimiter     gateway.RateLimiter
-	orchestrator       *orchestrator.Server
-	sehServer          *seh.Server
-	authHandler        *handlers.AuthHandler
-	mcpRouterHandler   *handlers.MCPRouterHandler
-	mcpServersHandler  *handlers.MCPServersHandler
-	snapshotsHandler   *handlers.SnapshotsHandler
-	skillEnterpriseSvc *service.SkillEnterpriseService
+	httpServer          *http.Server
+	repo                Repository
+	skillSvc            *service.SkillService
+	execSvc             *service.ExecutionService
+	taskSvc             *service.TaskService
+	experimentSvc       *service.ExperimentService
+	gatewayServer       *gateway.Server
+	gatewayLimiter      gateway.RateLimiter
+	orchestrator        *orchestrator.Server
+	sehServer           *seh.Server
+	authHandler         *handlers.AuthHandler
+	mcpRouterHandler    *handlers.MCPRouterHandler
+	mcpServersHandler   *handlers.MCPServersHandler
+	mcpInvokeHandler    *handlers.MCPInvokeHandler
+	grantMCPHandler     *handlers.GrantMCPHandler
+	policiesHandler     *handlers.PoliciesHandler
+	sweepHandler       *handlers.SweepHandler
+	snapshotsHandler    *handlers.SnapshotsHandler
+	skillEnterpriseSvc  *service.SkillEnterpriseService
+	bridgeHandler      *bridge.Handler
+	mcpRegistry         *executors.MCPRegistry
 	closeFn            func() error
 }
 
-// New creates a configured API server.
 func New(cfg config.Config) *Server {
 	return NewWithRepository(cfg, NewStore(), nil, nil)
 }
@@ -787,7 +885,19 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	gatewaySessionSvc := service.NewGatewaySessionService(gatewaySessionRepo, mcpRouterSvc)
 	mcpRouterHandler := handlers.NewMCPRouterHandler(mcpRouterSvc, gatewaySessionSvc, metricsCollector, memoryHubSvc)
 	mcpServersHandler := handlers.NewMCPServersHandler(repoToMCPServersRepoAdapter{repo: repo}, mcpRouterSvc)
+
+	mcpRegistry := executors.NewMCPRegistry()
+	executors.SetGlobalRegistry(mcpRegistry)
+	mcpRegistryAdapter := handlers.NewMCPRegistryAdapter(mcpRegistry)
+
+	repoToMCPRepoAdapter := &repoToMCPInvokeRepoAdapter{repo: repo}
+	mcpInvokeHandler := handlers.NewMCPInvokeHandler(repoToMCPRepoAdapter, mcpRegistryAdapter)
+	grantMCPHandler := handlers.NewGrantMCPHandler(repoToMCPGrantRepoAdapter{repo: repo})
+	policiesHandler := handlers.NewPoliciesHandler(repo)
+	sweepHandler := handlers.NewSweepHandler(&repoToSweepRepoAdapter{repo: repo})
+
 	snapshotsHandler := handlers.NewSnapshotsHandler(repoToSnapshotsRepoAdapter{repo: repo})
+	bridgeHandler := bridge.NewHandler(&bridgeAdapterRepoAdapter{repo: repo})
 
 	fallbackRouter := gateway.NewFallbackRouter(circuitBreaker)
 	providerKeys := map[llm.Provider]string{
@@ -821,27 +931,33 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	}
 
 	srv := &Server{
-		repo:          repo,
-		closeFn:       closeFn,
-		skillSvc:      service.NewSkillService(repoToSkillRepoAdapter{repo}),
-		execSvc:       service.NewExecutionService(repoToExecutionRepoAdapter{repo}),
-		taskSvc:       service.NewTaskService(repoToTaskRepoAdapter{repo}),
-		experimentSvc: experimentSvc,
-		gatewayServer: gateway.New(
+		repo:            repo,
+		closeFn:         closeFn,
+		skillSvc:        service.NewSkillService(repoToSkillRepoAdapter{repo}),
+		execSvc:         service.NewExecutionService(repoToExecutionRepoAdapter{repo}),
+		taskSvc:         service.NewTaskService(repoToTaskRepoAdapter{repo}),
+		experimentSvc:   experimentSvc,
+		gatewayServer:   gateway.New(
 			"",
 			gateway.WithAPIKeyValidator(gatewayValidator),
 			gateway.WithUsageRecorder(gatewayRecorder),
 			gateway.WithProviderKeyResolver(gatewayProviderKeyResolver),
 			gateway.WithRouter(fallbackRouter),
 		),
-		gatewayLimiter:     gatewayLimiter,
-		orchestrator:       orchestratorServer,
-		sehServer:          sehServer,
-		authHandler:        authHandler,
-		mcpRouterHandler:   mcpRouterHandler,
-		mcpServersHandler:  mcpServersHandler,
-		snapshotsHandler:   snapshotsHandler,
-		skillEnterpriseSvc: service.NewSkillEnterpriseService(repoToSkillRepoAdapter{repo}),
+		gatewayLimiter:      gatewayLimiter,
+		orchestrator:        orchestratorServer,
+		sehServer:           sehServer,
+		authHandler:         authHandler,
+		mcpRouterHandler:    mcpRouterHandler,
+		mcpServersHandler:   mcpServersHandler,
+		mcpInvokeHandler:    mcpInvokeHandler,
+		grantMCPHandler:     grantMCPHandler,
+		policiesHandler:     policiesHandler,
+		sweepHandler:       sweepHandler,
+		snapshotsHandler:    snapshotsHandler,
+		skillEnterpriseSvc:  service.NewSkillEnterpriseService(repoToSkillRepoAdapter{repo}),
+		bridgeHandler:       bridgeHandler,
+		mcpRegistry:         mcpRegistry,
 	}
 
 	mux.HandleFunc("/healthz", handleHealth)
@@ -893,19 +1009,23 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.HandleFunc("/api/v1/mcp-servers/{id}", srv.handleMCPServerByID)
 	mux.HandleFunc("/api/v1/mcp-servers/{id}/approve", srv.mcpServersHandler.Approve)
 
-	mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
+	mux.HandleFunc("/api/v1/mcp/invoke", srv.mcpInvokeHandler.Invoke)
+	mux.HandleFunc("/api/v1/mcp/permissions", srv.grantMCPHandler.Grant)
+	mux.HandleFunc("/api/v1/mcp/permissions/list", srv.grantMCPHandler.ListPermissions)
+
+mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
 	mux.HandleFunc("/api/v1/snapshots/list", srv.snapshotsHandler.ListSnapshots)
 
-	mux.HandleFunc("/api/v1/capabilities", srv.handleCapabilities)
-	mux.HandleFunc("/api/v1/capabilities/", srv.handleCapabilityByName)
-	mux.HandleFunc("/api/v1/capabilities/{name}/diff", srv.handleCapabilityDiff)
+	mux.HandleFunc("/api/v1/policies", srv.policiesHandler.ListPolicies)
+	mux.HandleFunc("/api/v1/policies/", srv.policiesHandler.GetPolicy)
 
-	mux.HandleFunc("/api/v1/router/mcp/route", srv.mcpRouterHandler.Route)
-	mux.HandleFunc("/api/v1/router/mcp/catalog", srv.mcpRouterHandler.Catalog)
-	mux.HandleFunc("/api/v1/router/mcp/match", srv.mcpRouterHandler.Match)
+	mux.HandleFunc("/api/v1/sweeps", srv.sweepHandler.ListSweeps)
+	mux.HandleFunc("/api/v1/sweeps/", srv.sweepHandler.GetSweep)
+	mux.HandleFunc("/api/v1/sweeps/create", srv.sweepHandler.CreateSweep)
+	mux.HandleFunc("/api/v1/sweeps/delete/", srv.sweepHandler.DeleteSweep)
+	mux.HandleFunc("/api/v1/sweeps/matrix/", srv.sweepHandler.GetSweepMatrix)
 
-	sessionHistoryHandler := handlers.NewSessionHistoryHandler(gatewaySessionSvc)
-	mux.HandleFunc("/api/v1/gateway/sessions", sessionHistoryHandler.ListSessions)
+	srv.bridgeHandler.RegisterRoutes(mux)
 
 	mux.Handle("/metrics", promhttp.Handler())
 
@@ -1799,9 +1919,11 @@ func (s *Server) handleCheckRegression(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		CurrentScore  float64 `json:"current_score"`
-		BaselineScore float64 `json:"baseline_score"`
-		Threshold     float64 `json:"threshold"`
+		SkillID        string  `json:"skill_id"`
+		Version        string  `json:"version"`
+		CurrentScore   float64 `json:"current_score"`
+		Threshold      float64 `json:"threshold"`
+		UseLatestSnapshot bool  `json:"use_latest_snapshot"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "INVALID_BODY", err.Error())
@@ -1812,18 +1934,42 @@ func (s *Server) handleCheckRegression(w http.ResponseWriter, r *http.Request) {
 		req.Threshold = 0.02
 	}
 
-	delta := req.CurrentScore - req.BaselineScore
+	var baselineScore float64
+	var snapshot *SkillCapabilitySnapshot
+	var err error
+
+	if req.UseLatestSnapshot && req.SkillID != "" && req.Version != "" {
+		snapshot, err = s.repo.GetLatestSnapshot(r.Context(), req.SkillID, req.Version)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "SNAPSHOT_NOT_FOUND", "no snapshot found for skill version")
+			return
+		}
+		baselineScore = snapshot.OverallScore
+	} else {
+		baselineScore = req.CurrentScore
+	}
+
+	delta := req.CurrentScore - baselineScore
 	regression := delta < -req.Threshold
 
+	response := map[string]any{
+		"current_score":  req.CurrentScore,
+		"baseline_score": baselineScore,
+		"delta":          round2(delta),
+		"threshold":      req.Threshold,
+		"regression":     regression,
+		"passed":         !regression,
+	}
+
+	if snapshot != nil {
+		response["snapshot_id"] = snapshot.ID
+		response["snapshot_version"] = snapshot.Version
+		response["snapshot_passed"] = snapshot.Passed
+		response["snapshot_evaluated_at"] = snapshot.EvaluatedAt.Format(time.RFC3339)
+	}
+
 	writeJSON(w, http.StatusOK, Envelope{
-		Data: map[string]any{
-			"current_score":  req.CurrentScore,
-			"baseline_score": req.BaselineScore,
-			"delta":          round2(delta),
-			"threshold":      req.Threshold,
-			"regression":     regression,
-			"passed":         !regression,
-		},
+		Data: response,
 	})
 }
 

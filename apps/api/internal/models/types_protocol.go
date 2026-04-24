@@ -20,19 +20,45 @@ const (
 )
 
 type PolicyDecision struct {
-	Allowed          bool
+	Allowed           bool
 	RequiredApprovals []string
-	PolicyID         string
-	PolicyVersion    string
-	Reasons          []string
-	DeterminedAt     time.Time
+	PolicyID          string
+	PolicyVersion     string
+	Reasons           []string
+	DeterminedAt      time.Time
+	ComplianceRequired bool     `json:"compliance_required,omitempty"`
+	SOPReference      SOPReference `json:"sop_reference,omitempty"`
+}
+
+type SOPReference struct {
+	SOPID       string `json:"sop_id,omitempty"`
+	SOPName     string `json:"sop_name,omitempty"`
+	SOPVersion  string `json:"sop_version,omitempty"`
+	SOPSection  string `json:"sop_section,omitempty"`
 }
 
 type PolicyRule struct {
-	ID        string   `json:"id"`
-	Condition string   `json:"condition"`
-	Action    string   `json:"action"`
-	Reason    string   `json:"reason"`
+	ID            string   `json:"id"`
+	Version       string   `json:"version"`
+	Condition     string   `json:"condition"`
+	Action        string   `json:"action"`
+	Reason        string   `json:"reason"`
+	Priority      int      `json:"priority"`
+	IsActive      bool     `json:"is_active"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type PolicyVersion struct {
+	ID          string      `json:"id"`
+	Name        string      `json:"name"`
+	Version     string      `json:"version"`
+	Description string      `json:"description"`
+	Rules       []PolicyRule `json:"rules"`
+	IsDefault   bool        `json:"is_default"`
+	IsActive    bool        `json:"is_active"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
 }
 
 type SessionStatus string
@@ -61,17 +87,18 @@ const (
 )
 
 type MemoryCell struct {
-	ID          string                 `json:"id"`
-	Scope       string                 `json:"scope"`
-	AgentID     string                 `json:"agent_id"`
-	SessionID   string                 `json:"session_id,omitempty"`
-	ExecutionID string                 `json:"execution_id,omitempty"`
-	Key         string                 `json:"key"`
-	Value       map[string]interface{} `json:"value"`
-	ValueType   string                 `json:"value_type"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-	Tags        []string               `json:"tags,omitempty"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
-	ExpiresAt   *time.Time            `json:"expires_at,omitempty"`
+	ID        string                 `json:"id"`
+	Scope     string                 `json:"scope"`
+	TenantID  string                 `json:"tenant_id"`
+	AgentID   string                 `json:"agent_id"`
+	SessionID string                 `json:"session_id,omitempty"`
+	ExecutionID string               `json:"execution_id,omitempty"`
+	Key       string                 `json:"key"`
+	Value     map[string]interface{} `json:"value"`
+	ValueType string                 `json:"value_type"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Tags      []string               `json:"tags,omitempty"`
+	CreatedAt time.Time             `json:"created_at"`
+	UpdatedAt time.Time             `json:"updated_at"`
+	ExpiresAt *time.Time            `json:"expires_at,omitempty"`
 }

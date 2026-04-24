@@ -114,3 +114,65 @@ export async function approveMCPServer(
     body: JSON.stringify(req),
   });
 }
+
+export type MCPServerPermission = {
+  id: string;
+  mcp_server_id: string;
+  user_id?: string;
+  api_key_id?: string;
+  skill_id?: string;
+  permission_type: string;
+  is_granted: boolean;
+  granted_by?: string;
+  granted_at: string;
+  expires_at?: string;
+};
+
+export type GrantMCPPermissionRequest = {
+  mcp_server_id: string;
+  user_id?: string;
+  api_key_id?: string;
+  skill_id?: string;
+  permission_type: string;
+  expires_at?: string;
+};
+
+export async function listMCPServerPermissions(
+  mcpServerID: string
+): Promise<{ items: MCPServerPermission[] }> {
+  return request<{ items: MCPServerPermission[] }>(
+    `/api/v1/mcp/permissions/list?mcp_server_id=${encodeURIComponent(mcpServerID)}`
+  );
+}
+
+export async function grantMCPServerPermission(
+  req: GrantMCPPermissionRequest
+): Promise<MCPServerPermission> {
+  return request<MCPServerPermission>("/api/v1/mcp/permissions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+}
+
+export type InvokeMCPRequest = {
+  server_id: string;
+  tool_name: string;
+  parameters?: Record<string, unknown>;
+};
+
+export type InvokeMCPResult = {
+  success: boolean;
+  output?: Record<string, unknown>;
+  error?: string;
+};
+
+export async function invokeMCPTool(
+  req: InvokeMCPRequest
+): Promise<InvokeMCPResult> {
+  return request<InvokeMCPResult>("/api/v1/mcp/invoke", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+}

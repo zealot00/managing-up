@@ -25,10 +25,14 @@ func NewMemoryHubService(repo MemoryRepository) *MemoryHubService {
 	return &MemoryHubService{repo: repo}
 }
 
-func (s *MemoryHubService) StoreMemory(ctx context.Context, scope, agentID, sessionID, key string, value interface{}, tags []string) (*models.MemoryCell, error) {
+func (s *MemoryHubService) StoreMemory(ctx context.Context, scope, tenantID, agentID, sessionID, key string, value interface{}, tags []string) (*models.MemoryCell, error) {
+	if tenantID == "" {
+		tenantID = "default"
+	}
 	cell := &models.MemoryCell{
 		ID:        generateID(),
 		Scope:     scope,
+		TenantID:  tenantID,
 		AgentID:   agentID,
 		SessionID: sessionID,
 		Key:       key,

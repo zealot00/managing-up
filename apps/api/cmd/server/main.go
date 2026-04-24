@@ -518,6 +518,12 @@ func (a repoToExperimentRunRepoAdapter) CreateExperimentRun(run service.Experime
 }
 
 func (a repoToExperimentRunRepoAdapter) GetExperimentRun(id string) (service.ExperimentRun, bool) {
+	runs := a.repo.ListExperimentRuns("")
+	for _, r := range runs {
+		if r.ID == id {
+			return toServiceExperimentRun(r), true
+		}
+	}
 	return service.ExperimentRun{}, false
 }
 

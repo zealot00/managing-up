@@ -24,6 +24,7 @@ export default function AdminHeader() {
     "/replays": t("replays"),
     "/gateway": t("gateway"),
     "/seh": t("sehModule"),
+    "/sweeps": t("sweeps"),
   };
 
   if (!isAuthenticated) {

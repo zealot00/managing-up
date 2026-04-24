@@ -458,12 +458,15 @@ func (s *OrchestrationService) Rollback(skillID string, req RollbackRequest) Act
 
 func (s *OrchestrationService) Promote(skillID string, req PromoteRequest) (ActionAccepted, error) {
 	if s.repo != nil {
-		passed, score, err := s.repo.GetLatestPassedSnapshot(context.Background(), skillID, req.Version)
+		snapshot, err := s.repo.GetLatestPassedSnapshot(context.Background(), skillID, req.Version)
 		if err != nil {
 			return ActionAccepted{}, fmt.Errorf("failed to get snapshot: %w", err)
 		}
-		if !passed {
-			return ActionAccepted{}, fmt.Errorf("skill version %s did not pass regression gate (score: %.2f)", req.Version, score)
+		if snapshot == nil {
+			return ActionAccepted{}, fmt.Errorf("no passed snapshot found for skill version %s", req.Version)
+		}
+		if !snapshot.Passed {
+			return ActionAccepted{}, fmt.Errorf("skill version %s did not pass regression gate (score: %.2f)", req.Version, snapshot.OverallScore)
 		}
 		if err := s.repo.UpdateSkillVersionPromoted(skillID, req.Version, true); err != nil {
 			return ActionAccepted{}, fmt.Errorf("failed to promote skill version: %w", err)

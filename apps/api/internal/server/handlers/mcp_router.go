@@ -90,9 +90,20 @@ func (h *MCPRouterHandler) Route(w http.ResponseWriter, r *http.Request) {
 		h.sessionSvc.RecordPolicyDecision(ctx, session.ID, decision)
 	}
 
-	if !decision.Allowed {
-		writeError(w, http.StatusForbidden, "POLICY_DENIED", "task not allowed by policy")
+	if decision == nil || !decision.Allowed {
+		reason := "task not allowed by policy"
+		if decision != nil && decision.ComplianceRequired {
+			reason = "compliance check required for this operation"
+		}
+		writeError(w, http.StatusForbidden, "POLICY_DENIED", reason)
 		return
+	}
+
+	if decision.ComplianceRequired {
+		slog.Info("compliance check required for task",
+			"agent_id", req.AgentID,
+			"task_type", req.Task.Structured.TaskType,
+			"sop_id", decision.SOPReference.SOPID)
 	}
 
 	start := time.Now()

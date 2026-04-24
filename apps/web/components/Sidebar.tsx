@@ -20,6 +20,7 @@ import {
   RotateCcw,
   Network,
   Shield,
+  Crosshair,
   PanelLeftClose,
   PanelLeftOpen,
   ChevronRight,
@@ -61,6 +62,8 @@ export default function Sidebar() {
         { href: "/replays", labelKey: "replays", icon: <RotateCcw size={18} aria-hidden="true" /> },
         { href: "/gateway", labelKey: "gateway", icon: <Network size={18} aria-hidden="true" />, children: [{ href: "/gateway/providers", labelKey: "providers" }] },
         { href: "/mcp", labelKey: "mcp", icon: <Shield size={18} aria-hidden="true" /> },
+        { href: "/sweeps", labelKey: "sweeps", icon: <Crosshair size={18} aria-hidden="true" /> },
+        { href: "/policies", labelKey: "policies", icon: <Shield size={18} aria-hidden="true" /> },
       ],
     },
     {

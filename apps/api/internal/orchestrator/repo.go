@@ -350,24 +350,32 @@ func (r *Repo) UpdateSkillVersionPromoted(skillID, version string, promoted bool
 	return err
 }
 
-func (r *Repo) GetLatestPassedSnapshot(ctx context.Context, skillID, version string) (passed bool, overallScore float64, err error) {
+func (r *Repo) GetLatestPassedSnapshot(ctx context.Context, skillID, version string) (*SkillCapabilitySnapshot, error) {
 	query := `
-		SELECT overall_score, passed
+		SELECT id, skill_id, version, snapshot_type, COALESCE(dataset_id, ''), COALESCE(run_id, ''), metrics,
+		       overall_score, passed, COALESCE(gate_policy_id, ''), evaluated_at, created_at
 		FROM skill_capability_snapshots
 		WHERE skill_id = $1 AND version = $2 AND passed = true
 		ORDER BY evaluated_at DESC
 		LIMIT 1
 	`
-	var score float64
-	var isPassed bool
-	err = r.db.QueryRowContext(ctx, query, skillID, version).Scan(&score, &isPassed)
+	var snap SkillCapabilitySnapshot
+	var metricsJSON []byte
+
+	err := r.db.QueryRowContext(ctx, query, skillID, version).Scan(
+		&snap.ID, &snap.SkillID, &snap.Version, &snap.SnapshotType,
+		&snap.DatasetID, &snap.RunID, &metricsJSON,
+		&snap.OverallScore, &snap.Passed, &snap.GatePolicyID,
+		&snap.EvaluatedAt, &snap.CreatedAt,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return false, 0, nil
+			return nil, nil
 		}
-		return false, 0, err
+		return nil, err
 	}
-	return isPassed, score, nil
+	json.Unmarshal(metricsJSON, &snap.Metrics)
+	return &snap, nil
 }
 
 func (r *Repo) CreateTestRun(req CreateTestRunRequest) (*TestRun, error) {
