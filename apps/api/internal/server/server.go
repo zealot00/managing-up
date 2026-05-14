@@ -817,6 +817,7 @@ type Server struct {
 	snapshotsHandler    *handlers.SnapshotsHandler
 	skillEnterpriseSvc  *service.SkillEnterpriseService
 	bridgeHandler      *bridge.Handler
+	fallbackChainHandler *handlers.FallbackChainHandler
 	mcpRegistry         *executors.MCPRegistry
 	closeFn            func() error
 }
@@ -900,6 +901,10 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	bridgeHandler := bridge.NewHandler(&bridgeAdapterRepoAdapter{repo: repo})
 
 	fallbackRouter := gateway.NewFallbackRouter(circuitBreaker)
+	fallbackChainHandler := handlers.NewFallbackChainHandler(
+		&fallbackChainRepoAdapter{repo: repo},
+		fallbackRouter,
+	)
 	providerKeys := map[llm.Provider]string{
 		llm.ProviderOpenAI:    os.Getenv("GATEWAY_OPENAI_API_KEY"),
 		llm.ProviderAnthropic: os.Getenv("GATEWAY_ANTHROPIC_API_KEY"),
@@ -992,6 +997,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		snapshotsHandler:    snapshotsHandler,
 		skillEnterpriseSvc:  service.NewSkillEnterpriseService(repoToSkillRepoAdapter{repo}),
 		bridgeHandler:       bridgeHandler,
+		fallbackChainHandler: fallbackChainHandler,
 		mcpRegistry:         mcpRegistry,
 	}
 
@@ -1061,6 +1067,9 @@ mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
 	mux.HandleFunc("/api/v1/sweeps/matrix/", srv.sweepHandler.GetSweepMatrix)
 
 	srv.bridgeHandler.RegisterRoutes(mux)
+
+	mux.Handle("/api/v1/admin/fallback-chains", srv.fallbackChainHandler)
+	mux.Handle("/api/v1/admin/fallback-chains/", srv.fallbackChainHandler)
 
 	mux.Handle("/metrics", promhttp.Handler())
 
@@ -2436,4 +2445,95 @@ func parseFallbackChains(jsonStr string) (map[llm.Model][]gateway.FallbackTarget
 		chains[model] = chain
 	}
 	return chains, nil
+}
+
+// fallbackChainRepoAdapter adapts the Repository to the FallbackChainRepo interface.
+type fallbackChainRepoAdapter struct {
+	repo Repository
+}
+
+func (a *fallbackChainRepoAdapter) ListFallbackChains() ([]handlers.FallbackChainDTO, error) {
+	chains, err := a.repo.ListFallbackChains()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]handlers.FallbackChainDTO, len(chains))
+	for i, c := range chains {
+		result[i] = toFallbackChainDTO(c)
+	}
+	return result, nil
+}
+
+func (a *fallbackChainRepoAdapter) GetFallbackChain(id string) (handlers.FallbackChainDTO, bool, error) {
+	chain, found, err := a.repo.GetFallbackChain(id)
+	if err != nil || !found {
+		return handlers.FallbackChainDTO{}, found, err
+	}
+	return toFallbackChainDTO(chain), true, nil
+}
+
+func (a *fallbackChainRepoAdapter) CreateFallbackChain(chain handlers.FallbackChainDTO) (handlers.FallbackChainDTO, error) {
+	created, err := a.repo.CreateFallbackChain(fromFallbackChainDTO(chain))
+	if err != nil {
+		return handlers.FallbackChainDTO{}, err
+	}
+	return toFallbackChainDTO(created), nil
+}
+
+func (a *fallbackChainRepoAdapter) UpdateFallbackChain(chain handlers.FallbackChainDTO) (handlers.FallbackChainDTO, error) {
+	updated, err := a.repo.UpdateFallbackChain(fromFallbackChainDTO(chain))
+	if err != nil {
+		return handlers.FallbackChainDTO{}, err
+	}
+	return toFallbackChainDTO(updated), nil
+}
+
+func (a *fallbackChainRepoAdapter) DeleteFallbackChain(id string) error {
+	return a.repo.DeleteFallbackChain(id)
+}
+
+func toFallbackChainDTO(c FallbackChain) handlers.FallbackChainDTO {
+	targets := make([]handlers.FallbackTargetDTO, len(c.Targets))
+	for i, t := range c.Targets {
+		targets[i] = handlers.FallbackTargetDTO{
+			ID:        t.ID,
+			ChainID:   t.ChainID,
+			Provider:  t.Provider,
+			Model:     t.Model,
+			Weight:    t.Weight,
+			Priority:  t.Priority,
+			IsEnabled: t.IsEnabled,
+		}
+	}
+	return handlers.FallbackChainDTO{
+		ID:        c.ID,
+		Model:     c.Model,
+		IsEnabled: c.IsEnabled,
+		Targets:   targets,
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
+	}
+}
+
+func fromFallbackChainDTO(c handlers.FallbackChainDTO) FallbackChain {
+	targets := make([]FallbackTarget, len(c.Targets))
+	for i, t := range c.Targets {
+		targets[i] = FallbackTarget{
+			ID:        t.ID,
+			ChainID:   t.ChainID,
+			Provider:  t.Provider,
+			Model:     t.Model,
+			Weight:    t.Weight,
+			Priority:  t.Priority,
+			IsEnabled: t.IsEnabled,
+		}
+	}
+	return FallbackChain{
+		ID:        c.ID,
+		Model:     c.Model,
+		IsEnabled: c.IsEnabled,
+		Targets:   targets,
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
+	}
 }

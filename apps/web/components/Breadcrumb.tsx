@@ -42,6 +42,7 @@ export default function Breadcrumb() {
       runs: t("sehRuns"),
       policies: t("sehPolicies"),
       "from-trace": t("taskBuilder"),
+      "fallback-chains": t("fallbackChains"),
     };
 
     const label = routeLabels[segment] || segment;

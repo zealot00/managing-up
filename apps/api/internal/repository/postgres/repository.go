@@ -2992,6 +2992,232 @@ func (r *Repository) UpdateSweepRun(run server.SweepRun) error {
 	return err
 }
 
+func (r *Repository) ListFallbackChains() ([]server.FallbackChain, error) {
+	query := `
+		SELECT c.id, c.model, c.is_enabled, c.created_at, c.updated_at,
+		       t.id, t.chain_id, t.provider, t.model, t.weight, t.priority, t.is_enabled, t.created_at, t.updated_at
+		FROM llm_fallback_chains c
+		LEFT JOIN llm_fallback_targets t ON t.chain_id = c.id
+		ORDER BY c.model, t.priority
+	`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	chainMap := make(map[string]*server.FallbackChain)
+	var order []string
+
+	for rows.Next() {
+		var chainID, chainModel string
+		var chainIsEnabled bool
+		var chainCreatedAt, chainUpdatedAt time.Time
+
+		var targetID, targetChainID, targetProvider, targetModel sql.NullString
+		var targetWeight, targetPriority sql.NullInt64
+		var targetIsEnabled sql.NullBool
+		var targetCreatedAt, targetUpdatedAt sql.NullTime
+
+		if err := rows.Scan(
+			&chainID, &chainModel, &chainIsEnabled, &chainCreatedAt, &chainUpdatedAt,
+			&targetID, &targetChainID, &targetProvider, &targetModel, &targetWeight, &targetPriority, &targetIsEnabled, &targetCreatedAt, &targetUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		if _, ok := chainMap[chainID]; !ok {
+			chain := server.FallbackChain{
+				ID:        chainID,
+				Model:     chainModel,
+				IsEnabled: chainIsEnabled,
+				Targets:   []server.FallbackTarget{},
+				CreatedAt: chainCreatedAt,
+				UpdatedAt: chainUpdatedAt,
+			}
+			chainMap[chainID] = &chain
+			order = append(order, chainID)
+		}
+
+		if targetID.Valid {
+			chainMap[chainID].Targets = append(chainMap[chainID].Targets, server.FallbackTarget{
+				ID:        targetID.String,
+				ChainID:   targetChainID.String,
+				Provider:  targetProvider.String,
+				Model:     targetModel.String,
+				Weight:    int(targetWeight.Int64),
+				Priority:  int(targetPriority.Int64),
+				IsEnabled: targetIsEnabled.Bool,
+			})
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	result := make([]server.FallbackChain, 0, len(order))
+	for _, id := range order {
+		result = append(result, *chainMap[id])
+	}
+	return result, nil
+}
+
+func (r *Repository) GetFallbackChain(id string) (server.FallbackChain, bool, error) {
+	query := `
+		SELECT c.id, c.model, c.is_enabled, c.created_at, c.updated_at,
+		       t.id, t.chain_id, t.provider, t.model, t.weight, t.priority, t.is_enabled, t.created_at, t.updated_at
+		FROM llm_fallback_chains c
+		LEFT JOIN llm_fallback_targets t ON t.chain_id = c.id
+		WHERE c.id = $1
+		ORDER BY t.priority
+	`
+	rows, err := r.db.Query(query, id)
+	if err != nil {
+		return server.FallbackChain{}, false, err
+	}
+	defer rows.Close()
+
+	var chain server.FallbackChain
+	chain.Targets = []server.FallbackTarget{}
+	found := false
+
+	for rows.Next() {
+		var chainID, chainModel string
+		var chainIsEnabled bool
+		var chainCreatedAt, chainUpdatedAt time.Time
+
+		var targetID, targetChainID, targetProvider, targetModel sql.NullString
+		var targetWeight, targetPriority sql.NullInt64
+		var targetIsEnabled sql.NullBool
+		var targetCreatedAt, targetUpdatedAt sql.NullTime
+
+		if err := rows.Scan(
+			&chainID, &chainModel, &chainIsEnabled, &chainCreatedAt, &chainUpdatedAt,
+			&targetID, &targetChainID, &targetProvider, &targetModel, &targetWeight, &targetPriority, &targetIsEnabled, &targetCreatedAt, &targetUpdatedAt,
+		); err != nil {
+			return server.FallbackChain{}, false, err
+		}
+
+		if !found {
+			chain = server.FallbackChain{
+				ID:        chainID,
+				Model:     chainModel,
+				IsEnabled: chainIsEnabled,
+				Targets:   []server.FallbackTarget{},
+				CreatedAt: chainCreatedAt,
+				UpdatedAt: chainUpdatedAt,
+			}
+			found = true
+		}
+
+		if targetID.Valid {
+			chain.Targets = append(chain.Targets, server.FallbackTarget{
+				ID:        targetID.String,
+				ChainID:   targetChainID.String,
+				Provider:  targetProvider.String,
+				Model:     targetModel.String,
+				Weight:    int(targetWeight.Int64),
+				Priority:  int(targetPriority.Int64),
+				IsEnabled: targetIsEnabled.Bool,
+			})
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return server.FallbackChain{}, false, err
+	}
+
+	if !found {
+		return server.FallbackChain{}, false, nil
+	}
+	return chain, true, nil
+}
+
+func (r *Repository) CreateFallbackChain(chain server.FallbackChain) (server.FallbackChain, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return server.FallbackChain{}, err
+	}
+	defer tx.Rollback()
+
+	err = tx.QueryRow(
+		`INSERT INTO llm_fallback_chains (model, is_enabled) VALUES ($1, $2) RETURNING id, created_at, updated_at`,
+		chain.Model, chain.IsEnabled,
+	).Scan(&chain.ID, &chain.CreatedAt, &chain.UpdatedAt)
+	if err != nil {
+		return server.FallbackChain{}, err
+	}
+
+	for i := range chain.Targets {
+		var tCreatedAt, tUpdatedAt time.Time
+		err := tx.QueryRow(
+			`INSERT INTO llm_fallback_targets (chain_id, provider, model, weight, priority, is_enabled) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, updated_at`,
+			chain.ID, chain.Targets[i].Provider, chain.Targets[i].Model, chain.Targets[i].Weight, chain.Targets[i].Priority, chain.Targets[i].IsEnabled,
+		).Scan(&chain.Targets[i].ID, &tCreatedAt, &tUpdatedAt)
+		if err != nil {
+			return server.FallbackChain{}, err
+		}
+		chain.Targets[i].ChainID = chain.ID
+	}
+
+	if err := tx.Commit(); err != nil {
+		return server.FallbackChain{}, err
+	}
+	return chain, nil
+}
+
+func (r *Repository) UpdateFallbackChain(chain server.FallbackChain) (server.FallbackChain, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return server.FallbackChain{}, err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(
+		`UPDATE llm_fallback_chains SET model = $2, is_enabled = $3, updated_at = now() WHERE id = $1`,
+		chain.ID, chain.Model, chain.IsEnabled,
+	)
+	if err != nil {
+		return server.FallbackChain{}, err
+	}
+
+	_, err = tx.Exec(`DELETE FROM llm_fallback_targets WHERE chain_id = $1`, chain.ID)
+	if err != nil {
+		return server.FallbackChain{}, err
+	}
+
+	for i := range chain.Targets {
+		var tCreatedAt, tUpdatedAt time.Time
+		err := tx.QueryRow(
+			`INSERT INTO llm_fallback_targets (chain_id, provider, model, weight, priority, is_enabled) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, updated_at`,
+			chain.ID, chain.Targets[i].Provider, chain.Targets[i].Model, chain.Targets[i].Weight, chain.Targets[i].Priority, chain.Targets[i].IsEnabled,
+		).Scan(&chain.Targets[i].ID, &tCreatedAt, &tUpdatedAt)
+		if err != nil {
+			return server.FallbackChain{}, err
+		}
+		chain.Targets[i].ChainID = chain.ID
+	}
+
+	err = tx.QueryRow(
+		`SELECT created_at, updated_at FROM llm_fallback_chains WHERE id = $1`,
+		chain.ID,
+	).Scan(&chain.CreatedAt, &chain.UpdatedAt)
+	if err != nil {
+		return server.FallbackChain{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return server.FallbackChain{}, err
+	}
+	return chain, nil
+}
+
+func (r *Repository) DeleteFallbackChain(id string) error {
+	_, err := r.db.Exec(`DELETE FROM llm_fallback_chains WHERE id = $1`, id)
+	return err
+}
+
 func nullFloat64(v float64) sql.NullFloat64 {
 	if v == 0 {
 		return sql.NullFloat64{}

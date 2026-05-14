@@ -618,3 +618,24 @@ type SweepMatrixCell struct {
 	Status      string  `json:"status"`
 	Score       float64 `json:"score,omitempty"`
 }
+
+// FallbackChain represents a per-model fallback chain configuration.
+type FallbackChain struct {
+	ID        string            `json:"id"`
+	Model     string            `json:"model"`
+	IsEnabled bool              `json:"is_enabled"`
+	Targets   []FallbackTarget  `json:"targets"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+}
+
+// FallbackTarget represents a single target in a fallback chain.
+type FallbackTarget struct {
+	ID        string `json:"id"`
+	ChainID   string `json:"chain_id"`
+	Provider  string `json:"provider"`
+	Model     string `json:"model"`
+	Weight    int    `json:"weight"`
+	Priority  int    `json:"priority"`
+	IsEnabled bool   `json:"is_enabled"`
+}

@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/zealot/managing-up/apps/api/internal/models"
 )
 
@@ -27,6 +29,7 @@ type store struct {
 	gatewayProviderKeys map[string]GatewayProviderKey
 	userBudgets         map[string]UserBudget
 	mcpServers          map[string]MCPServer
+	fallbackChains      map[string]FallbackChain
 	skillDependencies   []SkillDependency
 	skillRatings        []SkillRating
 	skillInstalls       []SkillInstall
@@ -171,6 +174,7 @@ func NewStore() *store {
 		gatewayProviderKeys: make(map[string]GatewayProviderKey),
 		userBudgets:         make(map[string]UserBudget),
 		mcpServers:          make(map[string]MCPServer),
+		fallbackChains:      make(map[string]FallbackChain),
 		skillDependencies: []SkillDependency{
 			{
 				ID:                "dep_001",
@@ -1313,5 +1317,75 @@ func (s *store) UpsertMCPRouterCatalogEntry(e MCPRouterCatalogEntry) error {
 }
 
 func (s *store) IncrementMCPRouterCatalogUseCount(serverID string) error {
+	return nil
+}
+
+func (s *store) ListFallbackChains() ([]FallbackChain, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []FallbackChain
+	for _, c := range s.fallbackChains {
+		result = append(result, c)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Model < result[j].Model
+	})
+	return result, nil
+}
+
+func (s *store) GetFallbackChain(id string) (FallbackChain, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	c, ok := s.fallbackChains[id]
+	return c, ok, nil
+}
+
+func (s *store) CreateFallbackChain(chain FallbackChain) (FallbackChain, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if chain.ID == "" {
+		chain.ID = uuid.New().String()
+	}
+	now := time.Now()
+	chain.CreatedAt = now
+	chain.UpdatedAt = now
+	for i := range chain.Targets {
+		if chain.Targets[i].ID == "" {
+			chain.Targets[i].ID = uuid.New().String()
+		}
+		chain.Targets[i].ChainID = chain.ID
+	}
+	s.fallbackChains[chain.ID] = chain
+	return chain, nil
+}
+
+func (s *store) UpdateFallbackChain(chain FallbackChain) (FallbackChain, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing, ok := s.fallbackChains[chain.ID]
+	if !ok {
+		return FallbackChain{}, fmt.Errorf("fallback chain not found")
+	}
+	chain.CreatedAt = existing.CreatedAt
+	chain.UpdatedAt = time.Now()
+	for i := range chain.Targets {
+		if chain.Targets[i].ID == "" {
+			chain.Targets[i].ID = uuid.New().String()
+		}
+		chain.Targets[i].ChainID = chain.ID
+	}
+	s.fallbackChains[chain.ID] = chain
+	return chain, nil
+}
+
+func (s *store) DeleteFallbackChain(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.fallbackChains, id)
 	return nil
 }

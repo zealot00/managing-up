@@ -21,6 +21,7 @@ import {
   Network,
   Shield,
   Crosshair,
+  ArrowDownUp,
   PanelLeftClose,
   PanelLeftOpen,
   ChevronRight,
@@ -64,6 +65,7 @@ export default function Sidebar() {
         { href: "/mcp", labelKey: "mcp", icon: <Shield size={18} aria-hidden="true" /> },
         { href: "/sweeps", labelKey: "sweeps", icon: <Crosshair size={18} aria-hidden="true" /> },
         { href: "/policies", labelKey: "policies", icon: <Shield size={18} aria-hidden="true" /> },
+        { href: "/fallback-chains", labelKey: "fallbackChains", icon: <ArrowDownUp size={18} aria-hidden="true" /> },
       ],
     },
     {
