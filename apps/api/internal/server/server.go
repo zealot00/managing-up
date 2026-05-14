@@ -912,6 +912,8 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		llm.ProviderBaidu:     os.Getenv("GATEWAY_BAIDU_API_KEY"),
 		llm.ProviderAlibaba:   os.Getenv("GATEWAY_ALIBABA_API_KEY"),
 	}
+
+	// Register providers for legacy Route() support
 	priority := 0
 	for provider, apiKey := range providerKeys {
 		if apiKey == "" {
@@ -928,6 +930,39 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 			Priority: priority,
 		})
 		priority++
+	}
+
+	// Set provider keys for fallback client creation
+	fallbackProviderKeys := make(map[llm.Provider]string)
+	for p, k := range providerKeys {
+		if k != "" {
+			fallbackProviderKeys[p] = k
+		}
+	}
+	// Ollama uses the key field as base URL; provide a default
+	if _, ok := fallbackProviderKeys[llm.ProviderOllama]; !ok {
+		fallbackProviderKeys[llm.ProviderOllama] = os.Getenv("GATEWAY_OLLAMA_BASE_URL")
+	}
+	fallbackRouter.SetProviderKeys(fallbackProviderKeys)
+
+	// Parse fallback chains from GATEWAY_FALLBACK_CHAINS env var
+	// Format: JSON map of model name -> array of "provider:model" strings
+	// Example: {"gpt-4o": ["anthropic:claude-sonnet-4", "ollama:qwen2.5"]}
+	if chainsJSON := os.Getenv("GATEWAY_FALLBACK_CHAINS"); chainsJSON != "" {
+		chains, err := parseFallbackChains(chainsJSON)
+		if err != nil {
+			slog.Error("failed to parse GATEWAY_FALLBACK_CHAINS", "error", err)
+		} else {
+			fallbackRouter.SetFallbackChains(chains)
+			slog.Info("configured fallback chains", "chain_count", len(chains))
+			for model, targets := range chains {
+				names := make([]string, len(targets))
+				for i, t := range targets {
+					names[i] = string(t.Provider) + ":" + string(t.Model)
+				}
+				slog.Info("fallback chain", "model", model, "targets", names)
+			}
+		}
 	}
 
 	srv := &Server{
@@ -2374,4 +2409,31 @@ func (s *Server) handleApproveMCPServer(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeEnvelope(w, http.StatusOK, generateRequestID(), server)
+}
+
+// parseFallbackChains parses the GATEWAY_FALLBACK_CHAINS JSON env var.
+// Format: {"model_name": ["provider:model", "provider:model"], ...}
+func parseFallbackChains(jsonStr string) (map[llm.Model][]gateway.FallbackTarget, error) {
+	var raw map[string][]string
+	if err := json.Unmarshal([]byte(jsonStr), &raw); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+
+	chains := make(map[llm.Model][]gateway.FallbackTarget, len(raw))
+	for modelStr, targets := range raw {
+		model := llm.Model(modelStr)
+		var chain []gateway.FallbackTarget
+		for _, t := range targets {
+			provider, m, err := llm.ParseModelString(t)
+			if err != nil {
+				return nil, fmt.Errorf("invalid fallback target %q for model %s: %w", t, modelStr, err)
+			}
+			chain = append(chain, gateway.FallbackTarget{
+				Provider: provider,
+				Model:    m,
+			})
+		}
+		chains[model] = chain
+	}
+	return chains, nil
 }

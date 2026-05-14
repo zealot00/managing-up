@@ -106,28 +106,50 @@ func (s *Server) HandleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 	}
 	opts = append(opts, llm.WithMaxTokens(req.MaxTokens))
 
-	upstreamAPIKey := apiKey
-	if s.providerKeyResolver != nil {
-		principal := GetPrincipalFromContext(r.Context())
-		userID := ""
-		if principal != nil {
-			userID = principal.UserID
+	resolveKey := func(p llm.Provider) string {
+		upstreamAPIKey := apiKey
+		if s.providerKeyResolver != nil {
+			principal := GetPrincipalFromContext(r.Context())
+			userID := ""
+			if principal != nil {
+				userID = principal.UserID
+			}
+			if resolved := s.providerKeyResolver.KeyFor(userID, p); resolved != "" {
+				upstreamAPIKey = resolved
+			}
 		}
-		if resolved := s.providerKeyResolver.KeyFor(userID, provider); resolved != "" {
-			upstreamAPIKey = resolved
-		}
+		return upstreamAPIKey
 	}
 
-	llmClient, err := llm.NewClient(provider, model, upstreamAPIKey)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", err))
-		return
-	}
+	var resp *llm.Response
 
-	resp, err := llmClient.Generate(r.Context(), messages, opts...)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "generation_failed", fmt.Sprintf("LLM generation failed: %v", err))
-		return
+	if s.router != nil {
+		clients, routeErr := s.router.RouteWithFallback(r.Context(), model, resolveKey)
+		if routeErr != nil {
+			writeError(w, http.StatusInternalServerError, "routing_failed", fmt.Sprintf("Failed to route request: %v", routeErr))
+			return
+		}
+		var genErr error
+		resp, genErr = GenerateWithFallback(r.Context(), clients, messages, opts, DefaultFallbackConfig(),
+			func(p llm.Provider) { s.router.RecordSuccess(p) },
+			func(p llm.Provider) { s.router.RecordFailure(p) },
+		)
+		if genErr != nil {
+			writeError(w, http.StatusInternalServerError, "generation_failed", fmt.Sprintf("LLM generation failed: %v", genErr))
+			return
+		}
+	} else {
+		llmClient, createErr := llm.NewClient(provider, model, resolveKey(provider))
+		if createErr != nil {
+			writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", createErr))
+			return
+		}
+		var genErr error
+		resp, genErr = llmClient.Generate(r.Context(), messages, opts...)
+		if genErr != nil {
+			writeError(w, http.StatusInternalServerError, "generation_failed", fmt.Sprintf("LLM generation failed: %v", genErr))
+			return
+		}
 	}
 
 	anthropicResp := anthropicMessageResponse{

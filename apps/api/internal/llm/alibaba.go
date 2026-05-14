@@ -140,6 +140,15 @@ func (c *AlibabaClient) Generate(ctx context.Context, messages []Message, opts .
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &ProviderError{
+			Provider:   ProviderAlibaba,
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
 	var alibabaResp struct {
 		Output struct {
 			Text string `json:"text"`
@@ -219,7 +228,11 @@ func (c *AlibabaClient) GenerateStream(ctx context.Context, messages []Message, 
 
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, fmt.Errorf("Alibaba API returned status %d", resp.StatusCode)
+		return nil, &ProviderError{
+			Provider:   ProviderAlibaba,
+			StatusCode: resp.StatusCode,
+			Message:    "stream request failed",
+		}
 	}
 
 	return &alibabaStreamReader{

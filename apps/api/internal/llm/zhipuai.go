@@ -147,6 +147,15 @@ func (c *ZhipuAIClient) Generate(ctx context.Context, messages []Message, opts .
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &ProviderError{
+			Provider:   ProviderZhipuAI,
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
 	var zhipuResp struct {
 		Choices []struct {
 			Message struct {
@@ -224,7 +233,11 @@ func (c *ZhipuAIClient) GenerateStream(ctx context.Context, messages []Message, 
 
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, fmt.Errorf("Zhipu AI API returned status %d", resp.StatusCode)
+		return nil, &ProviderError{
+			Provider:   ProviderZhipuAI,
+			StatusCode: resp.StatusCode,
+			Message:    "stream request failed",
+		}
 	}
 
 	return &zhipuStreamReader{
