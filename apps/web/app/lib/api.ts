@@ -500,13 +500,14 @@ export type RouteResponse = {
 };
 
 export async function getMCPRouterCatalog(): Promise<MCPRouterCatalogEntry[]> {
-  return readEnvelope<MCPRouterCatalogEntry[]>("/api/v1/router/mcp/catalog");
+  return readEnvelope<MCPRouterCatalogEntry[]>("/api/v1/mcp-router/catalog");
 }
 
 export async function routeMCP(request: RouteRequest): Promise<RouteResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/router/mcp/route`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/mcp-router/route`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(request),
   });
   const body = await response.json();
@@ -518,7 +519,105 @@ export async function matchMCPRouter(taskType: string, tags?: string[]): Promise
   if (tags?.length) {
     params.set("tags", tags.join(","));
   }
-  return readEnvelope<RouteResponse | null>(`/api/v1/router/mcp/match?${params}`);
+  return readEnvelope<RouteResponse | null>(`/api/v1/mcp-router/match?${params}`);
+}
+
+export type MCPSession = {
+  id: string;
+  agent_id: string;
+  correlation_id: string;
+  task_type: string;
+  policy_decision: string;
+  created_at: string;
+};
+
+export async function listMCPSessions(agentId?: string, limit?: number): Promise<{ items: MCPSession[] }> {
+  const params = new URLSearchParams();
+  if (agentId) params.set("agent_id", agentId);
+  if (limit) params.set("limit", String(limit));
+  const query = params.toString();
+  return readEnvelope<{ items: MCPSession[] }>(`/api/v1/mcp-router/sessions${query ? `?${query}` : ""}`);
+}
+
+// MCP Tools Discovery API
+export type MCPToolInfo = {
+  name: string;
+  description: string;
+  inputSchema?: Record<string, unknown>;
+};
+
+export type MCPServerToolsResponse = {
+  server_id: string;
+  server_name: string;
+  tools: MCPToolInfo[];
+};
+
+export async function listMCPServerTools(serverId: string): Promise<MCPServerToolsResponse> {
+  return readEnvelope<MCPServerToolsResponse>(`/api/v1/mcp-servers/${encodeURIComponent(serverId)}/tools`);
+}
+
+export async function listAllMCPTools(): Promise<{ tools: (MCPToolInfo & { server_name: string })[] }> {
+  return readEnvelope<{ tools: (MCPToolInfo & { server_name: string })[] }>("/api/v1/mcp/tools");
+}
+
+// MCP Resources API
+export type MCPResource = {
+  uri: string;
+  name: string;
+  mimeType?: string;
+  description?: string;
+};
+
+export async function listMCPServerResources(serverId: string): Promise<{ server_name: string; resources: MCPResource[] }> {
+  return readEnvelope(`/api/v1/mcp-servers/${encodeURIComponent(serverId)}/resources`);
+}
+
+export async function readMCPServerResource(serverId: string, uri: string): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/mcp-servers/${encodeURIComponent(serverId)}/resources/read`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ uri }),
+  });
+  const body = await response.json();
+  return body.data;
+}
+
+// MCP Prompts API
+export type MCPPrompt = {
+  name: string;
+  description?: string;
+  arguments?: Array<{ name: string; description?: string; required?: boolean }>;
+};
+
+export async function listMCPServerPrompts(serverId: string): Promise<{ server_name: string; prompts: MCPPrompt[] }> {
+  return readEnvelope(`/api/v1/mcp-servers/${encodeURIComponent(serverId)}/prompts`);
+}
+
+export async function getMCPServerPrompt(serverId: string, name: string, args?: Record<string, string>): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/mcp-servers/${encodeURIComponent(serverId)}/prompts/${encodeURIComponent(name)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ arguments: args || {} }),
+  });
+  const body = await response.json();
+  return body.data;
+}
+
+// MCP Health API
+export type MCPHealthStatus = {
+  name: string;
+  healthy: boolean;
+  error?: string;
+};
+
+export async function checkMCPHealth(): Promise<{ servers: MCPHealthStatus[] }> {
+  return readEnvelope<{ servers: MCPHealthStatus[] }>("/api/v1/mcp-servers/health");
+}
+
+export async function checkMCPServerHealth(serverId: string): Promise<{ server_id: string; server_name: string; healthy: boolean; error?: string }> {
+  return readEnvelope(`/api/v1/mcp-servers/${encodeURIComponent(serverId)}/health`);
 }
 
 // Skill Market API

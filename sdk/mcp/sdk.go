@@ -67,6 +67,8 @@ func NewServer(config Config) *Server {
 		token:       os.Getenv("MANAGING_UP_TOKEN"),
 		mcpServer: server.NewMCPServer(name, version,
 			server.WithToolCapabilities(true),
+			server.WithResourceCapabilities(true, true),
+			server.WithPromptCapabilities(true),
 			server.WithLogging(),
 		),
 		toolCalls: make(map[string]int64),
@@ -78,6 +80,16 @@ func (s *Server) AddTool(tool mcp.Tool, handler func(ctx context.Context, reques
 	defer s.toolMu.Unlock()
 	s.toolCalls[tool.Name] = 0
 	s.mcpServer.AddTool(tool, handler)
+}
+
+// AddResource adds a resource to the MCP server.
+func (s *Server) AddResource(resource mcp.Resource, handler func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error)) {
+	s.mcpServer.AddResource(resource, handler)
+}
+
+// AddPrompt adds a prompt template to the MCP server.
+func (s *Server) AddPrompt(prompt mcp.Prompt, handler func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error)) {
+	s.mcpServer.AddPrompt(prompt, handler)
 }
 
 type Metrics struct {

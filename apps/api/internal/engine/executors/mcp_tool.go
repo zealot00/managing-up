@@ -21,12 +21,29 @@ func NewMCPTool(serverName string, tool mcp.Tool, client *MCPClient) *MCPTool {
 	}
 }
 
+// Name returns the namespaced tool name in the format "serverName:toolName".
+// This prevents collisions when multiple servers expose tools with the same name.
 func (t *MCPTool) Name() string {
+	return toolNamespacedKey(t.serverName, t.tool.Name)
+}
+
+// ToolName returns the bare tool name (without server prefix).
+func (t *MCPTool) ToolName() string {
 	return t.tool.Name
 }
 
 func (t *MCPTool) Description() string {
 	return t.tool.Description
+}
+
+// ServerName returns the name of the MCP server this tool belongs to.
+func (t *MCPTool) ServerName() string {
+	return t.serverName
+}
+
+// MCPToolDef returns the underlying mcp.Tool definition.
+func (t *MCPTool) MCPToolDef() mcp.Tool {
+	return t.tool
 }
 
 func (t *MCPTool) Execute(ctx context.Context, args map[string]any) (any, error) {
@@ -41,7 +58,7 @@ func (t *MCPTool) Execute(ctx context.Context, args map[string]any) (any, error)
 
 	return map[string]any{
 		"content":           result.Content,
-		"structuredContent": result.StructuredContent,
+		"structructuredContent": result.StructuredContent,
 	}, nil
 }
 

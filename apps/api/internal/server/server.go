@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,7 +21,9 @@ import (
 	"github.com/zealot/managing-up/apps/api/internal/engine/executors"
 	"github.com/zealot/managing-up/apps/api/internal/gateway"
 	"github.com/zealot/managing-up/apps/api/internal/llm"
+	"github.com/zealot/managing-up/apps/api/internal/mcpproxy"
 	"github.com/zealot/managing-up/apps/api/internal/orchestrator"
+	"github.com/zealot/managing-up/apps/api/internal/repository"
 	"github.com/zealot/managing-up/apps/api/internal/seh"
 	"github.com/zealot/managing-up/apps/api/internal/server/handlers"
 	"github.com/zealot/managing-up/apps/api/internal/server/middleware"
@@ -812,6 +815,10 @@ type Server struct {
 	mcpServersHandler   *handlers.MCPServersHandler
 	mcpInvokeHandler    *handlers.MCPInvokeHandler
 	grantMCPHandler     *handlers.GrantMCPHandler
+	mcpResourcesHandler *handlers.MCPResourcesHandler
+	mcpPromptsHandler   *handlers.MCPPromptsHandler
+	mcpHealthHandler    *handlers.MCPHealthHandler
+	mcpStreamHandler    *handlers.MCPStreamHandler
 	policiesHandler     *handlers.PoliciesHandler
 	sweepHandler       *handlers.SweepHandler
 	snapshotsHandler    *handlers.SnapshotsHandler
@@ -822,11 +829,11 @@ type Server struct {
 }
 
 func New(cfg config.Config) *Server {
-	return NewWithRepository(cfg, NewStore(), nil, nil)
+	return NewWithRepository(cfg, NewStore(), nil, nil, executors.NewMCPRegistry())
 }
 
 // NewWithRepository creates a configured API server with an injected repository.
-func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error, experimentSvc *service.ExperimentService) *Server {
+func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error, experimentSvc *service.ExperimentService, mcpRegistry *executors.MCPRegistry) *Server {
 	mux := http.NewServeMux()
 	orchestratorSvc := orchestrator.NewOrchestrationService()
 	orchestratorServer := orchestrator.NewServer(orchestratorSvc)
@@ -876,23 +883,41 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		circuitBreaker = gateway.NewInMemoryCircuitBreaker(5, 2, 60*time.Second)
 	}
 	metricsCollector := service.NewMetricsCollector()
-	mcpRouterRepo := newInMemoryMCPRouterRepo()
+	// Access the underlying *sql.DB from the postgres Repository if available
+	var pgMCPRouterRepo *repository.PostgresMCPRouterRepository
+	type dbAccessor interface{ DB() *sql.DB }
+	if accessor, ok := repo.(dbAccessor); ok {
+		pgMCPRouterRepo = repository.NewPostgresMCPRouterRepository(accessor.DB())
+	}
+	var mcpRouterRepo service.MCPRouterRepository
+	var routeLogger handlers.RouteLogger
+	if pgMCPRouterRepo != nil {
+		mcpRouterRepo = newPostgresMCPRouterRepoAdapter(pgMCPRouterRepo)
+		routeLogger = newPostgresRouteLoggerAdapter(pgMCPRouterRepo)
+	} else {
+		mcpRouterRepo = newInMemoryMCPRouterRepo()
+		routeLogger = nil
+	}
 	gatewaySessionRepo := newInMemoryGatewaySessionRepo()
 	memoryHubRepo := newInMemoryMemoryRepo()
 	memoryHubSvc := service.NewMemoryHubService(memoryHubRepo)
 	policyChecker := service.NewDefaultPolicyChecker(mcpRouterRepo, service.DefaultPolicyRules)
 	mcpRouterSvc := service.NewMCPRouterService(mcpRouterRepo, metricsCollector, policyChecker)
 	gatewaySessionSvc := service.NewGatewaySessionService(gatewaySessionRepo, mcpRouterSvc)
-	mcpRouterHandler := handlers.NewMCPRouterHandler(mcpRouterSvc, gatewaySessionSvc, metricsCollector, memoryHubSvc)
-	mcpServersHandler := handlers.NewMCPServersHandler(repoToMCPServersRepoAdapter{repo: repo}, mcpRouterSvc)
+	mcpRouterHandler := handlers.NewMCPRouterHandler(mcpRouterSvc, gatewaySessionSvc, metricsCollector, memoryHubSvc, routeLogger)
+	mcpServersHandler := handlers.NewMCPServersHandler(repoToMCPServersRepoAdapter{repo: repo}, mcpRouterSvc, mcpRegistry)
 
-	mcpRegistry := executors.NewMCPRegistry()
 	executors.SetGlobalRegistry(mcpRegistry)
 	mcpRegistryAdapter := handlers.NewMCPRegistryAdapter(mcpRegistry)
 
 	repoToMCPRepoAdapter := &repoToMCPInvokeRepoAdapter{repo: repo}
-	mcpInvokeHandler := handlers.NewMCPInvokeHandler(repoToMCPRepoAdapter, mcpRegistryAdapter)
-	grantMCPHandler := handlers.NewGrantMCPHandler(repoToMCPGrantRepoAdapter{repo: repo})
+	keyResolver := &gatewayKeyResolver{repo: repo}
+	mcpInvokeHandler := handlers.NewMCPInvokeHandler(repoToMCPRepoAdapter, mcpRegistryAdapter, keyResolver)
+	grantMCPHandler := handlers.NewGrantMCPHandler(repoToMCPGrantRepoAdapter{repo: repo}, keyResolver)
+	mcpResourcesHandler := handlers.NewMCPResourcesHandler(mcpRegistry, repoToMCPServersRepoAdapter{repo: repo})
+	mcpPromptsHandler := handlers.NewMCPPromptsHandler(mcpRegistry, repoToMCPServersRepoAdapter{repo: repo})
+	mcpHealthHandler := handlers.NewMCPHealthHandler(mcpRegistry, repoToMCPServersRepoAdapter{repo: repo})
+	mcpStreamHandler := handlers.NewMCPStreamHandler(mcpRegistry, repoToMCPRepoAdapter, keyResolver)
 	policiesHandler := handlers.NewPoliciesHandler(repo)
 	sweepHandler := handlers.NewSweepHandler(&repoToSweepRepoAdapter{repo: repo})
 
@@ -952,6 +977,10 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		mcpServersHandler:   mcpServersHandler,
 		mcpInvokeHandler:    mcpInvokeHandler,
 		grantMCPHandler:     grantMCPHandler,
+		mcpResourcesHandler: mcpResourcesHandler,
+		mcpPromptsHandler:   mcpPromptsHandler,
+		mcpHealthHandler:    mcpHealthHandler,
+		mcpStreamHandler:    mcpStreamHandler,
 		policiesHandler:     policiesHandler,
 		sweepHandler:       sweepHandler,
 		snapshotsHandler:    snapshotsHandler,
@@ -1005,13 +1034,35 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	mux.Handle("/api/v1/gateway/usage/users", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayUsageByUsers)))
 	mux.Handle("/api/v1/gateway/budget", authMW.RequireAuth(http.HandlerFunc(srv.handleGatewayBudget)))
 
-	mux.HandleFunc("/api/v1/mcp-servers", srv.handleMCPServers)
-	mux.HandleFunc("/api/v1/mcp-servers/{id}", srv.handleMCPServerByID)
-	mux.HandleFunc("/api/v1/mcp-servers/{id}/approve", srv.mcpServersHandler.Approve)
+	mux.Handle("/api/v1/mcp-servers", authMW.RequireAuth(http.HandlerFunc(srv.handleMCPServers)))
+	mux.Handle("/api/v1/mcp-servers/{id}", authMW.RequireAuth(http.HandlerFunc(srv.handleMCPServerByID)))
+	mux.Handle("/api/v1/mcp-servers/{id}/approve", authMW.RequireAuth(http.HandlerFunc(srv.mcpServersHandler.Approve)))
+	mux.Handle("/api/v1/mcp-servers/{id}/tools", authMW.OptionalAuth(http.HandlerFunc(srv.mcpServersHandler.ListTools)))
+	mux.Handle("/api/v1/mcp-servers/{id}/resources", authMW.OptionalAuth(http.HandlerFunc(srv.mcpResourcesHandler.ListResources)))
+	mux.Handle("/api/v1/mcp-servers/{id}/resources/read", authMW.OptionalAuth(http.HandlerFunc(srv.mcpResourcesHandler.ReadResource)))
+	mux.Handle("/api/v1/mcp-servers/{id}/resources/templates", authMW.OptionalAuth(http.HandlerFunc(srv.mcpResourcesHandler.ListResourceTemplates)))
+	mux.Handle("/api/v1/mcp-servers/{id}/resources/subscribe", authMW.OptionalAuth(http.HandlerFunc(srv.mcpResourcesHandler.Subscribe)))
+	mux.Handle("/api/v1/mcp-servers/{id}/prompts", authMW.OptionalAuth(http.HandlerFunc(srv.mcpPromptsHandler.ListPrompts)))
+	mux.Handle("/api/v1/mcp-servers/{id}/prompts/", authMW.OptionalAuth(http.HandlerFunc(srv.mcpPromptsHandler.GetPrompt)))
+	mux.Handle("/api/v1/mcp-servers/{id}/health", authMW.OptionalAuth(http.HandlerFunc(srv.mcpHealthHandler.HealthCheckOne)))
+	mux.Handle("/api/v1/mcp-servers/health", authMW.OptionalAuth(http.HandlerFunc(srv.mcpHealthHandler.HealthCheckAll)))
+	mux.Handle("/api/v1/mcp/tools", authMW.OptionalAuth(http.HandlerFunc(srv.mcpServersHandler.ListAllTools)))
 
-	mux.HandleFunc("/api/v1/mcp/invoke", srv.mcpInvokeHandler.Invoke)
-	mux.HandleFunc("/api/v1/mcp/permissions", srv.grantMCPHandler.Grant)
-	mux.HandleFunc("/api/v1/mcp/permissions/list", srv.grantMCPHandler.ListPermissions)
+	// MCP invoke/stream endpoints: accept both JWT (web UI) and API key (agent)
+	mux.Handle("/api/v1/mcp/invoke", authMW.OptionalAuth(http.HandlerFunc(srv.mcpInvokeHandler.Invoke)))
+	mux.Handle("/api/v1/mcp/invoke/stream", authMW.OptionalAuth(http.HandlerFunc(srv.mcpStreamHandler.InvokeStream)))
+
+	// MCP permissions management: Grant/Revoke requires admin JWT auth; List supports API key too
+	mux.Handle("/api/v1/mcp/permissions", authMW.RequireAuth(http.HandlerFunc(srv.grantMCPHandler.Grant)))
+	mux.Handle("/api/v1/mcp/permissions/list", authMW.OptionalAuth(http.HandlerFunc(srv.grantMCPHandler.ListPermissions)))
+	mux.Handle("/api/v1/mcp/permissions/{id}", authMW.RequireAuth(http.HandlerFunc(srv.grantMCPHandler.Revoke)))
+
+	mux.Handle("/api/v1/mcp-router/route", authMW.OptionalAuth(http.HandlerFunc(srv.mcpRouterHandler.Route)))
+	mux.Handle("/api/v1/mcp-router/catalog", authMW.OptionalAuth(http.HandlerFunc(srv.mcpRouterHandler.Catalog)))
+	mux.Handle("/api/v1/mcp-router/match", authMW.OptionalAuth(http.HandlerFunc(srv.mcpRouterHandler.Match)))
+
+	sessionHistoryHandler := handlers.NewSessionHistoryHandler(gatewaySessionSvc)
+	mux.HandleFunc("/api/v1/mcp-router/sessions", sessionHistoryHandler.ListSessions)
 
 mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
 	mux.HandleFunc("/api/v1/snapshots/list", srv.snapshotsHandler.ListSnapshots)
@@ -1053,6 +1104,15 @@ mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
 
 	sehAuth := seh.AuthMiddleware(sehAuthConfig)
 	mux.Handle("/v1/seh/", sehAuth(http.StripPrefix("/v1/seh", srv.sehServer)))
+
+	// MCP Protocol Proxy endpoint — standard MCP server for clients like CodeBuddy/Cursor
+	mcpProxy := mcpproxy.NewProxyServer(
+		mcpproxy.NewRegistryAdapter(mcpRegistry),
+		&gatewayKeyResolverAdapter{repo: repo},
+		&mcpPermCheckerAdapter{repo: repo},
+		&mcpServerIndexAdapter{repo: repo},
+	)
+	mux.Handle("/mcp", mcpProxy.Handler())
 
 	srv.httpServer = &http.Server{
 		Addr:              cfg.Address(),
@@ -2374,4 +2434,51 @@ func (s *Server) handleApproveMCPServer(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeEnvelope(w, http.StatusOK, generateRequestID(), server)
+}
+
+// mcpproxy adapter types
+
+type gatewayKeyResolverAdapter struct {
+	repo Repository
+}
+
+func (a *gatewayKeyResolverAdapter) ResolveAPIKey(rawKey string) (dbKeyID, userID string, ok bool) {
+	keyHash := HashGatewayAPIKey(rawKey)
+	key, found := a.repo.GetGatewayAPIKeyByHash(keyHash)
+	if !found || key.RevokedAt != nil {
+		return "", "", false
+	}
+	return key.ID, key.UserID, true
+}
+
+type mcpPermCheckerAdapter struct {
+	repo Repository
+}
+
+func (a *mcpPermCheckerAdapter) CheckMCPPermission(serverID, userID, apiKeyID, skillID string) (bool, error) {
+	return a.repo.CheckMCPPermission(serverID, userID, apiKeyID, skillID)
+}
+
+func (a *mcpPermCheckerAdapter) ListPermissionsForIdentity(userID, apiKeyID string) ([]mcpproxy.PermEntry, error) {
+	perms, err := a.repo.ListPermissionsForIdentity(userID, apiKeyID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]mcpproxy.PermEntry, len(perms))
+	for i, p := range perms {
+		result[i] = mcpproxy.PermEntry{MCPServerID: p.MCPServerID}
+	}
+	return result, nil
+}
+
+type mcpServerIndexAdapter struct {
+	repo Repository
+}
+
+func (a *mcpServerIndexAdapter) GetMCPServerByName(name string) (string, bool) {
+	srv, ok := a.repo.GetMCPServerByName(name)
+	if !ok {
+		return "", false
+	}
+	return srv.ID, true
 }

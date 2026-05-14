@@ -5,6 +5,21 @@ import (
 	"github.com/zealot/managing-up/apps/api/internal/service"
 )
 
+// gatewayKeyResolver resolves raw API key strings to their database IDs
+// by hashing the raw key and looking it up in the gateway_api_keys table.
+type gatewayKeyResolver struct {
+	repo Repository
+}
+
+func (r *gatewayKeyResolver) ResolveAPIKey(rawKey string) (dbKeyID string, userID string, ok bool) {
+	keyHash := HashGatewayAPIKey(rawKey)
+	key, found := r.repo.GetGatewayAPIKeyByHash(keyHash)
+	if !found || key.RevokedAt != nil {
+		return "", "", false
+	}
+	return key.ID, key.UserID, true
+}
+
 type repoToMCPInvokeRepoAdapter struct {
 	repo Repository
 }
@@ -50,12 +65,28 @@ func (a repoToMCPGrantRepoAdapter) ListMCPServerPermissions(mcpServerID string) 
 	return result, nil
 }
 
+func (a repoToMCPGrantRepoAdapter) ListPermissionsForIdentity(userID, apiKeyID string) ([]handlers.MCPServerPermission, error) {
+	perms, err := a.repo.ListPermissionsForIdentity(userID, apiKeyID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]handlers.MCPServerPermission, len(perms))
+	for i, p := range perms {
+		result[i] = toHandlersMCPServerPermission(p)
+	}
+	return result, nil
+}
+
 func (a repoToMCPGrantRepoAdapter) GetMCPServer(id string) (handlers.MCPServerDTO, bool) {
 	server, ok := a.repo.GetMCPServer(id)
 	if !ok {
 		return handlers.MCPServerDTO{}, false
 	}
 	return toMCPServerDTO(server), true
+}
+
+func (a repoToMCPGrantRepoAdapter) RevokeMCPServerPermission(id string) error {
+	return a.repo.RevokeMCPServerPermission(id)
 }
 
 func toServerMCPServerPermission(p handlers.MCPServerPermission) MCPServerPermission {

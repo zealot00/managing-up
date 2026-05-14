@@ -77,6 +77,7 @@ type Repository interface {
 	GetRandomTip() (Tip, bool)
 	ListMCPServers() []MCPServer
 	GetMCPServer(id string) (MCPServer, bool)
+	GetMCPServerByName(name string) (MCPServer, bool)
 	CreateMCPServer(server MCPServer) (MCPServer, error)
 	UpdateMCPServer(server MCPServer) error
 	DeleteMCPServer(id string) error
@@ -93,8 +94,10 @@ type Repository interface {
 	UpdatePolicyVersion(pv models.PolicyVersion) error
 	DeletePolicyVersion(id string) error
 	ListMCPServerPermissions(mcpServerID string) ([]MCPServerPermission, error)
+	ListPermissionsForIdentity(userID, apiKeyID string) ([]MCPServerPermission, error)
 	CreateMCPServerPermission(p MCPServerPermission) (MCPServerPermission, error)
 	CheckMCPPermission(mcpServerID, userID, apiKeyID, skillID string) (bool, error)
+	RevokeMCPServerPermission(id string) error
 	ListMCPRouterCatalog() ([]MCPRouterCatalogEntry, error)
 	UpsertMCPRouterCatalogEntry(e MCPRouterCatalogEntry) error
 	IncrementMCPRouterCatalogUseCount(serverID string) error

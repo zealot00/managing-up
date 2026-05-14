@@ -18,24 +18,3 @@ CREATE INDEX idx_mcp_permissions_server ON mcp_server_permissions(mcp_server_id)
 CREATE INDEX idx_mcp_permissions_user ON mcp_server_permissions(user_id);
 CREATE INDEX idx_mcp_permissions_api_key ON mcp_server_permissions(api_key_id);
 CREATE INDEX idx_mcp_permissions_skill ON mcp_server_permissions(skill_id);
-
--- MCP Router Catalog: Persistent catalog for MCP servers available for routing
-CREATE TABLE mcp_router_catalog (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    server_id       VARCHAR(255) UNIQUE NOT NULL,
-    name            VARCHAR(255) NOT NULL,
-    trust_score     FLOAT NOT NULL DEFAULT 0.5,
-    transport_type  VARCHAR(50) NOT NULL,
-    url             TEXT,
-    headers         JSONB DEFAULT '{}',
-    enabled         BOOLEAN NOT NULL DEFAULT true,
-    approved_by     TEXT,
-    metadata_       JSONB DEFAULT '{}',
-    use_count      INTEGER NOT NULL DEFAULT 0,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_mcp_catalog_server_id ON mcp_router_catalog(server_id);
-CREATE INDEX idx_mcp_catalog_enabled ON mcp_router_catalog(enabled);
-CREATE INDEX idx_mcp_catalog_use_count ON mcp_router_catalog(use_count DESC);

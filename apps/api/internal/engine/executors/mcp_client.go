@@ -390,6 +390,147 @@ func (c *MCPClient) Close() error {
 	return nil
 }
 
+// Ping checks if the MCP server is reachable.
+func (c *MCPClient) Ping(ctx context.Context) error {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return fmt.Errorf("client closed")
+	}
+	c.mu.Unlock()
+
+	return c.client.Ping(ctx)
+}
+
+// GetServerCapabilities returns the server capabilities discovered during initialization.
+func (c *MCPClient) GetServerCapabilities() *mcp.ServerCapabilities {
+	capabilities := c.client.GetServerCapabilities()
+	return &capabilities
+}
+
+// ListResources returns the resources available on the MCP server.
+func (c *MCPClient) ListResources(ctx context.Context) ([]mcp.Resource, error) {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("client closed")
+	}
+	c.mu.Unlock()
+
+	result, err := c.client.ListResources(ctx, mcp.ListResourcesRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return result.Resources, nil
+}
+
+// ReadResource reads a specific resource from the MCP server.
+func (c *MCPClient) ReadResource(ctx context.Context, uri string) (*mcp.ReadResourceResult, error) {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("client closed")
+	}
+	c.mu.Unlock()
+
+	return c.client.ReadResource(ctx, mcp.ReadResourceRequest{
+		Params: mcp.ReadResourceParams{
+			URI: uri,
+		},
+	})
+}
+
+// ListResourceTemplates returns the resource templates available on the MCP server.
+func (c *MCPClient) ListResourceTemplates(ctx context.Context) ([]mcp.ResourceTemplate, error) {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("client closed")
+	}
+	c.mu.Unlock()
+
+	result, err := c.client.ListResourceTemplates(ctx, mcp.ListResourceTemplatesRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return result.ResourceTemplates, nil
+}
+
+// Subscribe subscribes to resource changes.
+func (c *MCPClient) Subscribe(ctx context.Context, uri string) error {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return fmt.Errorf("client closed")
+	}
+	c.mu.Unlock()
+
+	return c.client.Subscribe(ctx, mcp.SubscribeRequest{
+		Params: mcp.SubscribeParams{
+			URI: uri,
+		},
+	})
+}
+
+// Unsubscribe unsubscribes from resource changes.
+func (c *MCPClient) Unsubscribe(ctx context.Context, uri string) error {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return fmt.Errorf("client closed")
+	}
+	c.mu.Unlock()
+
+	return c.client.Unsubscribe(ctx, mcp.UnsubscribeRequest{
+		Params: mcp.UnsubscribeParams{
+			URI: uri,
+		},
+	})
+}
+
+// ListPrompts returns the prompts available on the MCP server.
+func (c *MCPClient) ListPrompts(ctx context.Context) ([]mcp.Prompt, error) {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("client closed")
+	}
+	c.mu.Unlock()
+
+	result, err := c.client.ListPrompts(ctx, mcp.ListPromptsRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return result.Prompts, nil
+}
+
+// GetPrompt retrieves a specific prompt from the MCP server.
+func (c *MCPClient) GetPrompt(ctx context.Context, name string, args map[string]string) (*mcp.GetPromptResult, error) {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("client closed")
+	}
+	c.mu.Unlock()
+
+	return c.client.GetPrompt(ctx, mcp.GetPromptRequest{
+		Params: mcp.GetPromptParams{
+			Name:      name,
+			Arguments: args,
+		},
+	})
+}
+
+// OnNotification registers a handler for server-initiated notifications.
+func (c *MCPClient) OnNotification(handler func(mcp.JSONRPCNotification)) {
+	c.client.OnNotification(handler)
+}
+
+// OnConnectionLost registers a handler for connection loss events.
+func (c *MCPClient) OnConnectionLost(handler func(error)) {
+	c.client.OnConnectionLost(handler)
+}
+
 // execLookPath validates a command exists in PATH
 func execLookPath(name string) (string, error) {
 	path, err := exec.LookPath(name)

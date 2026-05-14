@@ -526,19 +526,26 @@ type MCPServerPermission struct {
 }
 
 type MCPRouterCatalogEntry struct {
-	ID           string                 `json:"id"`
-	ServerID     string                 `json:"server_id"`
-	Name         string                 `json:"name"`
-	TrustScore   float64                `json:"trust_score"`
-	TransportType string               `json:"transport_type"`
-	URL          string                 `json:"url,omitempty"`
-	Headers      map[string]string     `json:"headers,omitempty"`
-	Enabled      bool                   `json:"enabled"`
-	ApprovedBy   string                 `json:"approved_by,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
-	UseCount    int                    `json:"use_count"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	ID            string                 `json:"id"`
+	ServerID      string                 `json:"server_id"`
+	Name          string                 `json:"name"`
+	Description   string                 `json:"description,omitempty"`
+	TransportType string                 `json:"transport_type"`
+	Command       string                 `json:"command,omitempty"`
+	Args          []string               `json:"args,omitempty"`
+	URL           string                 `json:"url,omitempty"`
+	TaskTypes     []string               `json:"task_types,omitempty"`
+	Tags          []string               `json:"tags,omitempty"`
+	Capabilities  map[string]interface{} `json:"capabilities,omitempty"`
+	RoutingConfig map[string]interface{} `json:"routing_config,omitempty"`
+	Status        string                 `json:"status"`
+	TrustScore    float64                `json:"trust_score"`
+	UseCount      int64                  `json:"use_count"`
+	ErrorCount    int64                  `json:"error_count"`
+	LastUsedAt    *time.Time             `json:"last_used_at,omitempty"`
+	SyncedAt      *time.Time             `json:"synced_at,omitempty"`
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     time.Time              `json:"updated_at"`
 }
 
 type GrantMCPPermissionRequest struct {

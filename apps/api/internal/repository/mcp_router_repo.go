@@ -83,23 +83,30 @@ func (r *PostgresMCPRouterRepository) FindMatchingServers(ctx context.Context, t
 		WHERE status = 'active'
 		AND task_types @> $1
 		ORDER BY trust_score DESC, use_count DESC
-		LIMIT 1
+		LIMIT 10
 	`
 
-	var entry RouterCatalogEntry
-	err := r.db.QueryRowContext(ctx, query, taskTypes).Scan(
-		&entry.ID, &entry.ServerID, &entry.Name, &entry.TransportType,
-		&entry.Command, &entry.Args, &entry.URL, &entry.TaskTypes, &entry.Tags,
-		&entry.TrustScore, &entry.UseCount,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
+	rows, err := r.db.QueryContext(ctx, query, taskTypes)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
+	defer rows.Close()
 
-	return []RouterCatalogEntry{entry}, nil
+	var entries []RouterCatalogEntry
+	for rows.Next() {
+		var entry RouterCatalogEntry
+		err := rows.Scan(
+			&entry.ID, &entry.ServerID, &entry.Name, &entry.TransportType,
+			&entry.Command, &entry.Args, &entry.URL, &entry.TaskTypes, &entry.Tags,
+			&entry.TrustScore, &entry.UseCount,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan failed: %w", err)
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
 }
 
 func (r *PostgresMCPRouterRepository) ListCatalog(ctx context.Context) ([]RouterCatalogEntry, error) {
