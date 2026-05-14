@@ -32,10 +32,15 @@ type MCPServerValidationResult struct {
 
 var globalMCPRegistry *MCPRegistry
 
+// toolNamespacedKey returns the namespaced registry key for a tool: "serverName:toolName".
+func toolNamespacedKey(serverName, toolName string) string {
+	return serverName + ":" + toolName
+}
+
 type MCPRegistry struct {
 	clients *MCPClients
 	mu      sync.RWMutex
-	tools   map[string]tool.Tool
+	tools   map[string]tool.Tool // key = "serverName:toolName" (namespaced)
 }
 
 func NewMCPRegistry() *MCPRegistry {
@@ -61,6 +66,14 @@ func (r *MCPRegistry) RegisterStdio(ctx context.Context, name string, config MCP
 	client, ok := r.clients.GetClient(name)
 	if !ok {
 		return fmt.Errorf("MCP client %s not found after registration", name)
+	}
+
+	// Wire disconnect callback
+	if config.OnDisconnect != nil {
+		serverName := name
+		client.OnConnectionLost(func(err error) {
+			config.OnDisconnect(serverName)
+		})
 	}
 
 	r.registerTools(name, client)
@@ -93,9 +106,10 @@ func (r *MCPRegistry) Unregister(name string) error {
 		return err
 	}
 
-	for toolName, t := range r.tools {
+	// Remove all tools belonging to this server
+	for key, t := range r.tools {
 		if mt, ok := t.(*MCPTool); ok && mt.serverName == name {
-			delete(r.tools, toolName)
+			delete(r.tools, key)
 		}
 	}
 
@@ -106,17 +120,48 @@ func (r *MCPRegistry) registerTools(serverName string, client *MCPClient) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// First, remove any existing tools for this server (handles re-registration)
+	for key, t := range r.tools {
+		if mt, ok := t.(*MCPTool); ok && mt.serverName == serverName {
+			delete(r.tools, key)
+		}
+	}
+
 	for _, t := range client.ListTools() {
 		mcpTool := NewMCPTool(serverName, t, client)
-		r.tools[mcpTool.Name()] = mcpTool
+		key := toolNamespacedKey(serverName, mcpTool.ToolName())
+		r.tools[key] = mcpTool
 	}
 }
 
+// GetToolByServer looks up a tool by server name and tool name (namespace-aware).
+func (r *MCPRegistry) GetToolByServer(serverName, toolName string) (tool.Tool, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	key := toolNamespacedKey(serverName, toolName)
+	t, ok := r.tools[key]
+	return t, ok
+}
+
+// GetTool looks up a tool by namespaced key "serverName:toolName".
+// For backward compatibility, if the key contains no ":", it searches across all servers.
 func (r *MCPRegistry) GetTool(name string) (tool.Tool, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	t, ok := r.tools[name]
-	return t, ok
+
+	// If namespaced key, look up directly
+	if strings.Contains(name, ":") {
+		t, ok := r.tools[name]
+		return t, ok
+	}
+
+	// Fallback: search across all servers by bare tool name (backward compat)
+	for _, t := range r.tools {
+		if mt, ok := t.(*MCPTool); ok && mt.ToolName() == name {
+			return t, true
+		}
+	}
+	return nil, false
 }
 
 func (r *MCPRegistry) ListTools() []tool.Tool {
@@ -134,19 +179,12 @@ func (r *MCPRegistry) ListMCPServers() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
+	seen := make(map[string]bool)
 	servers := make([]string, 0)
 	for _, t := range r.tools {
-		if mt, ok := t.(*MCPTool); ok {
-			found := false
-			for _, s := range servers {
-				if s == mt.serverName {
-					found = true
-					break
-				}
-			}
-			if !found {
-				servers = append(servers, mt.serverName)
-			}
+		if mt, ok := t.(*MCPTool); ok && !seen[mt.serverName] {
+			seen[mt.serverName] = true
+			servers = append(servers, mt.serverName)
 		}
 	}
 	return servers
@@ -162,6 +200,131 @@ func (r *MCPRegistry) ListToolsByServer(serverName string) []mcp.Tool {
 	r.mu.RUnlock()
 
 	return client.ListTools()
+}
+
+// IsRegistered returns whether a client with the given name is already registered.
+func (r *MCPRegistry) IsRegistered(name string) bool {
+	_, ok := r.clients.GetClient(name)
+	return ok
+}
+
+// GetClientByServerName returns the MCPClient for the given server name.
+func (r *MCPRegistry) GetClientByServerName(name string) (*MCPClient, bool) {
+	return r.clients.GetClient(name)
+}
+
+// HealthCheck pings all registered MCP servers and returns name→error map.
+func (r *MCPRegistry) HealthCheck(ctx context.Context) map[string]error {
+	servers := r.ListMCPServers()
+	results := make(map[string]error, len(servers))
+	for _, name := range servers {
+		c, ok := r.clients.GetClient(name)
+		if !ok {
+			results[name] = fmt.Errorf("client not found")
+			continue
+		}
+		results[name] = c.Ping(ctx)
+	}
+	return results
+}
+
+// RefreshTools re-fetches the tool list for a server and updates the registry.
+func (r *MCPRegistry) RefreshTools(ctx context.Context, serverName string) error {
+	c, ok := r.clients.GetClient(serverName)
+	if !ok {
+		return fmt.Errorf("MCP client not found: %s", serverName)
+	}
+
+	// Re-list tools from the server
+	listResult, err := c.client.ListTools(ctx, mcp.ListToolsRequest{})
+	if err != nil {
+		return fmt.Errorf("failed to list tools: %w", err)
+	}
+
+	// Update client's tool cache
+	c.mu.Lock()
+	newTools := make(map[string]mcp.Tool, len(listResult.Tools))
+	for _, t := range listResult.Tools {
+		newTools[t.Name] = t
+	}
+	c.tools = newTools
+	c.mu.Unlock()
+
+	// Re-register tools in the registry
+	r.registerTools(serverName, c)
+	return nil
+}
+
+// ListResourcesByServer returns resources for a specific server.
+func (r *MCPRegistry) ListResourcesByServer(ctx context.Context, serverName string) ([]mcp.Resource, error) {
+	c, ok := r.clients.GetClient(serverName)
+	if !ok {
+		return nil, fmt.Errorf("MCP client not found: %s", serverName)
+	}
+	return c.ListResources(ctx)
+}
+
+// ReadResource reads a resource from a specific server.
+func (r *MCPRegistry) ReadResource(ctx context.Context, serverName, uri string) (*mcp.ReadResourceResult, error) {
+	c, ok := r.clients.GetClient(serverName)
+	if !ok {
+		return nil, fmt.Errorf("MCP client not found: %s", serverName)
+	}
+	return c.ReadResource(ctx, uri)
+}
+
+// ListResourceTemplatesByServer returns resource templates for a specific server.
+func (r *MCPRegistry) ListResourceTemplatesByServer(ctx context.Context, serverName string) ([]mcp.ResourceTemplate, error) {
+	c, ok := r.clients.GetClient(serverName)
+	if !ok {
+		return nil, fmt.Errorf("MCP client not found: %s", serverName)
+	}
+	return c.ListResourceTemplates(ctx)
+}
+
+// SubscribeResource subscribes to resource changes on a specific server.
+func (r *MCPRegistry) SubscribeResource(ctx context.Context, serverName, uri string) error {
+	c, ok := r.clients.GetClient(serverName)
+	if !ok {
+		return fmt.Errorf("MCP client not found: %s", serverName)
+	}
+	return c.Subscribe(ctx, uri)
+}
+
+// UnsubscribeResource unsubscribes from resource changes on a specific server.
+func (r *MCPRegistry) UnsubscribeResource(ctx context.Context, serverName, uri string) error {
+	c, ok := r.clients.GetClient(serverName)
+	if !ok {
+		return fmt.Errorf("MCP client not found: %s", serverName)
+	}
+	return c.Unsubscribe(ctx, uri)
+}
+
+// ListPromptsByServer returns prompts for a specific server.
+func (r *MCPRegistry) ListPromptsByServer(ctx context.Context, serverName string) ([]mcp.Prompt, error) {
+	c, ok := r.clients.GetClient(serverName)
+	if !ok {
+		return nil, fmt.Errorf("MCP client not found: %s", serverName)
+	}
+	return c.ListPrompts(ctx)
+}
+
+// GetPrompt retrieves a prompt from a specific server.
+func (r *MCPRegistry) GetPrompt(ctx context.Context, serverName, name string, args map[string]string) (*mcp.GetPromptResult, error) {
+	c, ok := r.clients.GetClient(serverName)
+	if !ok {
+		return nil, fmt.Errorf("MCP client not found: %s", serverName)
+	}
+	return c.GetPrompt(ctx, name, args)
+}
+
+// GetServerCapabilities returns the capabilities of a specific server.
+func (r *MCPRegistry) GetServerCapabilities(serverName string) *mcp.ServerCapabilities {
+	c, ok := r.clients.GetClient(serverName)
+	if !ok {
+		return nil
+	}
+	return c.GetServerCapabilities()
 }
 
 func (r *MCPRegistry) Close() error {

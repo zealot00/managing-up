@@ -17,10 +17,28 @@ type MCPRouterHandler struct {
 	sessionSvc  *service.GatewaySessionService
 	metrics     *service.MetricsCollector
 	memorySvc   *service.MemoryHubService
+	routeLogger RouteLogger
 }
 
-func NewMCPRouterHandler(routerSvc *service.MCPRouterService, sessionSvc *service.GatewaySessionService, metrics *service.MetricsCollector, memorySvc *service.MemoryHubService) *MCPRouterHandler {
-	return &MCPRouterHandler{routerSvc: routerSvc, sessionSvc: sessionSvc, metrics: metrics, memorySvc: memorySvc}
+type RouteLogger interface {
+	LogRoute(ctx context.Context, log *RouteLogEntry) error
+}
+
+type RouteLogEntry struct {
+	SessionID       string
+	CorrelationID   string
+	AgentID         string
+	TaskType        string
+	TaskTags        []string
+	Matched         bool
+	MatchedServerID string
+	MatchScore      float64
+	MatchLatencyMS  int
+	Status          string
+}
+
+func NewMCPRouterHandler(routerSvc *service.MCPRouterService, sessionSvc *service.GatewaySessionService, metrics *service.MetricsCollector, memorySvc *service.MemoryHubService, routeLogger RouteLogger) *MCPRouterHandler {
+	return &MCPRouterHandler{routerSvc: routerSvc, sessionSvc: sessionSvc, metrics: metrics, memorySvc: memorySvc, routeLogger: routeLogger}
 }
 
 type RouteRequest struct {
@@ -80,6 +98,8 @@ func (h *MCPRouterHandler) Route(w http.ResponseWriter, r *http.Request) {
 		intent.Metadata["memory_context"] = memoryCtx
 	}
 
+	start := time.Now()
+
 	result, decision, err := h.routerSvc.MatchTaskWithPolicy(ctx, intent)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
@@ -106,19 +126,40 @@ func (h *MCPRouterHandler) Route(w http.ResponseWriter, r *http.Request) {
 			"sop_id", decision.SOPReference.SOPID)
 	}
 
-	start := time.Now()
 	duration := time.Since(start).Seconds()
 
 	if !result.Matched {
 		h.metrics.RecordMatchFailure("no_matching_server")
 		h.metrics.RecordRequest(req.AgentID, req.Task.Structured.TaskType, "no_match", duration)
+		h.logRoute(ctx, session.ID, req, false, "", 0, "no_match")
 		writeEnvelopeMatch(w, http.StatusOK, false, nil, 0, 0, req.CorrelationID)
 		return
 	}
 
 	h.metrics.RecordRequest(req.AgentID, req.Task.Structured.TaskType, "success", duration)
+	h.logRoute(ctx, session.ID, req, true, result.ServerID, result.MatchScore, "success")
 
 	writeEnvelopeMatch(w, http.StatusOK, true, result, time.Since(start).Milliseconds(), result.MatchScore, req.CorrelationID)
+}
+
+func (h *MCPRouterHandler) logRoute(ctx context.Context, sessionID string, req RouteRequest, matched bool, serverID string, matchScore float64, status string) {
+	if h.routeLogger == nil {
+		return
+	}
+	logEntry := &RouteLogEntry{
+		SessionID:       sessionID,
+		CorrelationID:   req.CorrelationID,
+		AgentID:         req.AgentID,
+		TaskType:        req.Task.Structured.TaskType,
+		TaskTags:        req.Task.Structured.Tags,
+		Matched:         matched,
+		MatchedServerID: serverID,
+		MatchScore:      matchScore,
+		Status:          status,
+	}
+	if err := h.routeLogger.LogRoute(ctx, logEntry); err != nil {
+		slog.Warn("failed to log route", "error", err)
+	}
 }
 
 func (h *MCPRouterHandler) Catalog(w http.ResponseWriter, r *http.Request) {

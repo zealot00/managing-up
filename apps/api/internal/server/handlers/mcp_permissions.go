@@ -30,9 +30,15 @@ func parseHeadersToMap(headers []string) map[string]string {
 	return result
 }
 
+// APIKeyResolver resolves raw API key strings to database IDs.
+type APIKeyResolver interface {
+	ResolveAPIKey(rawKey string) (dbKeyID string, userID string, ok bool)
+}
+
 type MCPInvokeHandler struct {
 	repo         MCPInvokeRepository
 	mcpRouterSvc MCPInvokerService
+	keyResolver  APIKeyResolver
 }
 
 type MCPInvokeRepository interface {
@@ -43,13 +49,13 @@ type MCPInvokeRepository interface {
 
 type MCPServerConfig struct {
 	ServerID      string
-	Name         string
+	Name          string
 	TransportType string
-	URL          string
-	Command      string
-	Args         []string
-	Env          []string
-	Headers      map[string]string
+	URL           string
+	Command       string
+	Args          []string
+	Env           []string
+	Headers       map[string]string
 }
 
 type MCPInvokerService interface {
@@ -58,21 +64,21 @@ type MCPInvokerService interface {
 
 type MCPInvokeResult struct {
 	Success bool                   `json:"success"`
-	Output  map[string]interface{}   `json:"output,omitempty"`
+	Output  map[string]interface{} `json:"output,omitempty"`
 	Error   string                 `json:"error,omitempty"`
 }
 
 type InvokeMCPRequest struct {
 	ServerID   string                 `json:"server_id"`
-	ToolName  string                 `json:"tool_name"`
+	ToolName   string                 `json:"tool_name"`
 	Parameters map[string]interface{} `json:"parameters,omitempty"`
-	UserID    string                 `json:"user_id,omitempty"`
-	APIKeyID  string                 `json:"api_key_id,omitempty"`
-	SkillID   string                 `json:"skill_id,omitempty"`
+	UserID     string                 `json:"user_id,omitempty"`
+	APIKeyID   string                 `json:"api_key_id,omitempty"`
+	SkillID    string                 `json:"skill_id,omitempty"`
 }
 
-func NewMCPInvokeHandler(repo MCPInvokeRepository, mcpRouterSvc MCPInvokerService) *MCPInvokeHandler {
-	return &MCPInvokeHandler{repo: repo, mcpRouterSvc: mcpRouterSvc}
+func NewMCPInvokeHandler(repo MCPInvokeRepository, mcpRouterSvc MCPInvokerService, keyResolver APIKeyResolver) *MCPInvokeHandler {
+	return &MCPInvokeHandler{repo: repo, mcpRouterSvc: mcpRouterSvc, keyResolver: keyResolver}
 }
 
 func (h *MCPInvokeHandler) Invoke(w http.ResponseWriter, r *http.Request) {
@@ -101,14 +107,23 @@ func (h *MCPInvokeHandler) Invoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolve identity: try JWT user first, then API key
 	user := middleware.UserFromContext(r.Context())
 	if user != nil {
 		req.UserID = user.ID
 	}
 
-	apiKeyID := getAPIKeyFromRequest(r)
-	if apiKeyID != "" {
-		req.APIKeyID = apiKeyID
+	rawAPIKey := getAPIKeyFromRequest(r)
+	if rawAPIKey != "" && h.keyResolver != nil {
+		dbKeyID, keyUserID, ok := h.keyResolver.ResolveAPIKey(rawAPIKey)
+		if ok {
+			req.APIKeyID = dbKeyID
+			// If no JWT user but API key resolved a user, use that
+			if req.UserID == "" && keyUserID != "" {
+				req.UserID = keyUserID
+			}
+		}
+		// If key not resolved, the permission check will naturally fail
 	}
 
 	hasPermission, err := h.repo.CheckMCPPermission(req.ServerID, req.UserID, req.APIKeyID, req.SkillID)
@@ -124,6 +139,11 @@ func (h *MCPInvokeHandler) Invoke(w http.ResponseWriter, r *http.Request) {
 	server, ok := h.repo.GetMCPServer(req.ServerID)
 	if !ok {
 		writeError(w, http.StatusNotFound, "SERVER_NOT_FOUND", "MCP server not found")
+		return
+	}
+
+	if server.Status != "approved" || !server.IsEnabled {
+		writeError(w, http.StatusForbidden, "SERVER_UNAVAILABLE", "MCP server is not approved or is disabled")
 		return
 	}
 
@@ -143,7 +163,6 @@ func (h *MCPInvokeHandler) Invoke(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.mcpRouterSvc.InvokeTool(ctx, config, req.ToolName, req.Parameters)
 	if err != nil {
-		h.repo.IncrementMCPRouterCatalogUseCount(req.ServerID)
 		writeError(w, http.StatusInternalServerError, "INVOKE_FAILED", err.Error())
 		return
 	}
@@ -164,17 +183,20 @@ func (h *MCPInvokeHandler) Invoke(w http.ResponseWriter, r *http.Request) {
 }
 
 type GrantMCPHandler struct {
-	repo MCPGrantRepository
+	repo        MCPGrantRepository
+	keyResolver APIKeyResolver
 }
 
 type MCPGrantRepository interface {
 	CreateMCPServerPermission(p MCPServerPermission) (MCPServerPermission, error)
 	ListMCPServerPermissions(mcpServerID string) ([]MCPServerPermission, error)
+	ListPermissionsForIdentity(userID, apiKeyID string) ([]MCPServerPermission, error)
 	GetMCPServer(id string) (MCPServerDTO, bool)
+	RevokeMCPServerPermission(id string) error
 }
 
 type MCPServerPermission struct {
-	ID              string     `json:"id"`
+	ID             string     `json:"id"`
 	MCPServerID    string     `json:"mcp_server_id"`
 	UserID         string     `json:"user_id,omitempty"`
 	APIKeyID       string     `json:"api_key_id,omitempty"`
@@ -188,15 +210,15 @@ type MCPServerPermission struct {
 
 type GrantMCPRequest struct {
 	MCPServerID    string     `json:"mcp_server_id"`
-	UserID         string    `json:"user_id,omitempty"`
-	APIKeyID       string    `json:"api_key_id,omitempty"`
-	SkillID        string    `json:"skill_id,omitempty"`
-	PermissionType string    `json:"permission_type"`
+	UserID         string     `json:"user_id,omitempty"`
+	APIKeyID       string     `json:"api_key_id,omitempty"`
+	SkillID        string     `json:"skill_id,omitempty"`
+	PermissionType string     `json:"permission_type"`
 	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
 }
 
-func NewGrantMCPHandler(repo MCPGrantRepository) *GrantMCPHandler {
-	return &GrantMCPHandler{repo: repo}
+func NewGrantMCPHandler(repo MCPGrantRepository, keyResolver APIKeyResolver) *GrantMCPHandler {
+	return &GrantMCPHandler{repo: repo, keyResolver: keyResolver}
 }
 
 func (h *GrantMCPHandler) Grant(w http.ResponseWriter, r *http.Request) {
@@ -230,6 +252,14 @@ func (h *GrantMCPHandler) Grant(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		writeError(w, http.StatusNotFound, "SERVER_NOT_FOUND", "MCP server not found")
 		return
+	}
+
+	// Resolve raw API key to DB ID if needed
+	if req.APIKeyID != "" && h.keyResolver != nil {
+		if dbKeyID, _, ok := h.keyResolver.ResolveAPIKey(req.APIKeyID); ok {
+			req.APIKeyID = dbKeyID
+		}
+		// If not resolved, keep the original value (might already be a DB UUID)
 	}
 
 	user := middleware.UserFromContext(r.Context())
@@ -266,12 +296,45 @@ func (h *GrantMCPHandler) ListPermissions(w http.ResponseWriter, r *http.Request
 	}
 
 	serverID := r.URL.Query().Get("mcp_server_id")
-	if serverID == "" {
-		writeError(w, http.StatusBadRequest, "SERVER_ID_REQUIRED", "mcp_server_id is required")
+
+	// If server_id is provided, list permissions for that server (admin use)
+	if serverID != "" {
+		perms, err := h.repo.ListMCPServerPermissions(serverID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+			return
+		}
+		writeEnvelope(w, http.StatusOK, "mcp_permissions", map[string]any{
+			"items": perms,
+		})
 		return
 	}
 
-	perms, err := h.repo.ListMCPServerPermissions(serverID)
+	// Otherwise, list permissions for the calling identity (agent use)
+	user := middleware.UserFromContext(r.Context())
+	userID := ""
+	apiKeyID := ""
+
+	if user != nil {
+		userID = user.ID
+	}
+
+	rawAPIKey := getAPIKeyFromRequest(r)
+	if rawAPIKey != "" && h.keyResolver != nil {
+		if dbKeyID, keyUserID, ok := h.keyResolver.ResolveAPIKey(rawAPIKey); ok {
+			apiKeyID = dbKeyID
+			if userID == "" && keyUserID != "" {
+				userID = keyUserID
+			}
+		}
+	}
+
+	if userID == "" && apiKeyID == "" {
+		writeError(w, http.StatusBadRequest, "IDENTITY_REQUIRED", "authentication required when mcp_server_id is not specified")
+		return
+	}
+
+	perms, err := h.repo.ListPermissionsForIdentity(userID, apiKeyID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
 		return
@@ -279,5 +342,28 @@ func (h *GrantMCPHandler) ListPermissions(w http.ResponseWriter, r *http.Request
 
 	writeEnvelope(w, http.StatusOK, "mcp_permissions", map[string]any{
 		"items": perms,
+	})
+}
+
+func (h *GrantMCPHandler) Revoke(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeMethodNotAllowed(w, r.Method)
+		return
+	}
+
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "PERMISSION_ID_REQUIRED", "permission id is required")
+		return
+	}
+
+	if err := h.repo.RevokeMCPServerPermission(id); err != nil {
+		writeError(w, http.StatusInternalServerError, "REVOKE_FAILED", "failed to revoke permission")
+		return
+	}
+
+	writeEnvelope(w, http.StatusOK, "mcp_revoke", map[string]any{
+		"revoked": true,
+		"id":      id,
 	})
 }

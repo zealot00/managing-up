@@ -57,7 +57,9 @@ class MCPServer:
         self.token = os.getenv("MANAGING_UP_TOKEN", "")
         self.server_id: Optional[str] = None
 
-        self._tools: dict[str, Callable] = {}
+        self._tools: dict[str, tuple[Callable, str, dict]] = {}
+        self._resources: dict[str, tuple[Callable, str, str]] = {}  # uri -> (handler, name, mime_type)
+        self._prompts: dict[str, tuple[Callable, str, list]] = {}  # name -> (handler, description, arguments)
         self._metrics = Metrics()
         self._server_impl = None
 
@@ -77,7 +79,29 @@ class MCPServer:
     def add_tool(
         self, name: str, description: str, input_schema: dict, handler: Callable
     ):
-        self._tools[name] = handler
+        self._tools[name] = (handler, description, input_schema)
+
+    def add_resource(self, uri: str, name: str, mime_type: str, handler: Callable):
+        """Add a resource to the MCP server.
+
+        Args:
+            uri: The URI of the resource.
+            name: Human-readable name for the resource.
+            mime_type: MIME type of the resource content.
+            handler: Async callable that takes no args and returns the resource content.
+        """
+        self._resources[uri] = (handler, name, mime_type)
+
+    def add_prompt(self, name: str, description: str, arguments: list, handler: Callable):
+        """Add a prompt template to the MCP server.
+
+        Args:
+            name: Name of the prompt.
+            description: Human-readable description.
+            arguments: List of argument dicts with 'name', 'description', 'required' keys.
+            handler: Async callable that takes arguments dict and returns prompt messages.
+        """
+        self._prompts[name] = (handler, description, arguments)
 
     async def register(self) -> dict:
         import httpx
@@ -144,10 +168,49 @@ class MCPServer:
 
             if method == "tools/list":
                 tools = [
-                    {"name": name, "description": desc}
-                    for name, (_, desc) in self._tools.items()
+                    {"name": name, "description": desc, "inputSchema": schema}
+                    for name, (_, desc, schema) in self._tools.items()
                 ]
                 return {"jsonrpc": "2.0", "id": id, "result": {"tools": tools}}
+
+            elif method == "resources/list":
+                resources = [
+                    {"uri": uri, "name": name, "mimeType": mime_type}
+                    for uri, (_, name, mime_type) in self._resources.items()
+                ]
+                return {"jsonrpc": "2.0", "id": id, "result": {"resources": resources}}
+
+            elif method == "resources/read":
+                uri = params.get("uri", "")
+                if uri in self._resources:
+                    handler = self._resources[uri][0]
+                    content = await handler()
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "result": {
+                            "contents": [
+                                {"uri": uri, "mimeType": self._resources[uri][2], "text": str(content)}
+                            ]
+                        },
+                    }
+                return {"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": f"Resource not found: {uri}"}}
+
+            elif method == "prompts/list":
+                prompts = [
+                    {"name": name, "description": desc, "arguments": args}
+                    for name, (_, desc, args) in self._prompts.items()
+                ]
+                return {"jsonrpc": "2.0", "id": id, "result": {"prompts": prompts}}
+
+            elif method == "prompts/get":
+                prompt_name = params.get("name", "")
+                if prompt_name in self._prompts:
+                    handler = self._prompts[prompt_name][0]
+                    arguments = params.get("arguments", {})
+                    result = await handler(arguments)
+                    return {"jsonrpc": "2.0", "id": id, "result": result}
+                return {"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": f"Prompt not found: {prompt_name}"}}
 
             elif method == "tools/call":
                 tool_name = params.get("name")
@@ -159,7 +222,8 @@ class MCPServer:
 
                 try:
                     if tool_name in self._tools:
-                        result = await self._tools[tool_name](arguments)
+                        handler = self._tools[tool_name][0]
+                        result = await handler(arguments)
                         self.record_tool_call(tool_name)
                         self.record_request(True, time.time() - start)
                         return {
