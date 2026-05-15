@@ -22,7 +22,6 @@ DO $$ BEGIN ALTER TABLE skills ALTER COLUMN created_by   DROP NOT NULL; EXCEPTIO
 UPDATE skills SET published_by = NULL WHERE published_by IS NOT NULL AND published_by NOT IN (SELECT id FROM users);
 UPDATE skills SET created_by   = NULL WHERE created_by   IS NOT NULL AND created_by   NOT IN (SELECT id FROM users);
 
--- Use WHEN OTHERS to catch both duplicate_object AND foreign_key_violation
 DO $$ BEGIN
     ALTER TABLE skills ADD CONSTRAINT fk_skills_published_by FOREIGN KEY (published_by) REFERENCES users(id) ON DELETE SET NULL;
 EXCEPTION WHEN OTHERS THEN NULL;
@@ -48,10 +47,8 @@ ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS changelog TEXT;
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS sop_version VARCHAR(50);
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS approved_by TEXT;
 
--- Ensure approved_by is nullable before cleaning orphaned data
 DO $$ BEGIN ALTER TABLE skill_versions ALTER COLUMN approved_by DROP NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
--- Clean orphaned FK references for approved_by
 UPDATE skill_versions SET approved_by = NULL WHERE approved_by IS NOT NULL AND approved_by NOT IN (SELECT id FROM users);
 
 DO $$ BEGIN
@@ -61,30 +58,54 @@ END $$;
 
 CREATE INDEX IF NOT EXISTS idx_skill_versions_skill ON skill_versions(skill_id);
 
+-- ============================================================
 -- Skill Dependencies
--- skills.id is TEXT, so FK columns must be TEXT not UUID
+-- skills.id is TEXT, so FK columns must be TEXT.
+-- Table may already exist with UUID columns from a prior run,
+-- so widen UUID → TEXT before adding FK constraints.
+-- ============================================================
 CREATE TABLE IF NOT EXISTS skill_dependencies (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id            TEXT NOT NULL,
     dependency_skill_id TEXT NOT NULL,
     version_constraint   VARCHAR(100) NOT NULL,
-    created_at          TIMESTAMP DEFAULT NOW(),
-    CONSTRAINT fk_skill_deps_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
-    CONSTRAINT fk_skill_deps_dep FOREIGN KEY (dependency_skill_id) REFERENCES skills(id) ON DELETE RESTRICT,
-    UNIQUE(skill_id, dependency_skill_id),
-    CONSTRAINT chk_skill_deps_no_self CHECK (skill_id != dependency_skill_id)
+    created_at          TIMESTAMP DEFAULT NOW()
 );
+
+-- Fix column types if table was created with UUID in a prior partial run
+DO $$ BEGIN
+    ALTER TABLE skill_dependencies ALTER COLUMN skill_id TYPE TEXT;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_dependencies ALTER COLUMN dependency_skill_id TYPE TEXT;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Now add constraints safely
+DO $$ BEGIN
+    ALTER TABLE skill_dependencies ADD CONSTRAINT fk_skill_deps_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_dependencies ADD CONSTRAINT fk_skill_deps_dep FOREIGN KEY (dependency_skill_id) REFERENCES skills(id) ON DELETE RESTRICT;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_dependencies ADD CONSTRAINT chk_skill_deps_no_self CHECK (skill_id != dependency_skill_id);
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_dependencies ADD CONSTRAINT skill_dependencies_skill_id_dependency_skill_id_key UNIQUE (skill_id, dependency_skill_id);
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_skill_deps_skill ON skill_dependencies(skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_deps_dep ON skill_dependencies(dependency_skill_id);
 
+-- ============================================================
 -- Skill Ratings
--- Clean orphaned user_id references before creating table (in case table already exists from partial run)
-DO $$ BEGIN
-    UPDATE skill_ratings SET user_id = NULL WHERE user_id NOT IN (SELECT id FROM users);
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
-
+-- ============================================================
 CREATE TABLE IF NOT EXISTS skill_ratings (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id    TEXT NOT NULL,
@@ -92,22 +113,44 @@ CREATE TABLE IF NOT EXISTS skill_ratings (
     rating      INTEGER NOT NULL,
     comment     TEXT,
     created_at  TIMESTAMP DEFAULT NOW(),
-    updated_at  TIMESTAMP DEFAULT NOW(),
-    CONSTRAINT fk_skill_ratings_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
-    CONSTRAINT fk_skill_ratings_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE(skill_id, user_id),
-    CONSTRAINT chk_skill_ratings CHECK (rating >= 1 AND rating <= 5)
+    updated_at  TIMESTAMP DEFAULT NOW()
 );
+
+-- Fix column types if table was created with UUID skill_id in a prior partial run
+DO $$ BEGIN
+    ALTER TABLE skill_ratings ALTER COLUMN skill_id TYPE TEXT;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Clean orphaned user_id references
+DO $$ BEGIN
+    UPDATE skill_ratings SET user_id = NULL WHERE user_id NOT IN (SELECT id FROM users);
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE skill_ratings ADD CONSTRAINT fk_skill_ratings_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_ratings ADD CONSTRAINT fk_skill_ratings_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_ratings ADD CONSTRAINT chk_skill_ratings CHECK (rating >= 1 AND rating <= 5);
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_ratings ADD CONSTRAINT skill_ratings_skill_id_user_id_key UNIQUE (skill_id, user_id);
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_skill_ratings_skill ON skill_ratings(skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_ratings_user ON skill_ratings(user_id);
 
+-- ============================================================
 -- Skill Installs
-DO $$ BEGIN
-    UPDATE skill_installs SET user_id = NULL WHERE user_id IS NOT NULL AND user_id NOT IN (SELECT id FROM users);
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
-
+-- ============================================================
 CREATE TABLE IF NOT EXISTS skill_installs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id        TEXT NOT NULL,
@@ -115,26 +158,41 @@ CREATE TABLE IF NOT EXISTS skill_installs (
     version         VARCHAR(50) NOT NULL,
     environment     VARCHAR(50) DEFAULT 'production',
     installed_at    TIMESTAMP DEFAULT NOW(),
-    skill_snapshot  JSONB,
-    CONSTRAINT fk_skill_installs_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
-    CONSTRAINT fk_skill_installs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-    CONSTRAINT chk_skill_installs_env CHECK (environment IN ('production', 'staging', 'development'))
+    skill_snapshot  JSONB
 );
+
+-- Fix column types if table was created with UUID skill_id in a prior partial run
+DO $$ BEGIN
+    ALTER TABLE skill_installs ALTER COLUMN skill_id TYPE TEXT;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Clean orphaned user_id references
+DO $$ BEGIN
+    UPDATE skill_installs SET user_id = NULL WHERE user_id IS NOT NULL AND user_id NOT IN (SELECT id FROM users);
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE skill_installs ADD CONSTRAINT fk_skill_installs_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_installs ADD CONSTRAINT fk_skill_installs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_installs ADD CONSTRAINT chk_skill_installs_env CHECK (environment IN ('production', 'staging', 'development'));
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_skill_installs_skill ON skill_installs(skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_installs_user ON skill_installs(user_id);
 CREATE INDEX IF NOT EXISTS idx_skill_installs_env ON skill_installs(environment);
 
+-- ============================================================
 -- Skill Publish Approvals
-DO $$ BEGIN
-    UPDATE skill_publish_approvals SET submitted_by = NULL WHERE submitted_by NOT IN (SELECT id FROM users);
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
-DO $$ BEGIN
-    UPDATE skill_publish_approvals SET reviewed_by = NULL WHERE reviewed_by IS NOT NULL AND reviewed_by NOT IN (SELECT id FROM users);
-EXCEPTION WHEN undefined_table THEN NULL;
-END $$;
-
+-- ============================================================
 CREATE TABLE IF NOT EXISTS skill_publish_approvals (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id                TEXT NOT NULL,
@@ -147,12 +205,41 @@ CREATE TABLE IF NOT EXISTS skill_publish_approvals (
     review_note             TEXT,
     compliance_check_passed  BOOLEAN DEFAULT false,
     compliance_check_note   TEXT,
-    created_at              TIMESTAMP DEFAULT NOW(),
-    CONSTRAINT fk_skill_pub_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
-    CONSTRAINT fk_skill_pub_submitted FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT fk_skill_pub_reviewed FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
-    CONSTRAINT chk_skill_pub_status CHECK (status IN ('pending', 'approved', 'rejected'))
+    created_at              TIMESTAMP DEFAULT NOW()
 );
+
+-- Fix column types if table was created with UUID skill_id in a prior partial run
+DO $$ BEGIN
+    ALTER TABLE skill_publish_approvals ALTER COLUMN skill_id TYPE TEXT;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Clean orphaned FK references
+DO $$ BEGIN
+    UPDATE skill_publish_approvals SET submitted_by = NULL WHERE submitted_by NOT IN (SELECT id FROM users);
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
+DO $$ BEGIN
+    UPDATE skill_publish_approvals SET reviewed_by = NULL WHERE reviewed_by IS NOT NULL AND reviewed_by NOT IN (SELECT id FROM users);
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE skill_publish_approvals ADD CONSTRAINT fk_skill_pub_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_publish_approvals ADD CONSTRAINT fk_skill_pub_submitted FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE CASCADE;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_publish_approvals ADD CONSTRAINT fk_skill_pub_reviewed FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+DO $$ BEGIN
+    ALTER TABLE skill_publish_approvals ADD CONSTRAINT chk_skill_pub_status CHECK (status IN ('pending', 'approved', 'rejected'));
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_skill_pub_skill ON skill_publish_approvals(skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_pub_status ON skill_publish_approvals(status);
