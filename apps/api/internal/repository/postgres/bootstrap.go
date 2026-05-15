@@ -14,12 +14,40 @@ import (
 )
 
 // Migrate applies all up migration files in lexical order.
+// It tracks applied migrations in a schema_migrations table so that
+// already-applied migrations are skipped on subsequent runs.
 func Migrate(dsn, migrationsDir string) error {
 	db, err := openDB(dsn)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+
+	// Ensure the tracking table exists.
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version   VARCHAR(255) PRIMARY KEY,
+			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+	`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+
+	// Collect already-applied versions.
+	applied := make(map[string]bool)
+	rows, err := db.Query(`SELECT version FROM schema_migrations`)
+	if err != nil {
+		return fmt.Errorf("read schema_migrations: %w", err)
+	}
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan schema_migrations: %w", err)
+		}
+		applied[v] = true
+	}
+	rows.Close()
 
 	files, err := filepath.Glob(filepath.Join(migrationsDir, "*.up.sql"))
 	if err != nil {
@@ -28,13 +56,34 @@ func Migrate(dsn, migrationsDir string) error {
 
 	sort.Strings(files)
 	for _, file := range files {
+		version := filepath.Base(file)
+
+		if applied[version] {
+			continue
+		}
+
 		content, err := os.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", file, err)
 		}
 
-		if _, err := db.Exec(string(content)); err != nil {
-			return fmt.Errorf("apply migration %s: %w", filepath.Base(file), err)
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin tx for %s: %w", version, err)
+		}
+
+		if _, err := tx.Exec(string(content)); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("apply migration %s: %w", version, err)
+		}
+
+		if _, err := tx.Exec(`INSERT INTO schema_migrations (version) VALUES ($1)`, version); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("record migration %s: %w", version, err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit migration %s: %w", version, err)
 		}
 	}
 
