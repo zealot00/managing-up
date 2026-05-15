@@ -1,5 +1,5 @@
 -- Memory Cells: 存储 Agent 的记忆单元
-CREATE TABLE memory_cells (
+CREATE TABLE IF NOT EXISTS memory_cells (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     scope               VARCHAR(50) NOT NULL DEFAULT 'session',
     agent_id            VARCHAR(255) NOT NULL,
@@ -17,9 +17,9 @@ CREATE TABLE memory_cells (
     CONSTRAINT chk_memory_value_type CHECK (value_type IN ('text', 'json', 'binary'))
 );
 
-CREATE INDEX idx_memory_cells_scope ON memory_cells(scope);
-CREATE INDEX idx_memory_cells_agent ON memory_cells(agent_id);
-CREATE INDEX idx_memory_cells_session ON memory_cells(session_id);
-CREATE INDEX idx_memory_cells_execution ON memory_cells(execution_id);
-CREATE INDEX idx_memory_cells_key ON memory_cells(key);
-CREATE INDEX idx_memory_cells_created ON memory_cells(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_cells_scope ON memory_cells(scope);
+CREATE INDEX IF NOT EXISTS idx_memory_cells_agent ON memory_cells(agent_id);
+CREATE INDEX IF NOT EXISTS idx_memory_cells_session ON memory_cells(session_id);
+CREATE INDEX IF NOT EXISTS idx_memory_cells_execution ON memory_cells(execution_id);
+CREATE INDEX IF NOT EXISTS idx_memory_cells_key ON memory_cells(key);
+CREATE INDEX IF NOT EXISTS idx_memory_cells_created ON memory_cells(created_at DESC);

@@ -1,4 +1,4 @@
-CREATE TABLE llm_fallback_chains (
+CREATE TABLE IF NOT EXISTS llm_fallback_chains (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     model       TEXT NOT NULL,
     is_enabled  BOOLEAN NOT NULL DEFAULT true,
@@ -7,7 +7,7 @@ CREATE TABLE llm_fallback_chains (
     UNIQUE(model)
 );
 
-CREATE TABLE llm_fallback_targets (
+CREATE TABLE IF NOT EXISTS llm_fallback_targets (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chain_id    UUID NOT NULL REFERENCES llm_fallback_chains(id) ON DELETE CASCADE,
     provider    TEXT NOT NULL,
@@ -19,4 +19,4 @@ CREATE TABLE llm_fallback_targets (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_fallback_targets_chain_id ON llm_fallback_targets(chain_id);
+CREATE INDEX IF NOT EXISTS idx_fallback_targets_chain_id ON llm_fallback_targets(chain_id);

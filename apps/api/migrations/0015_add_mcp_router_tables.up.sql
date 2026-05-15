@@ -1,5 +1,5 @@
 -- MCP Router Catalog
-CREATE TABLE mcp_router_catalog (
+CREATE TABLE IF NOT EXISTS mcp_router_catalog (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     server_id       TEXT NOT NULL UNIQUE,
     name            VARCHAR(255) NOT NULL,
@@ -25,13 +25,13 @@ CREATE TABLE mcp_router_catalog (
     CONSTRAINT chk_mcp_catalog_trust CHECK (trust_score >= 0 AND trust_score <= 1)
 );
 
-CREATE INDEX idx_mcp_catalog_task_types ON mcp_router_catalog USING GIN(task_types);
-CREATE INDEX idx_mcp_catalog_tags ON mcp_router_catalog USING GIN(tags);
-CREATE INDEX idx_mcp_catalog_status ON mcp_router_catalog(status);
-CREATE INDEX idx_mcp_catalog_trust ON mcp_router_catalog(trust_score DESC);
+CREATE INDEX IF NOT EXISTS idx_mcp_catalog_task_types ON mcp_router_catalog USING GIN(task_types);
+CREATE INDEX IF NOT EXISTS idx_mcp_catalog_tags ON mcp_router_catalog USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_mcp_catalog_status ON mcp_router_catalog(status);
+CREATE INDEX IF NOT EXISTS idx_mcp_catalog_trust ON mcp_router_catalog(trust_score DESC);
 
 -- MCP Router Logs
-CREATE TABLE mcp_router_logs (
+CREATE TABLE IF NOT EXISTS mcp_router_logs (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     correlation_id      VARCHAR(255) NOT NULL,
     agent_id            VARCHAR(255),
@@ -51,13 +51,13 @@ CREATE TABLE mcp_router_logs (
     CONSTRAINT chk_mcp_log_status CHECK (status IN ('success', 'failure', 'timeout'))
 );
 
-CREATE INDEX idx_mcp_router_logs_created ON mcp_router_logs(created_at);
-CREATE INDEX idx_mcp_router_logs_agent ON mcp_router_logs(agent_id);
-CREATE INDEX idx_mcp_router_logs_correlation ON mcp_router_logs(correlation_id);
-CREATE INDEX idx_mcp_router_logs_server ON mcp_router_logs(matched_server_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_router_logs_created ON mcp_router_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_mcp_router_logs_agent ON mcp_router_logs(agent_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_router_logs_correlation ON mcp_router_logs(correlation_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_router_logs_server ON mcp_router_logs(matched_server_id);
 
 -- MCP Router Sync Log
-CREATE TABLE mcp_router_sync_log (
+CREATE TABLE IF NOT EXISTS mcp_router_sync_log (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     server_id       TEXT NOT NULL,
     sync_type       VARCHAR(50) NOT NULL,
@@ -70,4 +70,4 @@ CREATE TABLE mcp_router_sync_log (
     CONSTRAINT chk_mcp_sync_type CHECK (sync_type IN ('approved_sync', 'status_change', 'removal', 'catalog_update'))
 );
 
-CREATE INDEX idx_mcp_sync_log_server ON mcp_router_sync_log(server_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_sync_log_server ON mcp_router_sync_log(server_id);

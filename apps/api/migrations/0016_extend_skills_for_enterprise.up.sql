@@ -14,9 +14,20 @@ ALTER TABLE skills ADD COLUMN IF NOT EXISTS draft_source VARCHAR(50) DEFAULT 'ma
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS draft_source_meta JSONB DEFAULT '{}';
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS created_by TEXT;
 
-ALTER TABLE skills ADD CONSTRAINT fk_skills_published_by FOREIGN KEY (published_by) REFERENCES users(id) ON DELETE SET NULL;
-ALTER TABLE skills ADD CONSTRAINT fk_skills_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
-ALTER TABLE skills ADD CONSTRAINT chk_skills_trust CHECK (trust_score >= 0 AND trust_score <= 1);
+DO $$ BEGIN
+    ALTER TABLE skills ADD CONSTRAINT fk_skills_published_by FOREIGN KEY (published_by) REFERENCES users(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE skills ADD CONSTRAINT fk_skills_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE skills ADD CONSTRAINT chk_skills_trust CHECK (trust_score >= 0 AND trust_score <= 1);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_skills_category ON skills(category);
 CREATE INDEX IF NOT EXISTS idx_skills_tags ON skills USING GIN(tags);
@@ -27,12 +38,16 @@ CREATE INDEX IF NOT EXISTS idx_skills_sop ON skills(sop_id);
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS changelog TEXT;
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS sop_version VARCHAR(50);
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS approved_by TEXT;
-ALTER TABLE skill_versions ADD CONSTRAINT fk_skill_versions_approved_by FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL;
+
+DO $$ BEGIN
+    ALTER TABLE skill_versions ADD CONSTRAINT fk_skill_versions_approved_by FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_skill_versions_skill ON skill_versions(skill_id);
 
 -- Skill Dependencies
-CREATE TABLE skill_dependencies (
+CREATE TABLE IF NOT EXISTS skill_dependencies (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id            UUID NOT NULL,
     dependency_skill_id UUID NOT NULL,
@@ -44,11 +59,11 @@ CREATE TABLE skill_dependencies (
     CONSTRAINT chk_skill_deps_no_self CHECK (skill_id != dependency_skill_id)
 );
 
-CREATE INDEX idx_skill_deps_skill ON skill_dependencies(skill_id);
-CREATE INDEX idx_skill_deps_dep ON skill_dependencies(dependency_skill_id);
+CREATE INDEX IF NOT EXISTS idx_skill_deps_skill ON skill_dependencies(skill_id);
+CREATE INDEX IF NOT EXISTS idx_skill_deps_dep ON skill_dependencies(dependency_skill_id);
 
 -- Skill Ratings
-CREATE TABLE skill_ratings (
+CREATE TABLE IF NOT EXISTS skill_ratings (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id    UUID NOT NULL,
     user_id     TEXT NOT NULL,
@@ -62,11 +77,11 @@ CREATE TABLE skill_ratings (
     CONSTRAINT chk_skill_ratings CHECK (rating >= 1 AND rating <= 5)
 );
 
-CREATE INDEX idx_skill_ratings_skill ON skill_ratings(skill_id);
-CREATE INDEX idx_skill_ratings_user ON skill_ratings(user_id);
+CREATE INDEX IF NOT EXISTS idx_skill_ratings_skill ON skill_ratings(skill_id);
+CREATE INDEX IF NOT EXISTS idx_skill_ratings_user ON skill_ratings(user_id);
 
 -- Skill Installs
-CREATE TABLE skill_installs (
+CREATE TABLE IF NOT EXISTS skill_installs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id        UUID NOT NULL,
     user_id         TEXT,
@@ -79,12 +94,12 @@ CREATE TABLE skill_installs (
     CONSTRAINT chk_skill_installs_env CHECK (environment IN ('production', 'staging', 'development'))
 );
 
-CREATE INDEX idx_skill_installs_skill ON skill_installs(skill_id);
-CREATE INDEX idx_skill_installs_user ON skill_installs(user_id);
-CREATE INDEX idx_skill_installs_env ON skill_installs(environment);
+CREATE INDEX IF NOT EXISTS idx_skill_installs_skill ON skill_installs(skill_id);
+CREATE INDEX IF NOT EXISTS idx_skill_installs_user ON skill_installs(user_id);
+CREATE INDEX IF NOT EXISTS idx_skill_installs_env ON skill_installs(environment);
 
 -- Skill Publish Approvals
-CREATE TABLE skill_publish_approvals (
+CREATE TABLE IF NOT EXISTS skill_publish_approvals (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id                UUID NOT NULL,
     version                 VARCHAR(50) NOT NULL,
@@ -103,6 +118,6 @@ CREATE TABLE skill_publish_approvals (
     CONSTRAINT chk_skill_pub_status CHECK (status IN ('pending', 'approved', 'rejected'))
 );
 
-CREATE INDEX idx_skill_pub_skill ON skill_publish_approvals(skill_id);
-CREATE INDEX idx_skill_pub_status ON skill_publish_approvals(status);
-CREATE INDEX idx_skill_pub_submitted ON skill_publish_approvals(submitted_by);
+CREATE INDEX IF NOT EXISTS idx_skill_pub_skill ON skill_publish_approvals(skill_id);
+CREATE INDEX IF NOT EXISTS idx_skill_pub_status ON skill_publish_approvals(status);
+CREATE INDEX IF NOT EXISTS idx_skill_pub_submitted ON skill_publish_approvals(submitted_by);
