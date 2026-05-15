@@ -161,7 +161,7 @@ body {
   flex-direction: column;
   z-index: 200;
   transition: width var(--transition-normal);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .sidebar-collapsed {
