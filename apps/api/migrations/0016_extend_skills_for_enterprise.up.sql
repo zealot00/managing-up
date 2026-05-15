@@ -14,6 +14,10 @@ ALTER TABLE skills ADD COLUMN IF NOT EXISTS draft_source VARCHAR(50) DEFAULT 'ma
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS draft_source_meta JSONB DEFAULT '{}';
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS created_by TEXT;
 
+-- Ensure FK columns are nullable (may have been created NOT NULL by a prior partial run)
+DO $$ BEGIN ALTER TABLE skills ALTER COLUMN published_by DROP NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE skills ALTER COLUMN created_by   DROP NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 -- Clean up orphaned FK references before adding constraints
 UPDATE skills SET published_by = NULL WHERE published_by IS NOT NULL AND published_by NOT IN (SELECT id FROM users);
 UPDATE skills SET created_by   = NULL WHERE created_by   IS NOT NULL AND created_by   NOT IN (SELECT id FROM users);
@@ -43,6 +47,9 @@ CREATE INDEX IF NOT EXISTS idx_skills_sop ON skills(sop_id);
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS changelog TEXT;
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS sop_version VARCHAR(50);
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS approved_by TEXT;
+
+-- Ensure approved_by is nullable before cleaning orphaned data
+DO $$ BEGIN ALTER TABLE skill_versions ALTER COLUMN approved_by DROP NOT NULL; EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- Clean orphaned FK references for approved_by
 UPDATE skill_versions SET approved_by = NULL WHERE approved_by IS NOT NULL AND approved_by NOT IN (SELECT id FROM users);
