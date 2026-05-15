@@ -27,7 +27,7 @@ export default function UserDropdown({ username, onLogout, collapsed = false }: 
   const initials = username?.charAt(0).toUpperCase() || "U";
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div ref={dropdownRef} style={{ position: "relative" }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`sidebar-user-trigger ${collapsed ? "collapsed" : ""}`}

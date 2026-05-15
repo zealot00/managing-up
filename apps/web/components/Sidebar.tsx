@@ -158,7 +158,7 @@ export default function Sidebar() {
                     return (
                       <div
                         key={item.href}
-                        className="relative"
+                        style={{ position: "relative" }}
                         onMouseEnter={() => setHoveredItem(item.href)}
                         onMouseLeave={() => setHoveredItem(null)}
                       >
