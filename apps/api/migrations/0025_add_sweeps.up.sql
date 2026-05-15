@@ -1,5 +1,5 @@
 -- Sweep Engine: Hyperparameter sweep configuration and execution tracking
-CREATE TABLE sweep_configs (
+CREATE TABLE IF NOT EXISTS sweep_configs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name            VARCHAR(255) NOT NULL,
     description     TEXT,
@@ -13,11 +13,11 @@ CREATE TABLE sweep_configs (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_sweep_configs_task ON sweep_configs(task_id);
-CREATE INDEX idx_sweep_configs_status ON sweep_configs(status);
-CREATE INDEX idx_sweep_configs_created_by ON sweep_configs(created_by);
+CREATE INDEX IF NOT EXISTS idx_sweep_configs_task ON sweep_configs(task_id);
+CREATE INDEX IF NOT EXISTS idx_sweep_configs_status ON sweep_configs(status);
+CREATE INDEX IF NOT EXISTS idx_sweep_configs_created_by ON sweep_configs(created_by);
 
-CREATE TABLE sweep_runs (
+CREATE TABLE IF NOT EXISTS sweep_runs (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sweep_config_id  UUID NOT NULL REFERENCES sweep_configs(id) ON DELETE CASCADE,
     variant_index     INTEGER NOT NULL,
@@ -35,6 +35,6 @@ CREATE TABLE sweep_runs (
     completed_at     TIMESTAMPTZ
 );
 
-CREATE INDEX idx_sweep_runs_config ON sweep_runs(sweep_config_id);
-CREATE INDEX idx_sweep_runs_status ON sweep_runs(status);
-CREATE INDEX idx_sweep_runs_execution ON sweep_runs(task_execution_id);
+CREATE INDEX IF NOT EXISTS idx_sweep_runs_config ON sweep_runs(sweep_config_id);
+CREATE INDEX IF NOT EXISTS idx_sweep_runs_status ON sweep_runs(status);
+CREATE INDEX IF NOT EXISTS idx_sweep_runs_execution ON sweep_runs(task_execution_id);

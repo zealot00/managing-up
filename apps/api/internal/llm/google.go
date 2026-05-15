@@ -150,6 +150,15 @@ func (c *GoogleClient) Generate(ctx context.Context, messages []Message, opts ..
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &ProviderError{
+			Provider:   ProviderGoogle,
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
 	var googleResp struct {
 		Candidates []struct {
 			Content struct {
@@ -242,7 +251,11 @@ func (c *GoogleClient) GenerateStream(ctx context.Context, messages []Message, o
 
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, fmt.Errorf("Google API returned status %d", resp.StatusCode)
+		return nil, &ProviderError{
+			Provider:   ProviderGoogle,
+			StatusCode: resp.StatusCode,
+			Message:    "stream request failed",
+		}
 	}
 
 	return &googleStreamReader{

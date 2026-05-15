@@ -824,6 +824,8 @@ type Server struct {
 	snapshotsHandler    *handlers.SnapshotsHandler
 	skillEnterpriseSvc  *service.SkillEnterpriseService
 	bridgeHandler      *bridge.Handler
+	fallbackChainHandler *handlers.FallbackChainHandler
+	userHandler          *handlers.UserHandler
 	mcpRegistry         *executors.MCPRegistry
 	closeFn            func() error
 }
@@ -925,6 +927,17 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	bridgeHandler := bridge.NewHandler(&bridgeAdapterRepoAdapter{repo: repo})
 
 	fallbackRouter := gateway.NewFallbackRouter(circuitBreaker)
+	fallbackChainHandler := handlers.NewFallbackChainHandler(
+		&fallbackChainRepoAdapter{repo: repo},
+		fallbackRouter,
+		authMW,
+	)
+	userHandler := handlers.NewUserHandler(&handlers.UserHandlerRepoAdapter{
+		GetUserByIDFn:           repo.GetUserByID,
+		UpdateUserPasswordFn:    repo.UpdateUserPassword,
+		GetUserPreferencesFn:    repo.GetUserPreferences,
+		UpdateUserPreferencesFn: repo.UpdateUserPreferences,
+	})
 	providerKeys := map[llm.Provider]string{
 		llm.ProviderOpenAI:    os.Getenv("GATEWAY_OPENAI_API_KEY"),
 		llm.ProviderAnthropic: os.Getenv("GATEWAY_ANTHROPIC_API_KEY"),
@@ -937,6 +950,8 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		llm.ProviderBaidu:     os.Getenv("GATEWAY_BAIDU_API_KEY"),
 		llm.ProviderAlibaba:   os.Getenv("GATEWAY_ALIBABA_API_KEY"),
 	}
+
+	// Register providers for legacy Route() support
 	priority := 0
 	for provider, apiKey := range providerKeys {
 		if apiKey == "" {
@@ -953,6 +968,73 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 			Priority: priority,
 		})
 		priority++
+	}
+
+	// Set provider keys for fallback client creation
+	fallbackProviderKeys := make(map[llm.Provider]string)
+	for p, k := range providerKeys {
+		if k != "" {
+			fallbackProviderKeys[p] = k
+		}
+	}
+	// Ollama uses the key field as base URL; provide a default
+	if _, ok := fallbackProviderKeys[llm.ProviderOllama]; !ok {
+		fallbackProviderKeys[llm.ProviderOllama] = os.Getenv("GATEWAY_OLLAMA_BASE_URL")
+	}
+	fallbackRouter.SetProviderKeys(fallbackProviderKeys)
+
+	// Parse fallback chains from GATEWAY_FALLBACK_CHAINS env var
+	// Format: JSON map of model name -> array of "provider:model" strings
+	// Example: {"gpt-4o": ["anthropic:claude-sonnet-4", "ollama:qwen2.5"]}
+	if chainsJSON := os.Getenv("GATEWAY_FALLBACK_CHAINS"); chainsJSON != "" {
+		chains, err := parseFallbackChains(chainsJSON)
+		if err != nil {
+			slog.Error("failed to parse GATEWAY_FALLBACK_CHAINS", "error", err)
+		} else {
+			fallbackRouter.SetFallbackChains(chains)
+			slog.Info("configured fallback chains from env", "chain_count", len(chains))
+			for model, targets := range chains {
+				names := make([]string, len(targets))
+				for i, t := range targets {
+					names[i] = string(t.Provider) + ":" + string(t.Model)
+				}
+				slog.Info("fallback chain", "model", model, "targets", names)
+			}
+		}
+	}
+
+	// Load persisted fallback chains from DB so they survive restarts.
+	// DB chains override env chains for the same model, but env-only models are preserved.
+	if dbChains, err := repo.ListFallbackChains(); err == nil && len(dbChains) > 0 {
+		current := fallbackRouter.GetFallbackChains()
+		if current == nil {
+			current = make(map[llm.Model][]gateway.FallbackTarget)
+		}
+		loaded := 0
+		for _, c := range dbChains {
+			if !c.IsEnabled {
+				continue
+			}
+			var targets []gateway.FallbackTarget
+			for _, t := range c.Targets {
+				if t.IsEnabled {
+					targets = append(targets, gateway.FallbackTarget{
+						Provider: llm.Provider(t.Provider),
+						Model:    llm.Model(t.Model),
+					})
+				}
+			}
+			if len(targets) > 0 {
+				current[llm.Model(c.Model)] = targets
+				loaded++
+			}
+		}
+		if loaded > 0 {
+			fallbackRouter.SetFallbackChains(current)
+			slog.Info("loaded fallback chains from database", "chain_count", loaded)
+		}
+	} else if err != nil {
+		slog.Warn("failed to load fallback chains from database", "error", err)
 	}
 
 	srv := &Server{
@@ -986,6 +1068,8 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		snapshotsHandler:    snapshotsHandler,
 		skillEnterpriseSvc:  service.NewSkillEnterpriseService(repoToSkillRepoAdapter{repo}),
 		bridgeHandler:       bridgeHandler,
+		fallbackChainHandler: fallbackChainHandler,
+		userHandler:           userHandler,
 		mcpRegistry:         mcpRegistry,
 	}
 
@@ -1067,8 +1151,26 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
 	mux.HandleFunc("/api/v1/snapshots/list", srv.snapshotsHandler.ListSnapshots)
 
-	mux.HandleFunc("/api/v1/policies", srv.policiesHandler.ListPolicies)
-	mux.HandleFunc("/api/v1/policies/", srv.policiesHandler.GetPolicy)
+	mux.HandleFunc("/api/v1/policies", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			srv.policiesHandler.ListPolicies(w, r)
+		case http.MethodPost:
+			srv.policiesHandler.CreatePolicy(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/v1/policies/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			srv.policiesHandler.GetPolicy(w, r)
+		case http.MethodPut, http.MethodPost:
+			srv.policiesHandler.UpdatePolicy(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	mux.HandleFunc("/api/v1/sweeps", srv.sweepHandler.ListSweeps)
 	mux.HandleFunc("/api/v1/sweeps/", srv.sweepHandler.GetSweep)
@@ -1077,6 +1179,13 @@ mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
 	mux.HandleFunc("/api/v1/sweeps/matrix/", srv.sweepHandler.GetSweepMatrix)
 
 	srv.bridgeHandler.RegisterRoutes(mux)
+
+	srv.fallbackChainHandler.RegisterRoutes(mux)
+
+	// User profile & preferences (require auth)
+	mux.Handle("/api/v1/user/profile", authMW.RequireAuth(http.HandlerFunc(srv.userHandler.GetProfile)))
+	mux.Handle("/api/v1/user/password", authMW.RequireAuth(http.HandlerFunc(srv.userHandler.ChangePassword)))
+	mux.Handle("/api/v1/user/preferences", authMW.RequireAuth(http.HandlerFunc(srv.userHandler.HandlePreferences)))
 
 	mux.Handle("/metrics", promhttp.Handler())
 
@@ -2436,6 +2545,50 @@ func (s *Server) handleApproveMCPServer(w http.ResponseWriter, r *http.Request) 
 	writeEnvelope(w, http.StatusOK, generateRequestID(), server)
 }
 
+// parseFallbackChains parses the GATEWAY_FALLBACK_CHAINS JSON env var.
+// Format: {"model_name": ["provider:model", "provider:model"], ...}
+func parseFallbackChains(jsonStr string) (map[llm.Model][]gateway.FallbackTarget, error) {
+	var raw map[string][]string
+	if err := json.Unmarshal([]byte(jsonStr), &raw); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+
+	chains := make(map[llm.Model][]gateway.FallbackTarget, len(raw))
+	for modelStr, targets := range raw {
+		model := llm.Model(modelStr)
+		var chain []gateway.FallbackTarget
+		for _, t := range targets {
+			provider, m, err := llm.ParseModelString(t)
+			if err != nil {
+				return nil, fmt.Errorf("invalid fallback target %q for model %s: %w", t, modelStr, err)
+			}
+			chain = append(chain, gateway.FallbackTarget{
+				Provider: provider,
+				Model:    m,
+			})
+		}
+		chains[model] = chain
+	}
+	return chains, nil
+}
+
+// fallbackChainRepoAdapter adapts the Repository to the FallbackChainRepo interface.
+type fallbackChainRepoAdapter struct {
+	repo Repository
+}
+
+func (a *fallbackChainRepoAdapter) ListFallbackChains() ([]handlers.FallbackChainDTO, error) {
+	chains, err := a.repo.ListFallbackChains()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]handlers.FallbackChainDTO, len(chains))
+	for i, c := range chains {
+		result[i] = toFallbackChainDTO(c)
+	}
+	return result, nil
+}
+
 // mcpproxy adapter types
 
 type gatewayKeyResolverAdapter struct {
@@ -2469,6 +2622,80 @@ func (a *mcpPermCheckerAdapter) ListPermissionsForIdentity(userID, apiKeyID stri
 		result[i] = mcpproxy.PermEntry{MCPServerID: p.MCPServerID}
 	}
 	return result, nil
+}
+
+func (a *fallbackChainRepoAdapter) GetFallbackChain(id string) (handlers.FallbackChainDTO, bool, error) {
+	chain, found, err := a.repo.GetFallbackChain(id)
+	if err != nil || !found {
+		return handlers.FallbackChainDTO{}, found, err
+	}
+	return toFallbackChainDTO(chain), true, nil
+}
+
+func (a *fallbackChainRepoAdapter) CreateFallbackChain(chain handlers.FallbackChainDTO) (handlers.FallbackChainDTO, error) {
+	created, err := a.repo.CreateFallbackChain(fromFallbackChainDTO(chain))
+	if err != nil {
+		return handlers.FallbackChainDTO{}, err
+	}
+	return toFallbackChainDTO(created), nil
+}
+
+func (a *fallbackChainRepoAdapter) UpdateFallbackChain(chain handlers.FallbackChainDTO) (handlers.FallbackChainDTO, error) {
+	updated, err := a.repo.UpdateFallbackChain(fromFallbackChainDTO(chain))
+	if err != nil {
+		return handlers.FallbackChainDTO{}, err
+	}
+	return toFallbackChainDTO(updated), nil
+}
+
+func (a *fallbackChainRepoAdapter) DeleteFallbackChain(id string) error {
+	return a.repo.DeleteFallbackChain(id)
+}
+
+func toFallbackChainDTO(c FallbackChain) handlers.FallbackChainDTO {
+	targets := make([]handlers.FallbackTargetDTO, len(c.Targets))
+	for i, t := range c.Targets {
+		targets[i] = handlers.FallbackTargetDTO{
+			ID:        t.ID,
+			ChainID:   t.ChainID,
+			Provider:  t.Provider,
+			Model:     t.Model,
+			Weight:    t.Weight,
+			Priority:  t.Priority,
+			IsEnabled: t.IsEnabled,
+		}
+	}
+	return handlers.FallbackChainDTO{
+		ID:        c.ID,
+		Model:     c.Model,
+		IsEnabled: c.IsEnabled,
+		Targets:   targets,
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
+	}
+}
+
+func fromFallbackChainDTO(c handlers.FallbackChainDTO) FallbackChain {
+	targets := make([]FallbackTarget, len(c.Targets))
+	for i, t := range c.Targets {
+		targets[i] = FallbackTarget{
+			ID:        t.ID,
+			ChainID:   t.ChainID,
+			Provider:  t.Provider,
+			Model:     t.Model,
+			Weight:    t.Weight,
+			Priority:  t.Priority,
+			IsEnabled: t.IsEnabled,
+		}
+	}
+	return FallbackChain{
+		ID:        c.ID,
+		Model:     c.Model,
+		IsEnabled: c.IsEnabled,
+		Targets:   targets,
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
+	}
 }
 
 type mcpServerIndexAdapter struct {

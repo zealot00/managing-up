@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	_ "github.com/lib/pq"
 )
 
@@ -162,7 +164,7 @@ func (r *Repo) ListRunArtifacts(runID string) ([]ArtifactRef, error) {
 func (r *Repo) CreateSkill(req CreateSkillRequest) (*Skill, error) {
 	id := req.SkillID
 	if id == "" {
-		id = fmt.Sprintf("skill_%d", time.Now().UnixNano())
+	id = uuid.New().String()
 	}
 	now := time.Now().UTC()
 

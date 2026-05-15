@@ -227,8 +227,12 @@ func (c *MinimaxClient) Generate(ctx context.Context, messages []Message, opts .
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("MiniMax API returned status %d: %s", resp.StatusCode, string(bodyBytes))
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &ProviderError{
+			Provider:   ProviderMinimax,
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
 	}
 
 	var miniResp struct {
@@ -318,7 +322,11 @@ func (c *MinimaxClient) GenerateStream(ctx context.Context, messages []Message, 
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		slog.Error("MinimaxClient: non-200 response", "status", resp.StatusCode, "body", string(bodyBytes))
-		return nil, fmt.Errorf("MiniMax API returned status %d", resp.StatusCode)
+		return nil, &ProviderError{
+			Provider:   ProviderMinimax,
+			StatusCode: resp.StatusCode,
+			Message:    "stream request failed",
+		}
 	}
 
 	return &minimaxStreamReader{

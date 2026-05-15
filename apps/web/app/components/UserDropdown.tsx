@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, ReactNode } from "react";
 import { LogOut, Settings, User, ChevronDown } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 
 interface UserDropdownProps {
   username: string;
@@ -12,6 +14,8 @@ interface UserDropdownProps {
 export default function UserDropdown({ username, onLogout, collapsed = false }: UserDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const t = useTranslations("userDropdown");
+  const router = useRouter();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -27,7 +31,7 @@ export default function UserDropdown({ username, onLogout, collapsed = false }: 
   const initials = username?.charAt(0).toUpperCase() || "U";
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div ref={dropdownRef} style={{ position: "relative" }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`sidebar-user-trigger ${collapsed ? "collapsed" : ""}`}
@@ -65,7 +69,7 @@ export default function UserDropdown({ username, onLogout, collapsed = false }: 
               }}>
                 {username}
               </span>
-              <span className="sidebar-user-role">Administrator</span>
+              <span className="sidebar-user-role">{t("administrator")}</span>
             </div>
             <ChevronDown
               size={16}
@@ -85,14 +89,12 @@ export default function UserDropdown({ username, onLogout, collapsed = false }: 
           className="sidebar-user-dropdown"
           style={{
             position: "absolute",
-            bottom: "100%",
-            left: collapsed ? "50%" : 0,
-            right: collapsed ? "auto" : 0,
-            transform: collapsed ? "translateX(-50%)" : "translateX(0)",
-            marginBottom: 8,
+            bottom: 0,
+            left: "100%",
+            marginLeft: 8,
             minWidth: 200,
-            background: "var(--surface-raised)",
-            border: "1px solid var(--line)",
+            background: "var(--sidebar-bg-hover)",
+            border: "1px solid var(--sidebar-border)",
             borderRadius: "var(--radius-md)",
             boxShadow: "var(--shadow-lg)",
             overflow: "hidden",
@@ -102,13 +104,13 @@ export default function UserDropdown({ username, onLogout, collapsed = false }: 
         >
           <div style={{
             padding: "var(--space-3) var(--space-4)",
-            borderBottom: "1px solid var(--line)",
+            borderBottom: "1px solid var(--sidebar-border)",
           }}>
-            <p style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--ink-strong)" }}>
+            <p style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--sidebar-text-active)" }}>
               {username}
             </p>
-            <p style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
-              Administrator
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--sidebar-text)" }}>
+              {t("administrator")}
             </p>
           </div>
 
@@ -116,6 +118,7 @@ export default function UserDropdown({ username, onLogout, collapsed = false }: 
             <button
               onClick={() => {
                 setIsOpen(false);
+                router.push("/profile");
               }}
               style={{
                 display: "flex",
@@ -128,19 +131,20 @@ export default function UserDropdown({ username, onLogout, collapsed = false }: 
                 border: "none",
                 cursor: "pointer",
                 fontSize: "var(--text-sm)",
-                color: "var(--ink)",
+                color: "var(--sidebar-text)",
                 transition: "background var(--transition-fast)",
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg)"}
+              onMouseEnter={(e) => e.currentTarget.style.background = "var(--sidebar-bg-active)"}
               onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
             >
-              <User size={16} style={{ color: "var(--muted)" }} />
-              <span>Profile Settings</span>
+              <User size={16} style={{ color: "var(--sidebar-text)" }} />
+              <span>{t("profileSettings")}</span>
             </button>
 
             <button
               onClick={() => {
                 setIsOpen(false);
+                router.push("/preferences");
               }}
               style={{
                 display: "flex",
@@ -153,19 +157,19 @@ export default function UserDropdown({ username, onLogout, collapsed = false }: 
                 border: "none",
                 cursor: "pointer",
                 fontSize: "var(--text-sm)",
-                color: "var(--ink)",
+                color: "var(--sidebar-text)",
                 transition: "background var(--transition-fast)",
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg)"}
+              onMouseEnter={(e) => e.currentTarget.style.background = "var(--sidebar-bg-active)"}
               onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
             >
-              <Settings size={16} style={{ color: "var(--muted)" }} />
-              <span>Preferences</span>
+              <Settings size={16} style={{ color: "var(--sidebar-text)" }} />
+              <span>{t("preferences")}</span>
             </button>
           </div>
 
           <div style={{
-            borderTop: "1px solid var(--line)",
+            borderTop: "1px solid var(--sidebar-border)",
             padding: "var(--space-2)",
           }}>
             <button
@@ -187,11 +191,11 @@ export default function UserDropdown({ username, onLogout, collapsed = false }: 
                 color: "var(--danger)",
                 transition: "background var(--transition-fast)",
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(153, 27, 27, 0.08)"}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(185, 28, 28, 0.12)"}
               onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
             >
               <LogOut size={16} />
-              <span>Log out</span>
+              <span>{t("logout")}</span>
             </button>
           </div>
         </div>

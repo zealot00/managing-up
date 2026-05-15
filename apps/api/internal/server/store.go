@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/zealot/managing-up/apps/api/internal/models"
 )
 
@@ -27,6 +29,8 @@ type store struct {
 	gatewayProviderKeys map[string]GatewayProviderKey
 	userBudgets         map[string]UserBudget
 	mcpServers          map[string]MCPServer
+	fallbackChains      map[string]FallbackChain
+	userPreferences     map[string]models.UserPreferences
 	skillDependencies   []SkillDependency
 	skillRatings        []SkillRating
 	skillInstalls       []SkillInstall
@@ -38,10 +42,15 @@ var _ interface{} = (*store)(nil)
 func NewStore() *store {
 	now := time.Date(2026, 3, 19, 10, 0, 0, 0, time.UTC)
 
+	// Deterministic UUIDs for seed skills, compatible with UUID columns
+	seedSkill1 := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("skill_001")).String()
+	seedSkill2 := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("skill_002")).String()
+	seedSkill3 := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("skill_003")).String()
+
 	return &store{
 		skills: []Skill{
 			{
-				ID:             "skill_001",
+				ID:             seedSkill1,
 				Name:           "restart_service_skill",
 				OwnerTeam:      "platform_team",
 				RiskLevel:      "medium",
@@ -52,7 +61,7 @@ func NewStore() *store {
 				Verified:       true,
 			},
 			{
-				ID:             "skill_002",
+				ID:             seedSkill2,
 				Name:           "collect_logs_skill",
 				OwnerTeam:      "sre_team",
 				RiskLevel:      "low",
@@ -63,7 +72,7 @@ func NewStore() *store {
 				Verified:       true,
 			},
 			{
-				ID:             "skill_003",
+				ID:             seedSkill3,
 				Name:           "rollback_deployment_skill",
 				OwnerTeam:      "platform_team",
 				RiskLevel:      "high",
@@ -76,7 +85,7 @@ func NewStore() *store {
 		skillVersions: []SkillVersion{
 			{
 				ID:               "version_001",
-				SkillID:          "skill_001",
+				SkillID:          seedSkill1,
 				Version:          "v1",
 				Status:           "published",
 				ChangeSummary:    "Initial restart automation flow.",
@@ -85,7 +94,7 @@ func NewStore() *store {
 			},
 			{
 				ID:               "version_002",
-				SkillID:          "skill_002",
+				SkillID:          seedSkill2,
 				Version:          "v3",
 				Status:           "published",
 				ChangeSummary:    "Added export safety checks and retry handling.",
@@ -94,7 +103,7 @@ func NewStore() *store {
 			},
 			{
 				ID:               "version_003",
-				SkillID:          "skill_003",
+				SkillID:          seedSkill3,
 				Version:          "v0-draft",
 				Status:           "draft",
 				ChangeSummary:    "Rollback flow under review.",
@@ -125,7 +134,7 @@ func NewStore() *store {
 		executions: []Execution{
 			{
 				ID:            "exec_001",
-				SkillID:       "skill_001",
+				SkillID:       seedSkill1,
 				SkillName:     "restart_service_skill",
 				Status:        "running",
 				TriggeredBy:   "sre_oncall",
@@ -134,7 +143,7 @@ func NewStore() *store {
 			},
 			{
 				ID:            "exec_002",
-				SkillID:       "skill_002",
+				SkillID:       seedSkill2,
 				SkillName:     "collect_logs_skill",
 				Status:        "waiting_approval",
 				TriggeredBy:   "ops_manager",
@@ -143,7 +152,7 @@ func NewStore() *store {
 			},
 			{
 				ID:            "exec_003",
-				SkillID:       "skill_001",
+				SkillID:       seedSkill1,
 				SkillName:     "restart_service_skill",
 				Status:        "succeeded",
 				TriggeredBy:   "platform_operator",
@@ -171,11 +180,12 @@ func NewStore() *store {
 		gatewayProviderKeys: make(map[string]GatewayProviderKey),
 		userBudgets:         make(map[string]UserBudget),
 		mcpServers:          make(map[string]MCPServer),
+		fallbackChains:      make(map[string]FallbackChain),
 		skillDependencies: []SkillDependency{
 			{
 				ID:                "dep_001",
-				SkillID:           "skill_001",
-				DependencySkillID: "skill_002",
+				SkillID:           seedSkill1,
+				DependencySkillID: seedSkill2,
 				VersionConstraint: ">=v3",
 				CreatedAt:         now.Add(-24 * time.Hour).Format(time.RFC3339),
 			},
@@ -183,7 +193,7 @@ func NewStore() *store {
 		skillRatings: []SkillRating{
 			{
 				ID:        "rating_001",
-				SkillID:   "skill_001",
+				SkillID:   seedSkill1,
 				UserID:    "demo-user",
 				Rating:    5,
 				Comment:   "Stable in production.",
@@ -191,7 +201,7 @@ func NewStore() *store {
 			},
 			{
 				ID:        "rating_002",
-				SkillID:   "skill_002",
+				SkillID:   seedSkill2,
 				UserID:    "demo-user",
 				Rating:    4,
 				Comment:   "Useful for incident triage.",
@@ -201,7 +211,7 @@ func NewStore() *store {
 		skillInstalls: []SkillInstall{
 			{
 				ID:          "install_001",
-				SkillID:     "skill_001",
+				SkillID:     seedSkill1,
 				UserID:      "demo-user",
 				Version:     "v1",
 				Environment: "production",
@@ -209,7 +219,7 @@ func NewStore() *store {
 			},
 			{
 				ID:          "install_002",
-				SkillID:     "skill_001",
+				SkillID:     seedSkill1,
 				UserID:      "platform-bot",
 				Version:     "v1",
 				Environment: "staging",
@@ -255,7 +265,7 @@ func (s *store) CreateSkill(req CreateSkillRequest) Skill {
 	defer s.mu.Unlock()
 
 	skill := Skill{
-		ID:             fmt.Sprintf("skill_%03d", len(s.skills)+1),
+		ID:             uuid.New().String(),
 		Name:           req.Name,
 		OwnerTeam:      req.OwnerTeam,
 		RiskLevel:      req.RiskLevel,
@@ -1333,5 +1343,129 @@ func (s *store) UpsertMCPRouterCatalogEntry(e MCPRouterCatalogEntry) error {
 }
 
 func (s *store) IncrementMCPRouterCatalogUseCount(serverID string) error {
+	return nil
+}
+
+func (s *store) ListFallbackChains() ([]FallbackChain, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []FallbackChain
+	for _, c := range s.fallbackChains {
+		result = append(result, c)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Model < result[j].Model
+	})
+	return result, nil
+}
+
+func (s *store) GetFallbackChain(id string) (FallbackChain, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	c, ok := s.fallbackChains[id]
+	return c, ok, nil
+}
+
+func (s *store) CreateFallbackChain(chain FallbackChain) (FallbackChain, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if chain.ID == "" {
+		chain.ID = uuid.New().String()
+	}
+	now := time.Now()
+	chain.CreatedAt = now
+	chain.UpdatedAt = now
+	for i := range chain.Targets {
+		if chain.Targets[i].ID == "" {
+			chain.Targets[i].ID = uuid.New().String()
+		}
+		chain.Targets[i].ChainID = chain.ID
+	}
+	s.fallbackChains[chain.ID] = chain
+	return chain, nil
+}
+
+func (s *store) UpdateFallbackChain(chain FallbackChain) (FallbackChain, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing, ok := s.fallbackChains[chain.ID]
+	if !ok {
+		return FallbackChain{}, fmt.Errorf("fallback chain not found")
+	}
+	chain.CreatedAt = existing.CreatedAt
+	chain.UpdatedAt = time.Now()
+	for i := range chain.Targets {
+		if chain.Targets[i].ID == "" {
+			chain.Targets[i].ID = uuid.New().String()
+		}
+		chain.Targets[i].ChainID = chain.ID
+	}
+	s.fallbackChains[chain.ID] = chain
+	return chain, nil
+}
+
+func (s *store) DeleteFallbackChain(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.fallbackChains, id)
+	return nil
+}
+
+func (s *store) GetUserPreferences(userID string) (models.UserPreferences, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.userPreferences == nil {
+		return models.UserPreferences{UserID: userID, Language: "en", SidebarCollapsed: false}, false
+	}
+
+	prefs, ok := s.userPreferences[userID]
+	if !ok {
+		return models.UserPreferences{UserID: userID, Language: "en", SidebarCollapsed: false}, false
+	}
+	return prefs, true
+}
+
+func (s *store) UpdateUserPreferences(userID string, req models.UpdatePreferencesRequest) (models.UserPreferences, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.userPreferences == nil {
+		s.userPreferences = make(map[string]models.UserPreferences)
+	}
+
+	current, ok := s.userPreferences[userID]
+	if !ok {
+		current = models.UserPreferences{UserID: userID, Language: "en", SidebarCollapsed: false}
+	}
+
+	if req.Language != nil {
+		current.Language = *req.Language
+	}
+	if req.SidebarCollapsed != nil {
+		current.SidebarCollapsed = *req.SidebarCollapsed
+	}
+	current.UpdatedAt = time.Now()
+
+	s.userPreferences[userID] = current
+	return current, nil
+}
+
+func (s *store) UpdateUserPassword(userID string, passwordHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	user, ok := s.users[userID]
+	if !ok {
+		return fmt.Errorf("user not found")
+	}
+	user.PasswordHash = passwordHash
+	user.UpdatedAt = time.Now()
+	s.users[userID] = user
 	return nil
 }

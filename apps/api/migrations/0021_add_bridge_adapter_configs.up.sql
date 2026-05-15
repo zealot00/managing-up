@@ -1,5 +1,5 @@
 -- Bridge Adapter: REST API to MCP Adapter Configuration
-CREATE TABLE bridge_adapter_configs (
+CREATE TABLE IF NOT EXISTS bridge_adapter_configs (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name                VARCHAR(255) NOT NULL,
     description         TEXT,
@@ -11,6 +11,6 @@ CREATE TABLE bridge_adapter_configs (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_bridge_adapter_name ON bridge_adapter_configs(name);
-CREATE INDEX idx_bridge_adapter_type ON bridge_adapter_configs(adapter_type);
-CREATE INDEX idx_bridge_adapter_enabled ON bridge_adapter_configs(enabled);
+CREATE INDEX IF NOT EXISTS idx_bridge_adapter_name ON bridge_adapter_configs(name);
+CREATE INDEX IF NOT EXISTS idx_bridge_adapter_type ON bridge_adapter_configs(adapter_type);
+CREATE INDEX IF NOT EXISTS idx_bridge_adapter_enabled ON bridge_adapter_configs(enabled);

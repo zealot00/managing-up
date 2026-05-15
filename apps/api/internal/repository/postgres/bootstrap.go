@@ -10,16 +10,45 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
 
 // Migrate applies all up migration files in lexical order.
+// It tracks applied migrations in a schema_migrations table so that
+// already-applied migrations are skipped on subsequent runs.
 func Migrate(dsn, migrationsDir string) error {
 	db, err := openDB(dsn)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+
+	// Ensure the tracking table exists.
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version   VARCHAR(255) PRIMARY KEY,
+			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+	`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+
+	// Collect already-applied versions.
+	applied := make(map[string]bool)
+	rows, err := db.Query(`SELECT version FROM schema_migrations`)
+	if err != nil {
+		return fmt.Errorf("read schema_migrations: %w", err)
+	}
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan schema_migrations: %w", err)
+		}
+		applied[v] = true
+	}
+	rows.Close()
 
 	files, err := filepath.Glob(filepath.Join(migrationsDir, "*.up.sql"))
 	if err != nil {
@@ -28,13 +57,34 @@ func Migrate(dsn, migrationsDir string) error {
 
 	sort.Strings(files)
 	for _, file := range files {
+		version := filepath.Base(file)
+
+		if applied[version] {
+			continue
+		}
+
 		content, err := os.ReadFile(file)
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", file, err)
 		}
 
-		if _, err := db.Exec(string(content)); err != nil {
-			return fmt.Errorf("apply migration %s: %w", filepath.Base(file), err)
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin tx for %s: %w", version, err)
+		}
+
+		if _, err := tx.Exec(string(content)); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("apply migration %s: %w", version, err)
+		}
+
+		if _, err := tx.Exec(`INSERT INTO schema_migrations (version) VALUES ($1)`, version); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("record migration %s: %w", version, err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit migration %s: %w", version, err)
 		}
 	}
 
@@ -103,6 +153,16 @@ func openDB(dsn string) (*sql.DB, error) {
 	return db, nil
 }
 
+// Deterministic UUIDs for seed skills, compatible with the UUID columns
+// created by migration 0027. Generated via uuid.NewSHA1 with a stable namespace.
+var seedSkillNamespace = uuid.MustParse("6ba7b810-9dad-11d1-80b4-00c04fd430c8") // DNS namespace UUID
+
+var (
+	seedSkillID1 = uuid.NewSHA1(seedSkillNamespace, []byte("skill_001")).String()
+	seedSkillID2 = uuid.NewSHA1(seedSkillNamespace, []byte("skill_002")).String()
+	seedSkillID3 = uuid.NewSHA1(seedSkillNamespace, []byte("skill_003")).String()
+)
+
 func seedSkills(tx *sql.Tx, now time.Time) error {
 	query := `
 		INSERT INTO skills (id, name, owner_team, risk_level, status, current_version, created_at, updated_at)
@@ -117,9 +177,9 @@ func seedSkills(tx *sql.Tx, now time.Time) error {
 	`
 
 	records := [][]any{
-		{"skill_001", "restart_service_skill", "platform_team", "medium", "published", "v1", now.Add(-72 * time.Hour), now},
-		{"skill_002", "collect_logs_skill", "sre_team", "low", "published", "v3", now.Add(-48 * time.Hour), now},
-		{"skill_003", "rollback_deployment_skill", "platform_team", "high", "draft", "", now.Add(-12 * time.Hour), now},
+		{seedSkillID1, "restart_service_skill", "platform_team", "medium", "published", "v1", now.Add(-72 * time.Hour), now},
+		{seedSkillID2, "collect_logs_skill", "sre_team", "low", "published", "v3", now.Add(-48 * time.Hour), now},
+		{seedSkillID3, "rollback_deployment_skill", "platform_team", "high", "draft", "", now.Add(-12 * time.Hour), now},
 	}
 
 	for _, record := range records {
@@ -144,9 +204,9 @@ func seedSkillVersions(tx *sql.Tx, now time.Time) error {
 	`
 
 	records := [][]any{
-		{"version_001", "skill_001", "v1", "published", "Initial restart automation flow.", true, now.Add(-72 * time.Hour)},
-		{"version_002", "skill_002", "v3", "published", "Added export safety checks and retry handling.", true, now.Add(-48 * time.Hour)},
-		{"version_003", "skill_003", "v0-draft", "draft", "Rollback flow under review.", true, now.Add(-12 * time.Hour)},
+		{"version_001", seedSkillID1, "v1", "published", "Initial restart automation flow.", true, now.Add(-72 * time.Hour)},
+		{"version_002", seedSkillID2, "v3", "published", "Added export safety checks and retry handling.", true, now.Add(-48 * time.Hour)},
+		{"version_003", seedSkillID3, "v0-draft", "draft", "Rollback flow under review.", true, now.Add(-12 * time.Hour)},
 	}
 
 	for _, record := range records {
@@ -204,9 +264,9 @@ func seedExecutions(tx *sql.Tx, now time.Time) error {
 	input2, _ := json.Marshal(map[string]any{"collection_id": "logs-20260319"})
 	input3, _ := json.Marshal(map[string]any{"server_id": "srv-007"})
 	records := [][]any{
-		{"exec_001", "skill_001", "restart_service_skill", "running", "sre_oncall", now, "verify_health", string(input1)},
-		{"exec_002", "skill_002", "collect_logs_skill", "waiting_approval", "ops_manager", now.Add(-35 * time.Minute), "approval_before_export", string(input2)},
-		{"exec_003", "skill_001", "restart_service_skill", "succeeded", "platform_operator", now.Add(-2 * time.Hour), "completed", string(input3)},
+		{"exec_001", seedSkillID1, "restart_service_skill", "running", "sre_oncall", now, "verify_health", string(input1)},
+		{"exec_002", seedSkillID2, "collect_logs_skill", "waiting_approval", "ops_manager", now.Add(-35 * time.Minute), "approval_before_export", string(input2)},
+		{"exec_003", seedSkillID1, "restart_service_skill", "succeeded", "platform_operator", now.Add(-2 * time.Hour), "completed", string(input3)},
 	}
 
 	for _, record := range records {

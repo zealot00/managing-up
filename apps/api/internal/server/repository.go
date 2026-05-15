@@ -111,6 +111,18 @@ type Repository interface {
 	CreateSweepRuns(runs []SweepRun) error
 	GetSweepRunsByConfigID(configID string) ([]SweepRun, error)
 	UpdateSweepRun(run SweepRun) error
+
+	// Fallback Chains
+	ListFallbackChains() ([]FallbackChain, error)
+	GetFallbackChain(id string) (FallbackChain, bool, error)
+	CreateFallbackChain(chain FallbackChain) (FallbackChain, error)
+	UpdateFallbackChain(chain FallbackChain) (FallbackChain, error)
+	DeleteFallbackChain(id string) error
+
+	// User Profile & Preferences
+	GetUserPreferences(userID string) (models.UserPreferences, bool)
+	UpdateUserPreferences(userID string, req models.UpdatePreferencesRequest) (models.UserPreferences, error)
+	UpdateUserPassword(userID string, passwordHash string) error
 }
 
 // ExecutionRepository extends Repository with methods needed by the runtime engine.

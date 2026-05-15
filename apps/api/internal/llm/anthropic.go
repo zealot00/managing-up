@@ -72,6 +72,15 @@ func (c *AnthropicClient) Generate(ctx context.Context, messages []Message, opts
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, &ProviderError{
+			Provider:   ProviderAnthropic,
+			StatusCode: resp.StatusCode,
+			Message:    string(body),
+		}
+	}
+
 	var anthropicResp struct {
 		Content []struct {
 			Type string `json:"type"`
@@ -155,7 +164,11 @@ func (c *AnthropicClient) GenerateStream(ctx context.Context, messages []Message
 
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, fmt.Errorf("Anthropic API returned status %d", resp.StatusCode)
+		return nil, &ProviderError{
+			Provider:   ProviderAnthropic,
+			StatusCode: resp.StatusCode,
+			Message:    "stream request failed",
+		}
 	}
 
 	return &anthropicStreamReader{

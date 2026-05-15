@@ -24,3 +24,23 @@ func IsValidRole(role string) bool {
 	}
 	return false
 }
+
+// UserPreferences stores per-user preference settings.
+type UserPreferences struct {
+	UserID           string    `json:"user_id"`
+	Language         string    `json:"language"`
+	SidebarCollapsed bool      `json:"sidebar_collapsed"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// ChangePasswordRequest is the DTO for password change.
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// UpdatePreferencesRequest is the DTO for updating user preferences.
+type UpdatePreferencesRequest struct {
+	Language         *string `json:"language,omitempty"`
+	SidebarCollapsed *bool   `json:"sidebar_collapsed,omitempty"`
+}

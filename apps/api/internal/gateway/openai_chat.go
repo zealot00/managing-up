@@ -148,45 +148,39 @@ func (s *Server) HandleOpenAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var resp *llm.Response
-	err = error(nil)
+
+	// resolveKey returns the upstream API key for a given provider
+	resolveKey := func(p llm.Provider) string {
+		upstreamAPIKey := apiKey
+		if s.providerKeyResolver != nil {
+			principal := GetPrincipalFromContext(r.Context())
+			userID := ""
+			if principal != nil {
+				userID = principal.UserID
+			}
+			if resolved := s.providerKeyResolver.KeyFor(userID, p); resolved != "" {
+				upstreamAPIKey = resolved
+			}
+		}
+		return upstreamAPIKey
+	}
 
 	if s.router != nil {
-		upstreamAPIKey := apiKey
-		if s.providerKeyResolver != nil {
-			principal := GetPrincipalFromContext(r.Context())
-			userID := ""
-			if principal != nil {
-				userID = principal.UserID
-			}
-			if resolved := s.providerKeyResolver.KeyFor(userID, provider); resolved != "" {
-				upstreamAPIKey = resolved
-			}
-		}
-		llmClient, createErr := llm.NewClient(provider, model, upstreamAPIKey)
-		if createErr != nil {
-			writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", createErr))
+		clients, routeErr := s.router.RouteWithFallback(r.Context(), model, resolveKey)
+		if routeErr != nil {
+			writeError(w, http.StatusInternalServerError, "routing_failed", fmt.Sprintf("Failed to route request: %v", routeErr))
 			return
 		}
-		resp, err = GenerateWithRetry(r.Context(), llmClient, messages, opts, DefaultRetryConfig())
+		resp, err = GenerateWithFallback(r.Context(), clients, messages, opts, DefaultFallbackConfig(),
+			func(p llm.Provider) { s.router.RecordSuccess(p) },
+			func(p llm.Provider) { s.router.RecordFailure(p) },
+		)
 	} else {
-		upstreamAPIKey := apiKey
-		if s.providerKeyResolver != nil {
-			principal := GetPrincipalFromContext(r.Context())
-			userID := ""
-			if principal != nil {
-				userID = principal.UserID
-			}
-			if resolved := s.providerKeyResolver.KeyFor(userID, provider); resolved != "" {
-				upstreamAPIKey = resolved
-			}
-		}
-
-		llmClient, createErr := llm.NewClient(provider, model, upstreamAPIKey)
+		llmClient, createErr := llm.NewClient(provider, model, resolveKey(provider))
 		if createErr != nil {
 			writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", createErr))
 			return
 		}
-
 		resp, err = GenerateWithRetry(r.Context(), llmClient, messages, opts, DefaultRetryConfig())
 	}
 
@@ -260,26 +254,45 @@ func generateID() string {
 
 func (s *Server) handleOpenAIChatStream(w http.ResponseWriter, r *http.Request, apiKey string, provider llm.Provider, model llm.Model, messages []llm.Message, opts []llm.Option) {
 	slog.Info("handleOpenAIChatStream: started", "provider", provider, "model", model, "messages_count", len(messages))
-	upstreamAPIKey := apiKey
-	if s.providerKeyResolver != nil {
-		principal := GetPrincipalFromContext(r.Context())
-		userID := ""
-		if principal != nil {
-			userID = principal.UserID
+
+	resolveKey := func(p llm.Provider) string {
+		upstreamAPIKey := apiKey
+		if s.providerKeyResolver != nil {
+			principal := GetPrincipalFromContext(r.Context())
+			userID := ""
+			if principal != nil {
+				userID = principal.UserID
+			}
+			if resolved := s.providerKeyResolver.KeyFor(userID, p); resolved != "" {
+				upstreamAPIKey = resolved
+			}
 		}
-		if resolved := s.providerKeyResolver.KeyFor(userID, provider); resolved != "" {
-			upstreamAPIKey = resolved
-		}
+		return upstreamAPIKey
 	}
 
-	llmClient, err := llm.NewClient(provider, model, upstreamAPIKey)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", err))
-		return
+	var streamReader llm.StreamReader
+	var err error
+
+	if s.router != nil {
+		clients, routeErr := s.router.RouteWithFallback(r.Context(), model, resolveKey)
+		if routeErr != nil {
+			writeError(w, http.StatusInternalServerError, "routing_failed", fmt.Sprintf("Failed to route request: %v", routeErr))
+			return
+		}
+		streamReader, err = StreamWithFallback(r.Context(), clients, messages, opts, DefaultFallbackConfig(),
+			func(p llm.Provider) { s.router.RecordSuccess(p) },
+			func(p llm.Provider) { s.router.RecordFailure(p) },
+		)
+	} else {
+		llmClient, createErr := llm.NewClient(provider, model, resolveKey(provider))
+		if createErr != nil {
+			writeError(w, http.StatusInternalServerError, "client_creation_failed", fmt.Sprintf("Failed to create LLM client: %v", createErr))
+			return
+		}
+		streamReader, err = llmClient.GenerateStream(r.Context(), messages, opts...)
 	}
 
-	streamReader, err := llmClient.GenerateStream(r.Context(), messages, opts...)
-	slog.Info("handleOpenAIChatStream: GenerateStream called", "err", err)
+	slog.Info("handleOpenAIChatStream: stream initiated", "err", err)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "stream_failed", fmt.Sprintf("Failed to start stream: %v", err))
 		return
