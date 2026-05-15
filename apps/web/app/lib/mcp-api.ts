@@ -155,6 +155,12 @@ export async function grantMCPServerPermission(
   });
 }
 
+export async function revokeMCPServerPermission(id: string): Promise<void> {
+  await request<{ revoked: boolean }>(`/api/v1/mcp/permissions/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
 export type InvokeMCPRequest = {
   server_id: string;
   tool_name: string;

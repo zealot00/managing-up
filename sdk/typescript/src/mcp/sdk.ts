@@ -38,12 +38,34 @@ export interface ToolDefinition {
   handler: ToolHandler;
 }
 
+export interface ResourceDefinition {
+  uri: string;
+  name: string;
+  mimeType: string;
+  handler: () => Promise<string>;
+}
+
+export interface PromptArgument {
+  name: string;
+  description: string;
+  required: boolean;
+}
+
+export interface PromptDefinition {
+  name: string;
+  description: string;
+  arguments: PromptArgument[];
+  handler: (args: Record<string, string>) => Promise<{ messages: Array<{ role: string; content: { type: string; text: string } }> }>;
+}
+
 export class MCPServer {
   private config: MCPServerConfig;
   private platformUrl: string;
   private token: string;
   private serverId?: string;
   private tools: Map<string, ToolDefinition> = new Map();
+  private resources: Map<string, ResourceDefinition> = new Map();
+  private prompts: Map<string, PromptDefinition> = new Map();
   private metrics: Metrics = {
     requests_total: 0,
     requests_success: 0,
@@ -70,6 +92,14 @@ export class MCPServer {
 
   addTool(definition: ToolDefinition): void {
     this.tools.set(definition.name, definition);
+  }
+
+  addResource(definition: ResourceDefinition): void {
+    this.resources.set(definition.uri, definition);
+  }
+
+  addPrompt(definition: PromptDefinition): void {
+    this.prompts.set(definition.name, definition);
   }
 
   async register(): Promise<{ id?: string; name?: string; status?: string } | null> {
@@ -148,6 +178,49 @@ export class MCPServer {
           inputSchema: t.inputSchema,
         }));
         return { jsonrpc: "2.0", id: request.id, result: { tools } };
+      }
+
+      if (request.method === "resources/list") {
+        const resources = Array.from(this.resources.values()).map((r) => ({
+          uri: r.uri,
+          name: r.name,
+          mimeType: r.mimeType,
+        }));
+        return { jsonrpc: "2.0", id: request.id, result: { resources } };
+      }
+
+      if (request.method === "resources/read") {
+        const uri = request.params?.name || "";
+        if (uri && this.resources.has(uri)) {
+          const resource = this.resources.get(uri)!;
+          const content = await resource.handler();
+          return {
+            jsonrpc: "2.0",
+            id: request.id,
+            result: { contents: [{ uri, mimeType: resource.mimeType, text: content }] },
+          };
+        }
+        return { jsonrpc: "2.0", id: request.id, error: { code: -32601, message: `Resource not found: ${uri}` } };
+      }
+
+      if (request.method === "prompts/list") {
+        const prompts = Array.from(this.prompts.values()).map((p) => ({
+          name: p.name,
+          description: p.description,
+          arguments: p.arguments,
+        }));
+        return { jsonrpc: "2.0", id: request.id, result: { prompts } };
+      }
+
+      if (request.method === "prompts/get") {
+        const promptName = request.params?.name || "";
+        if (promptName && this.prompts.has(promptName)) {
+          const prompt = this.prompts.get(promptName)!;
+          const args = (request.params as { arguments?: Record<string, string> })?.arguments || {};
+          const result = await prompt.handler(args);
+          return { jsonrpc: "2.0", id: request.id, result };
+        }
+        return { jsonrpc: "2.0", id: request.id, error: { code: -32601, message: `Prompt not found: ${promptName}` } };
       }
 
       if (request.method === "tools/call") {

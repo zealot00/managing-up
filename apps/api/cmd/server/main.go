@@ -48,13 +48,17 @@ func main() {
 	executors.SetGlobalRegistry(mcpRegistry)
 	defer mcpRegistry.Close()
 
+	// Start periodic health checker (every 60 seconds)
+	stopHealthCheck := executors.StartHealthChecker(context.Background(), mcpRegistry, 60*time.Second)
+	defer stopHealthCheck()
+
 	llmClient := createLLMClient()
 	agent := createLLMAgentWithMCP(llmClient, mcpRegistry)
 	evalRunner := createEvaluationRunner(repo, agent, llmClient)
 	taskRunnerAdapter := newTaskRunnerAdapter(evalRunner)
 	experimentSvc := createExperimentService(repo, taskRunnerAdapter)
 
-	srv := server.NewWithRepository(cfg, repo, repo.Close, experimentSvc)
+	srv := server.NewWithRepository(cfg, repo, repo.Close, experimentSvc, mcpRegistry)
 
 	execEngine := engine.NewExecutionEngine(repo, engine.NewToolGateway())
 	worker := engine.NewWorker(execEngine, repo, 2*time.Second)
@@ -174,9 +178,9 @@ func registerMCPServerFromDB(ctx context.Context, registry *executors.MCPRegistr
 		log.Printf("Registering MCP HTTP server from DB: %s", dbServer.Name)
 		headers := make(map[string]string)
 		for _, h := range dbServer.Headers {
-			parts := strings.SplitN(h, "=", 2)
+			parts := strings.SplitN(h, ":", 2)
 			if len(parts) == 2 {
-				headers[parts[0]] = parts[1]
+				headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 			}
 		}
 		if err := registry.RegisterHTTP(ctx, dbServer.Name, dbServer.URL, headers); err != nil {

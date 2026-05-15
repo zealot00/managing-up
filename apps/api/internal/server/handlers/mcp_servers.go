@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -39,12 +40,14 @@ type MCPServerDTO struct {
 type MCPServersHandler struct {
 	repo         MCPServersRepository
 	mcpRouterSvc *service.MCPRouterService
+	registry     *executors.MCPRegistry
 }
 
-func NewMCPServersHandler(repo MCPServersRepository, mcpRouterSvc *service.MCPRouterService) *MCPServersHandler {
+func NewMCPServersHandler(repo MCPServersRepository, mcpRouterSvc *service.MCPRouterService, registry *executors.MCPRegistry) *MCPServersHandler {
 	return &MCPServersHandler{
 		repo:         repo,
 		mcpRouterSvc: mcpRouterSvc,
+		registry:     registry,
 	}
 }
 
@@ -136,7 +139,144 @@ func (h *MCPServersHandler) Approve(w http.ResponseWriter, r *http.Request) {
 		if err := h.mcpRouterSvc.SyncFromMCPServer(ctx, syncServer, approvedBy); err != nil {
 			log.Printf("failed to sync to router catalog: %v", err)
 		}
+
+		// Register the server into the runtime MCPRegistry so tools are discoverable immediately
+		if h.registry != nil && !h.registry.IsRegistered(mcpServer.Name) {
+			go h.registerToRuntime(mcpServer)
+		}
 	}
 
 	writeEnvelope(w, http.StatusOK, "req_mcp_approve", mcpServer)
+}
+
+// ListTools returns the tools available on a specific MCP server.
+func (h *MCPServersHandler) ListTools(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w, r.Method)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/mcp-servers/")
+	id := strings.TrimSuffix(path, "/tools")
+	if id == "" || id == path {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "MCP server ID is required.")
+		return
+	}
+
+	mcpServer, ok := h.repo.GetMCPServer(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "MCP server not found.")
+		return
+	}
+
+	if h.registry == nil {
+		writeEnvelope(w, http.StatusOK, "mcp_server_tools", map[string]any{
+			"server_id":   mcpServer.ID,
+			"server_name": mcpServer.Name,
+			"tools":       []any{},
+		})
+		return
+	}
+
+	// If server is approved but not yet in runtime registry, register it on the fly
+	if !h.registry.IsRegistered(mcpServer.Name) && mcpServer.Status == "approved" && mcpServer.IsEnabled {
+		h.registerToRuntimeSync(r.Context(), mcpServer)
+	}
+
+	mcpTools := h.registry.ListToolsByServer(mcpServer.Name)
+	tools := make([]map[string]any, 0, len(mcpTools))
+	for _, t := range mcpTools {
+		toolInfo := map[string]any{
+			"name":        t.Name,
+			"description": t.Description,
+		}
+		if t.InputSchema.Type != "" || len(t.InputSchema.Properties) > 0 {
+			toolInfo["inputSchema"] = t.InputSchema
+		}
+		tools = append(tools, toolInfo)
+	}
+
+	writeEnvelope(w, http.StatusOK, "mcp_server_tools", map[string]any{
+		"server_id":   mcpServer.ID,
+		"server_name": mcpServer.Name,
+		"tools":       tools,
+	})
+}
+
+// ListAllTools returns all tools from all registered MCP servers.
+func (h *MCPServersHandler) ListAllTools(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w, r.Method)
+		return
+	}
+
+	if h.registry == nil {
+		writeEnvelope(w, http.StatusOK, "mcp_all_tools", map[string]any{
+			"tools": []any{},
+		})
+		return
+	}
+
+	allTools := h.registry.ListTools()
+	tools := make([]map[string]any, 0, len(allTools))
+	for _, t := range allTools {
+		mcpTool, ok := t.(*executors.MCPTool)
+		if !ok {
+			continue
+		}
+		info := executors.MCPToolInfoFromMCP(mcpTool.ServerName(), mcpTool.MCPToolDef())
+		toolInfo := map[string]any{
+			"server_name": info.ServerName,
+			"name":        info.Name,
+			"description": info.Description,
+		}
+		if info.InputSchema != nil {
+			toolInfo["inputSchema"] = info.InputSchema
+		}
+		tools = append(tools, toolInfo)
+	}
+
+	writeEnvelope(w, http.StatusOK, "mcp_all_tools", map[string]any{
+		"tools": tools,
+	})
+}
+
+// registerToRuntime registers an approved MCP server into the in-memory registry.
+// Called in a goroutine from Approve to avoid blocking the HTTP response.
+func (h *MCPServersHandler) registerToRuntime(server MCPServerDTO) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	h.doRegisterToRuntime(ctx, server)
+}
+
+// registerToRuntimeSync registers synchronously (used by ListTools when server not yet in registry).
+func (h *MCPServersHandler) registerToRuntimeSync(ctx context.Context, server MCPServerDTO) {
+	h.doRegisterToRuntime(ctx, server)
+}
+
+func (h *MCPServersHandler) doRegisterToRuntime(ctx context.Context, server MCPServerDTO) {
+	switch server.TransportType {
+	case "http", "https":
+		headers := parseHeadersToMap(server.Headers)
+		if err := h.registry.RegisterHTTP(ctx, server.Name, server.URL, headers); err != nil {
+			log.Printf("failed to register MCP server %s to runtime registry: %v", server.Name, err)
+		} else {
+			log.Printf("registered MCP server %s to runtime registry", server.Name)
+		}
+	case "stdio":
+		env := server.Env
+		if env == nil {
+			env = []string{}
+		}
+		if err := h.registry.RegisterStdio(ctx, server.Name, executors.MCPClientConfig{
+			Command: server.Command,
+			Args:    server.Args,
+			Env:     env,
+			Timeout: 30 * time.Second,
+		}); err != nil {
+			log.Printf("failed to register MCP server %s to runtime registry: %v", server.Name, err)
+		} else {
+			log.Printf("registered MCP server %s to runtime registry", server.Name)
+		}
+	}
 }

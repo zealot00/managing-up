@@ -74,6 +74,33 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
+// OptionalAuth sets the user in context if a valid JWT cookie is present,
+// but does not reject the request if authentication is missing.
+// This allows endpoints to accept both JWT (web UI) and API key (agent) auth.
+func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("auth_token")
+		if err == nil && cookie.Value != "" {
+			claims := &Claims{}
+			token, parseErr := jwt.ParseWithClaims(cookie.Value, claims, func(token *jwt.Token) (interface{}, error) {
+				return m.jwtSecret, nil
+			})
+
+			if parseErr == nil && token.Valid {
+				user := User{
+					ID:       claims.UserID,
+					Username: claims.Username,
+					Role:     claims.Role,
+				}
+				ctx := context.WithValue(r.Context(), UserContextKey, user)
+				r = r.WithContext(ctx)
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (m *AuthMiddleware) RequireRole(role string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

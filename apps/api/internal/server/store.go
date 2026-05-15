@@ -1051,6 +1051,18 @@ func (s *store) GetMCPServer(id string) (MCPServer, bool) {
 	return server, found
 }
 
+func (s *store) GetMCPServerByName(name string) (MCPServer, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, srv := range s.mcpServers {
+		if srv.Name == name {
+			return srv, true
+		}
+	}
+	return MCPServer{}, false
+}
+
 func (s *store) CreateMCPServer(server MCPServer) (MCPServer, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1306,12 +1318,20 @@ func (s *store) ListMCPServerPermissions(mcpServerID string) ([]MCPServerPermiss
 	return nil, nil
 }
 
+func (s *store) ListPermissionsForIdentity(userID, apiKeyID string) ([]MCPServerPermission, error) {
+	return nil, nil
+}
+
 func (s *store) CreateMCPServerPermission(p MCPServerPermission) (MCPServerPermission, error) {
 	return p, nil
 }
 
 func (s *store) CheckMCPPermission(mcpServerID, userID, apiKeyID, skillID string) (bool, error) {
-	return false, nil
+	return true, nil
+}
+
+func (s *store) RevokeMCPServerPermission(id string) error {
+	return nil
 }
 
 func (s *store) ListMCPRouterCatalog() ([]MCPRouterCatalogEntry, error) {

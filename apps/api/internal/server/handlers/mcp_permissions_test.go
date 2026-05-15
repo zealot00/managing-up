@@ -19,21 +19,23 @@ func TestMCPInvokeHandler_Invoke(t *testing.T) {
 		hasPermission: true,
 		findServer:   true,
 		server: MCPServerDTO{
-			ID:           "server_001",
-			Name:         "test_server",
+			ID:            "server_001",
+			Name:          "test_server",
 			TransportType: "stdio",
-			URL:          "/path/to/server",
-			Command:      "node",
-			Args:         []string{"server.js"},
-			Env:          []string{},
-			Headers:      []string{},
+			URL:           "/path/to/server",
+			Command:       "node",
+			Args:          []string{"server.js"},
+			Env:           []string{},
+			Headers:       []string{},
+			Status:        "approved",
+			IsEnabled:     true,
 		},
 	}, &mockMCPInvoker{
 		result: &MCPInvokeResult{
 			Success: true,
 			Output:  map[string]interface{}{"result": "ok"},
 		},
-	})
+	}, nil)
 
 	body := []byte(`{
 		"server_id": "server_001",
@@ -55,7 +57,7 @@ func TestMCPInvokeHandler_Invoke(t *testing.T) {
 func TestMCPInvokeHandler_Invoke_MethodNotAllowed(t *testing.T) {
 	t.Parallel()
 
-	handler := NewMCPInvokeHandler(&mockMCPInvokeRepo{}, &mockMCPInvoker{})
+	handler := NewMCPInvokeHandler(&mockMCPInvokeRepo{}, &mockMCPInvoker{}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mcp/invoke", nil)
 	rec := httptest.NewRecorder()
@@ -70,7 +72,7 @@ func TestMCPInvokeHandler_Invoke_MethodNotAllowed(t *testing.T) {
 func TestMCPInvokeHandler_Invoke_InvalidContentType(t *testing.T) {
 	t.Parallel()
 
-	handler := NewMCPInvokeHandler(&mockMCPInvokeRepo{}, &mockMCPInvoker{})
+	handler := NewMCPInvokeHandler(&mockMCPInvokeRepo{}, &mockMCPInvoker{}, nil)
 
 	body := []byte(`{"server_id": "s1", "tool_name": "t1"}`)
 
@@ -88,7 +90,7 @@ func TestMCPInvokeHandler_Invoke_InvalidContentType(t *testing.T) {
 func TestMCPInvokeHandler_Invoke_MissingServerID(t *testing.T) {
 	t.Parallel()
 
-	handler := NewMCPInvokeHandler(&mockMCPInvokeRepo{}, &mockMCPInvoker{})
+	handler := NewMCPInvokeHandler(&mockMCPInvokeRepo{}, &mockMCPInvoker{}, nil)
 
 	body := []byte(`{"tool_name": "test_tool"}`)
 
@@ -106,7 +108,7 @@ func TestMCPInvokeHandler_Invoke_MissingServerID(t *testing.T) {
 func TestMCPInvokeHandler_Invoke_MissingToolName(t *testing.T) {
 	t.Parallel()
 
-	handler := NewMCPInvokeHandler(&mockMCPInvokeRepo{}, &mockMCPInvoker{})
+	handler := NewMCPInvokeHandler(&mockMCPInvokeRepo{}, &mockMCPInvoker{}, nil)
 
 	body := []byte(`{"server_id": "server_001"}`)
 
@@ -126,7 +128,7 @@ func TestMCPInvokeHandler_Invoke_PermissionDenied(t *testing.T) {
 
 	handler := NewMCPInvokeHandler(&mockMCPInvokeRepo{
 		hasPermission: false,
-	}, &mockMCPInvoker{})
+	}, &mockMCPInvoker{}, nil)
 
 	body := []byte(`{"server_id": "server_001", "tool_name": "test_tool"}`)
 
@@ -147,7 +149,7 @@ func TestMCPInvokeHandler_Invoke_ServerNotFound(t *testing.T) {
 	handler := NewMCPInvokeHandler(&mockMCPInvokeRepo{
 		hasPermission: true,
 		findServer:   false,
-	}, &mockMCPInvoker{})
+	}, &mockMCPInvoker{}, nil)
 
 	body := []byte(`{"server_id": "nonexistent", "tool_name": "test_tool"}`)
 
@@ -169,13 +171,15 @@ func TestMCPInvokeHandler_Invoke_InvokeFailed(t *testing.T) {
 		hasPermission: true,
 		findServer:   true,
 		server: MCPServerDTO{
-			ID:           "server_001",
-			Name:         "test_server",
+			ID:            "server_001",
+			Name:          "test_server",
 			TransportType: "stdio",
+			Status:        "approved",
+			IsEnabled:     true,
 		},
 	}, &mockMCPInvoker{
 		invokeErr: errors.New("invoke failed"),
-	})
+	}, nil)
 
 	body := []byte(`{"server_id": "server_001", "tool_name": "test_tool"}`)
 
@@ -200,7 +204,7 @@ func TestGrantMCPHandler_Grant(t *testing.T) {
 			Name: "test_server",
 		},
 	}
-	handler := NewGrantMCPHandler(repo)
+	handler := NewGrantMCPHandler(repo, nil)
 
 	body := []byte(`{
 		"mcp_server_id": "server_001",
@@ -226,7 +230,7 @@ func TestGrantMCPHandler_Grant(t *testing.T) {
 func TestGrantMCPHandler_Grant_MethodNotAllowed(t *testing.T) {
 	t.Parallel()
 
-	handler := NewGrantMCPHandler(&mockMCPGrantRepo{})
+	handler := NewGrantMCPHandler(&mockMCPGrantRepo{}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mcp/grant", nil)
 	rec := httptest.NewRecorder()
@@ -241,7 +245,7 @@ func TestGrantMCPHandler_Grant_MethodNotAllowed(t *testing.T) {
 func TestGrantMCPHandler_Grant_InvalidContentType(t *testing.T) {
 	t.Parallel()
 
-	handler := NewGrantMCPHandler(&mockMCPGrantRepo{})
+	handler := NewGrantMCPHandler(&mockMCPGrantRepo{}, nil)
 
 	body := []byte(`{"mcp_server_id": "s1"}`)
 
@@ -259,7 +263,7 @@ func TestGrantMCPHandler_Grant_InvalidContentType(t *testing.T) {
 func TestGrantMCPHandler_Grant_MissingServerID(t *testing.T) {
 	t.Parallel()
 
-	handler := NewGrantMCPHandler(&mockMCPGrantRepo{})
+	handler := NewGrantMCPHandler(&mockMCPGrantRepo{}, nil)
 
 	body := []byte(`{"user_id": "user_001"}`)
 
@@ -277,7 +281,7 @@ func TestGrantMCPHandler_Grant_MissingServerID(t *testing.T) {
 func TestGrantMCPHandler_Grant_MissingTarget(t *testing.T) {
 	t.Parallel()
 
-	handler := NewGrantMCPHandler(&mockMCPGrantRepo{})
+	handler := NewGrantMCPHandler(&mockMCPGrantRepo{}, nil)
 
 	body := []byte(`{"mcp_server_id": "server_001"}`)
 
@@ -297,7 +301,7 @@ func TestGrantMCPHandler_Grant_ServerNotFound(t *testing.T) {
 
 	handler := NewGrantMCPHandler(&mockMCPGrantRepo{
 		findServer: false,
-	})
+	}, nil)
 
 	body := []byte(`{"mcp_server_id": "nonexistent", "user_id": "user_001"}`)
 
@@ -327,7 +331,7 @@ func TestGrantMCPHandler_ListPermissions(t *testing.T) {
 			},
 		},
 	}
-	handler := NewGrantMCPHandler(repo)
+	handler := NewGrantMCPHandler(repo, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mcp/permissions?mcp_server_id=server_001", nil)
 	rec := httptest.NewRecorder()
@@ -361,7 +365,7 @@ func TestGrantMCPHandler_ListPermissions(t *testing.T) {
 func TestGrantMCPHandler_ListPermissions_MissingServerID(t *testing.T) {
 	t.Parallel()
 
-	handler := NewGrantMCPHandler(&mockMCPGrantRepo{})
+	handler := NewGrantMCPHandler(&mockMCPGrantRepo{}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mcp/permissions", nil)
 	rec := httptest.NewRecorder()
@@ -376,7 +380,7 @@ func TestGrantMCPHandler_ListPermissions_MissingServerID(t *testing.T) {
 func TestGrantMCPHandler_ListPermissions_MethodNotAllowed(t *testing.T) {
 	t.Parallel()
 
-	handler := NewGrantMCPHandler(&mockMCPGrantRepo{})
+	handler := NewGrantMCPHandler(&mockMCPGrantRepo{}, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/mcp/permissions?mcp_server_id=server_001", nil)
 	rec := httptest.NewRecorder()
@@ -458,6 +462,14 @@ func (m *mockMCPGrantRepo) CreateMCPServerPermission(p MCPServerPermission) (MCP
 }
 
 func (m *mockMCPGrantRepo) ListMCPServerPermissions(mcpServerID string) ([]MCPServerPermission, error) {
+	return m.permissions, nil
+}
+
+func (m *mockMCPGrantRepo) RevokeMCPServerPermission(id string) error {
+	return nil
+}
+
+func (m *mockMCPGrantRepo) ListPermissionsForIdentity(userID, apiKeyID string) ([]MCPServerPermission, error) {
 	return m.permissions, nil
 }
 

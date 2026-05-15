@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 
 	"github.com/zealot/managing-up/apps/api/internal/models"
 	"github.com/zealot/managing-up/apps/api/internal/server"
@@ -20,6 +20,11 @@ const defaultSnapshotLimit = 10
 
 type Repository struct {
 	db *sql.DB
+}
+
+// DB returns the underlying *sql.DB for use by sub-repositories.
+func (r *Repository) DB() *sql.DB {
+	return r.db
 }
 
 // New opens a PostgreSQL-backed repository and verifies connectivity.
@@ -1670,6 +1675,72 @@ func (r *Repository) GetMCPServer(id string) (server.MCPServer, bool) {
 	return s, true
 }
 
+func (r *Repository) GetMCPServerByName(name string) (server.MCPServer, bool) {
+	query := `
+		SELECT id, name, description, transport_type, command, args, env, url, headers,
+		       status, rejection_reason, approved_by, approved_at, is_enabled,
+		       created_at, updated_at
+		FROM mcp_servers
+		WHERE name = $1
+	`
+	var s server.MCPServer
+	var desc, cmd, url, rejectionReason, approvedBy sql.NullString
+	var args, env, headers []byte
+	var approvedAt sql.NullTime
+
+	err := r.db.QueryRow(query, name).Scan(
+		&s.ID,
+		&s.Name,
+		&desc,
+		&s.TransportType,
+		&cmd,
+		&args,
+		&env,
+		&url,
+		&headers,
+		&s.Status,
+		&rejectionReason,
+		&approvedBy,
+		&approvedAt,
+		&s.IsEnabled,
+		&s.CreatedAt,
+		&s.UpdatedAt,
+	)
+	if err != nil {
+		return server.MCPServer{}, false
+	}
+
+	if desc.Valid {
+		s.Description = desc.String
+	}
+	if cmd.Valid {
+		s.Command = cmd.String
+	}
+	if url.Valid {
+		s.URL = url.String
+	}
+	if rejectionReason.Valid {
+		s.RejectionReason = rejectionReason.String
+	}
+	if approvedBy.Valid {
+		s.ApprovedBy = approvedBy.String
+	}
+	if approvedAt.Valid {
+		s.ApprovedAt = &approvedAt.Time
+	}
+	if args != nil {
+		_ = json.Unmarshal(args, &s.Args)
+	}
+	if env != nil {
+		_ = json.Unmarshal(env, &s.Env)
+	}
+	if headers != nil {
+		_ = json.Unmarshal(headers, &s.Headers)
+	}
+
+	return s, true
+}
+
 func (r *Repository) CreateMCPServer(s server.MCPServer) (server.MCPServer, error) {
 	id := s.ID
 	if id == "" {
@@ -2786,6 +2857,46 @@ func (r *Repository) ListMCPServerPermissions(mcpServerID string) ([]server.MCPS
 	return permissions, nil
 }
 
+func (r *Repository) ListPermissionsForIdentity(userID, apiKeyID string) ([]server.MCPServerPermission, error) {
+	query := `SELECT id, mcp_server_id, user_id, api_key_id, skill_id, permission_type, is_granted, granted_by, granted_at, expires_at
+		FROM mcp_server_permissions
+		WHERE is_granted = true
+		  AND (expires_at IS NULL OR expires_at > NOW())
+		  AND ((user_id = $1 AND $1 != '') OR (api_key_id = $2 AND $2 != ''))`
+	rows, err := r.db.Query(query, userID, apiKeyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var permissions []server.MCPServerPermission
+	for rows.Next() {
+		var p server.MCPServerPermission
+		var uid, aid, skillID, grantedBy sql.NullString
+		var expiresAt sql.NullTime
+		if err := rows.Scan(&p.ID, &p.MCPServerID, &uid, &aid, &skillID, &p.PermissionType, &p.IsGranted, &grantedBy, &p.GrantedAt, &expiresAt); err != nil {
+			continue
+		}
+		if uid.Valid {
+			p.UserID = uid.String
+		}
+		if aid.Valid {
+			p.APIKeyID = aid.String
+		}
+		if skillID.Valid {
+			p.SkillID = skillID.String
+		}
+		if grantedBy.Valid {
+			p.GrantedBy = grantedBy.String
+		}
+		if expiresAt.Valid {
+			p.ExpiresAt = &expiresAt.Time
+		}
+		permissions = append(permissions, p)
+	}
+	return permissions, nil
+}
+
 func (r *Repository) CreateMCPServerPermission(p server.MCPServerPermission) (server.MCPServerPermission, error) {
 	if p.ID == "" {
 		p.ID = uuid.New().String()
@@ -2805,8 +2916,13 @@ func (r *Repository) CheckMCPPermission(mcpServerID, userID, apiKeyID, skillID s
 	return isGranted, err
 }
 
+func (r *Repository) RevokeMCPServerPermission(id string) error {
+	_, err := r.db.Exec(`DELETE FROM mcp_server_permissions WHERE id = $1`, id)
+	return err
+}
+
 func (r *Repository) ListMCPRouterCatalog() ([]server.MCPRouterCatalogEntry, error) {
-	query := `SELECT id, server_id, name, trust_score, transport_type, url, headers, enabled, approved_by, metadata_, use_count, created_at, updated_at FROM mcp_router_catalog WHERE enabled = true ORDER BY trust_score DESC, use_count DESC`
+	query := `SELECT id, server_id, name, description, transport_type, command, args, url, task_types, tags, capabilities, routing_config, status, trust_score, use_count, error_count, last_used_at, synced_at, created_at, updated_at FROM mcp_router_catalog WHERE status = 'active' ORDER BY trust_score DESC, use_count DESC`
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -2816,24 +2932,32 @@ func (r *Repository) ListMCPRouterCatalog() ([]server.MCPRouterCatalogEntry, err
 	var entries []server.MCPRouterCatalogEntry
 	for rows.Next() {
 		var e server.MCPRouterCatalogEntry
-		var url sql.NullString
-		var headers []byte
-		var approvedBy sql.NullString
-		var metadata []byte
-		if err := rows.Scan(&e.ID, &e.ServerID, &e.Name, &e.TrustScore, &e.TransportType, &url, &headers, &e.Enabled, &approvedBy, &metadata, &e.UseCount, &e.CreatedAt, &e.UpdatedAt); err != nil {
+		var description, command, urlStr sql.NullString
+		var capabilities, routingConfig []byte
+		var lastUsedAt, syncedAt sql.NullTime
+		if err := rows.Scan(&e.ID, &e.ServerID, &e.Name, &description, &e.TransportType, &command, pq.Array(&e.Args), &urlStr, pq.Array(&e.TaskTypes), pq.Array(&e.Tags), &capabilities, &routingConfig, &e.Status, &e.TrustScore, &e.UseCount, &e.ErrorCount, &lastUsedAt, &syncedAt, &e.CreatedAt, &e.UpdatedAt); err != nil {
 			continue
 		}
-		if url.Valid {
-			e.URL = url.String
+		if description.Valid {
+			e.Description = description.String
 		}
-		if approvedBy.Valid {
-			e.ApprovedBy = approvedBy.String
+		if command.Valid {
+			e.Command = command.String
 		}
-		if headers != nil {
-			json.Unmarshal(headers, &e.Headers)
+		if urlStr.Valid {
+			e.URL = urlStr.String
 		}
-		if metadata != nil {
-			json.Unmarshal(metadata, &e.Metadata)
+		if lastUsedAt.Valid {
+			e.LastUsedAt = &lastUsedAt.Time
+		}
+		if syncedAt.Valid {
+			e.SyncedAt = &syncedAt.Time
+		}
+		if capabilities != nil {
+			json.Unmarshal(capabilities, &e.Capabilities)
+		}
+		if routingConfig != nil {
+			json.Unmarshal(routingConfig, &e.RoutingConfig)
 		}
 		entries = append(entries, e)
 	}
@@ -2841,13 +2965,10 @@ func (r *Repository) ListMCPRouterCatalog() ([]server.MCPRouterCatalogEntry, err
 }
 
 func (r *Repository) UpsertMCPRouterCatalogEntry(e server.MCPRouterCatalogEntry) error {
-	headersJSON, _ := json.Marshal(e.Headers)
-	metadataJSON, _ := json.Marshal(e.Metadata)
-	query := `INSERT INTO mcp_router_catalog (id, server_id, name, trust_score, transport_type, url, headers, enabled, approved_by, metadata_, use_count, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (server_id) DO UPDATE SET name = $3, trust_score = $4, transport_type = $5, url = $6, headers = $7, enabled = $8, approved_by = $9, metadata_ = $10, updated_at = $13`
-	if e.ID == "" {
-		e.ID = uuid.New().String()
-	}
-	_, err := r.db.Exec(query, e.ID, e.ServerID, e.Name, e.TrustScore, e.TransportType, nullString(e.URL), headersJSON, e.Enabled, nullString(e.ApprovedBy), metadataJSON, e.UseCount, e.CreatedAt, e.UpdatedAt)
+	capabilitiesJSON, _ := json.Marshal(e.Capabilities)
+	routingConfigJSON, _ := json.Marshal(e.RoutingConfig)
+	query := `INSERT INTO mcp_router_catalog (server_id, name, description, transport_type, command, args, url, task_types, tags, capabilities, routing_config, status, trust_score) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (server_id) DO UPDATE SET name = $2, description = $3, transport_type = $4, command = $5, args = $6, url = $7, task_types = $8, tags = $9, capabilities = $10, routing_config = $11, status = $12, trust_score = $13, synced_at = NOW()`
+	_, err := r.db.Exec(query, e.ServerID, e.Name, nullString(e.Description), e.TransportType, nullString(e.Command), pq.Array(e.Args), nullString(e.URL), pq.Array(e.TaskTypes), pq.Array(e.Tags), capabilitiesJSON, routingConfigJSON, e.Status, e.TrustScore)
 	return err
 }
 

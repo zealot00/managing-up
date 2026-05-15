@@ -6,8 +6,95 @@ import (
 	"sync"
 
 	"github.com/zealot/managing-up/apps/api/internal/models"
+	"github.com/zealot/managing-up/apps/api/internal/repository"
+	"github.com/zealot/managing-up/apps/api/internal/server/handlers"
 	"github.com/zealot/managing-up/apps/api/internal/service"
 )
+
+// postgresMCPRouterRepoAdapter adapts repository.MCPRouterRepository
+// (which uses repository-level types) to service.MCPRouterRepository
+// (which uses service-level types).
+type postgresMCPRouterRepoAdapter struct {
+	inner *repository.PostgresMCPRouterRepository
+}
+
+var _ service.MCPRouterRepository = (*postgresMCPRouterRepoAdapter)(nil)
+
+func newPostgresMCPRouterRepoAdapter(inner *repository.PostgresMCPRouterRepository) *postgresMCPRouterRepoAdapter {
+	return &postgresMCPRouterRepoAdapter{inner: inner}
+}
+
+func (a *postgresMCPRouterRepoAdapter) FindMatchingServers(ctx context.Context, taskTypes []string, tags []string) ([]service.MCPServer, error) {
+	entries, err := a.inner.FindMatchingServers(ctx, taskTypes, tags)
+	if err != nil {
+		return nil, err
+	}
+	servers := make([]service.MCPServer, len(entries))
+	for i, e := range entries {
+		servers[i] = service.MCPServer{
+			ID:            e.ID,
+			ServerID:      e.ServerID,
+			Name:          e.Name,
+			TrustScore:    e.TrustScore,
+			TransportType: e.TransportType,
+			URL:           e.URL,
+		}
+	}
+	return servers, nil
+}
+
+func (a *postgresMCPRouterRepoAdapter) IncrementUseCount(ctx context.Context, id string) {
+	_ = a.inner.IncrementUseCount(ctx, id)
+}
+
+func (a *postgresMCPRouterRepoAdapter) SyncServer(ctx context.Context, server service.MCPServer, approvedBy string) error {
+	return a.inner.SyncServer(ctx, server.ServerID, approvedBy)
+}
+
+func (a *postgresMCPRouterRepoAdapter) ListCatalog(ctx context.Context) ([]service.RouterCatalogEntry, error) {
+	entries, err := a.inner.ListCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]service.RouterCatalogEntry, len(entries))
+	for i, e := range entries {
+		result[i] = service.RouterCatalogEntry{
+			ID:            e.ID,
+			ServerID:      e.ServerID,
+			Name:          e.Name,
+			TrustScore:    e.TrustScore,
+			TransportType: e.TransportType,
+			URL:           e.URL,
+		}
+	}
+	return result, nil
+}
+
+// postgresRouteLoggerAdapter adapts repository.PostgresMCPRouterRepository
+// to the handlers.RouteLogger interface.
+type postgresRouteLoggerAdapter struct {
+	inner *repository.PostgresMCPRouterRepository
+}
+
+func newPostgresRouteLoggerAdapter(inner *repository.PostgresMCPRouterRepository) *postgresRouteLoggerAdapter {
+	return &postgresRouteLoggerAdapter{inner: inner}
+}
+
+func (a *postgresRouteLoggerAdapter) LogRoute(ctx context.Context, log *handlers.RouteLogEntry) error {
+	repoLog := &repository.RouteLogEntry{
+		SessionID:       log.SessionID,
+		CorrelationID:   log.CorrelationID,
+		AgentID:         log.AgentID,
+		TaskType:        log.TaskType,
+		TaskTags:        log.TaskTags,
+		Matched:         log.Matched,
+		MatchedServerID: log.MatchedServerID,
+		MatchScore:      log.MatchScore,
+		MatchLatencyMS:  log.MatchLatencyMS,
+		Status:          log.Status,
+	}
+	return a.inner.LogRouteWithSession(ctx, repoLog)
+}
 
 type inMemoryMCPRouterRepo struct {
 	mu       sync.RWMutex

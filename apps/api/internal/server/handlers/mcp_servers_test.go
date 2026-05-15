@@ -10,7 +10,7 @@ import (
 func TestMCPServersHandler_Approve_MethodNotAllowed(t *testing.T) {
 	t.Parallel()
 
-	handler := NewMCPServersHandler(&mockMCPServersRepo{}, nil)
+	handler := NewMCPServersHandler(&mockMCPServersRepo{}, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mcp-servers/server_001/approve", nil)
 	rec := httptest.NewRecorder()
@@ -25,7 +25,7 @@ func TestMCPServersHandler_Approve_MethodNotAllowed(t *testing.T) {
 func TestMCPServersHandler_Approve_InvalidContentType(t *testing.T) {
 	t.Parallel()
 
-	handler := NewMCPServersHandler(&mockMCPServersRepo{}, nil)
+	handler := NewMCPServersHandler(&mockMCPServersRepo{}, nil, nil)
 
 	body := []byte(`{"decision": "approved", "approver": "admin"}`)
 
@@ -43,7 +43,7 @@ func TestMCPServersHandler_Approve_InvalidContentType(t *testing.T) {
 func TestMCPServersHandler_Approve_InvalidDecision(t *testing.T) {
 	t.Parallel()
 
-	handler := NewMCPServersHandler(&mockMCPServersRepo{}, nil)
+	handler := NewMCPServersHandler(&mockMCPServersRepo{}, nil, nil)
 
 	body := []byte(`{"decision": "maybe", "approver": "admin"}`)
 
@@ -61,7 +61,7 @@ func TestMCPServersHandler_Approve_InvalidDecision(t *testing.T) {
 func TestMCPServersHandler_Approve_ServerNotFound(t *testing.T) {
 	t.Parallel()
 
-	handler := NewMCPServersHandler(&mockMCPServersRepo{found: false}, nil)
+	handler := NewMCPServersHandler(&mockMCPServersRepo{found: false}, nil, nil)
 
 	body := []byte(`{"decision": "approved", "approver": "admin"}`)
 
@@ -79,7 +79,7 @@ func TestMCPServersHandler_Approve_ServerNotFound(t *testing.T) {
 func TestMCPServersHandler_Approve_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
-	handler := NewMCPServersHandler(&mockMCPServersRepo{}, nil)
+	handler := NewMCPServersHandler(&mockMCPServersRepo{}, nil, nil)
 
 	body := []byte(`{"decision":}`)
 
