@@ -42,10 +42,15 @@ var _ interface{} = (*store)(nil)
 func NewStore() *store {
 	now := time.Date(2026, 3, 19, 10, 0, 0, 0, time.UTC)
 
+	// Deterministic UUIDs for seed skills, compatible with UUID columns
+	seedSkill1 := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("skill_001")).String()
+	seedSkill2 := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("skill_002")).String()
+	seedSkill3 := uuid.NewSHA1(uuid.NameSpaceDNS, []byte("skill_003")).String()
+
 	return &store{
 		skills: []Skill{
 			{
-				ID:             "skill_001",
+				ID:             seedSkill1,
 				Name:           "restart_service_skill",
 				OwnerTeam:      "platform_team",
 				RiskLevel:      "medium",
@@ -56,7 +61,7 @@ func NewStore() *store {
 				Verified:       true,
 			},
 			{
-				ID:             "skill_002",
+				ID:             seedSkill2,
 				Name:           "collect_logs_skill",
 				OwnerTeam:      "sre_team",
 				RiskLevel:      "low",
@@ -67,7 +72,7 @@ func NewStore() *store {
 				Verified:       true,
 			},
 			{
-				ID:             "skill_003",
+				ID:             seedSkill3,
 				Name:           "rollback_deployment_skill",
 				OwnerTeam:      "platform_team",
 				RiskLevel:      "high",
@@ -80,7 +85,7 @@ func NewStore() *store {
 		skillVersions: []SkillVersion{
 			{
 				ID:               "version_001",
-				SkillID:          "skill_001",
+				SkillID:          seedSkill1,
 				Version:          "v1",
 				Status:           "published",
 				ChangeSummary:    "Initial restart automation flow.",
@@ -89,7 +94,7 @@ func NewStore() *store {
 			},
 			{
 				ID:               "version_002",
-				SkillID:          "skill_002",
+				SkillID:          seedSkill2,
 				Version:          "v3",
 				Status:           "published",
 				ChangeSummary:    "Added export safety checks and retry handling.",
@@ -98,7 +103,7 @@ func NewStore() *store {
 			},
 			{
 				ID:               "version_003",
-				SkillID:          "skill_003",
+				SkillID:          seedSkill3,
 				Version:          "v0-draft",
 				Status:           "draft",
 				ChangeSummary:    "Rollback flow under review.",
@@ -129,7 +134,7 @@ func NewStore() *store {
 		executions: []Execution{
 			{
 				ID:            "exec_001",
-				SkillID:       "skill_001",
+				SkillID:       seedSkill1,
 				SkillName:     "restart_service_skill",
 				Status:        "running",
 				TriggeredBy:   "sre_oncall",
@@ -138,7 +143,7 @@ func NewStore() *store {
 			},
 			{
 				ID:            "exec_002",
-				SkillID:       "skill_002",
+				SkillID:       seedSkill2,
 				SkillName:     "collect_logs_skill",
 				Status:        "waiting_approval",
 				TriggeredBy:   "ops_manager",
@@ -147,7 +152,7 @@ func NewStore() *store {
 			},
 			{
 				ID:            "exec_003",
-				SkillID:       "skill_001",
+				SkillID:       seedSkill1,
 				SkillName:     "restart_service_skill",
 				Status:        "succeeded",
 				TriggeredBy:   "platform_operator",
@@ -179,8 +184,8 @@ func NewStore() *store {
 		skillDependencies: []SkillDependency{
 			{
 				ID:                "dep_001",
-				SkillID:           "skill_001",
-				DependencySkillID: "skill_002",
+				SkillID:           seedSkill1,
+				DependencySkillID: seedSkill2,
 				VersionConstraint: ">=v3",
 				CreatedAt:         now.Add(-24 * time.Hour).Format(time.RFC3339),
 			},
@@ -188,7 +193,7 @@ func NewStore() *store {
 		skillRatings: []SkillRating{
 			{
 				ID:        "rating_001",
-				SkillID:   "skill_001",
+				SkillID:   seedSkill1,
 				UserID:    "demo-user",
 				Rating:    5,
 				Comment:   "Stable in production.",
@@ -196,7 +201,7 @@ func NewStore() *store {
 			},
 			{
 				ID:        "rating_002",
-				SkillID:   "skill_002",
+				SkillID:   seedSkill2,
 				UserID:    "demo-user",
 				Rating:    4,
 				Comment:   "Useful for incident triage.",
@@ -206,7 +211,7 @@ func NewStore() *store {
 		skillInstalls: []SkillInstall{
 			{
 				ID:          "install_001",
-				SkillID:     "skill_001",
+				SkillID:     seedSkill1,
 				UserID:      "demo-user",
 				Version:     "v1",
 				Environment: "production",
@@ -214,7 +219,7 @@ func NewStore() *store {
 			},
 			{
 				ID:          "install_002",
-				SkillID:     "skill_001",
+				SkillID:     seedSkill1,
 				UserID:      "platform-bot",
 				Version:     "v1",
 				Environment: "staging",
@@ -260,7 +265,7 @@ func (s *store) CreateSkill(req CreateSkillRequest) Skill {
 	defer s.mu.Unlock()
 
 	skill := Skill{
-		ID:             fmt.Sprintf("skill_%03d", len(s.skills)+1),
+		ID:             uuid.New().String(),
 		Name:           req.Name,
 		OwnerTeam:      req.OwnerTeam,
 		RiskLevel:      req.RiskLevel,

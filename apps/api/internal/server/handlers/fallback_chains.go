@@ -9,6 +9,7 @@ import (
 
 	"github.com/zealot/managing-up/apps/api/internal/gateway"
 	"github.com/zealot/managing-up/apps/api/internal/llm"
+	"github.com/zealot/managing-up/apps/api/internal/server/middleware"
 )
 
 // FallbackChainDTO is the data transfer object for fallback chains.
@@ -50,16 +51,17 @@ type FallbackChainReloader interface {
 type FallbackChainHandler struct {
 	repo     FallbackChainRepo
 	reloader FallbackChainReloader
+	authMW   *middleware.AuthMiddleware
 }
 
 // NewFallbackChainHandler creates a new handler.
-func NewFallbackChainHandler(repo FallbackChainRepo, reloader FallbackChainReloader) *FallbackChainHandler {
-	return &FallbackChainHandler{repo: repo, reloader: reloader}
+func NewFallbackChainHandler(repo FallbackChainRepo, reloader FallbackChainReloader, authMW *middleware.AuthMiddleware) *FallbackChainHandler {
+	return &FallbackChainHandler{repo: repo, reloader: reloader, authMW: authMW}
 }
 
-// RegisterRoutes registers fallback chain endpoints on the mux.
+// RegisterRoutes registers fallback chain endpoints on the mux with auth protection.
 func (h *FallbackChainHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/v1/admin/fallback-chains", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/api/v1/admin/fallback-chains", h.authMW.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			h.list(w, r)
@@ -68,9 +70,9 @@ func (h *FallbackChainHandler) RegisterRoutes(mux *http.ServeMux) {
 		default:
 			writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
 		}
-	})
+	})))
 
-	mux.HandleFunc("/api/v1/admin/fallback-chains/", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/api/v1/admin/fallback-chains/", h.authMW.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extract ID from path: /api/v1/admin/fallback-chains/{id}
 		id := strings.TrimPrefix(r.URL.Path, "/api/v1/admin/fallback-chains/")
 		if id == "" {
@@ -88,7 +90,7 @@ func (h *FallbackChainHandler) RegisterRoutes(mux *http.ServeMux) {
 		default:
 			writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
 		}
-	})
+	})))
 }
 
 func (h *FallbackChainHandler) list(w http.ResponseWriter, r *http.Request) {

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os/exec"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 var ErrNoPassedSnapshot = errors.New("no passed snapshot found for this skill version")
@@ -127,7 +129,7 @@ func (s *OrchestrationService) runExtractionAsync(runID string, req CreateRunReq
 		var extracted ExtractedResult
 		if err := json.Unmarshal(stdout.Bytes(), &extracted); err == nil {
 			result = &RunResult{
-				SkillID: fmt.Sprintf("skill_%s", runID[:8]),
+				SkillID: uuid.New().String(),
 				Version: "1.0.0",
 				Artifacts: []ArtifactRef{
 					{Kind: "skill_md", URI: fmt.Sprintf("extracted/%s/skill.md", runID)},
@@ -167,11 +169,11 @@ func (s *OrchestrationService) GetRun(runID string) RunDetail {
 		CreatedAt: time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339),
 		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
 		Result: &RunResult{
-			SkillID: "skill_001",
+			SkillID: uuid.New().String(),
 			Version: "1.0.0",
 			Artifacts: []ArtifactRef{
-				{Kind: "skill_md", URI: "s3://artifacts/skill_001/1.0.0/skill.md"},
-				{Kind: "schema_json", URI: "s3://artifacts/skill_001/1.0.0/schema.json"},
+				{Kind: "skill_md", URI: fmt.Sprintf("s3://artifacts/%s/1.0.0/skill.md", runID)},
+				{Kind: "schema_json", URI: fmt.Sprintf("s3://artifacts/%s/1.0.0/schema.json", runID)},
 			},
 		},
 		Errors: []ErrorResponse{},
@@ -192,10 +194,10 @@ func (s *OrchestrationService) ListRunArtifacts(runID string) ArtifactListRespon
 	return ArtifactListResponse{
 		RunID: runID,
 		Artifacts: []ArtifactRef{
-			{Kind: "skill_md", URI: "s3://artifacts/skill_001/1.0.0/skill.md"},
-			{Kind: "full_skill_md", URI: "s3://artifacts/skill_001/1.0.0/full_skill.md"},
-			{Kind: "schema_json", URI: "s3://artifacts/skill_001/1.0.0/schema.json"},
-			{Kind: "manifest_yaml", URI: "s3://artifacts/skill_001/1.0.0/manifest.yaml"},
+			{Kind: "skill_md", URI: fmt.Sprintf("s3://artifacts/%s/1.0.0/skill.md", runID)},
+			{Kind: "full_skill_md", URI: fmt.Sprintf("s3://artifacts/%s/1.0.0/full_skill.md", runID)},
+			{Kind: "schema_json", URI: fmt.Sprintf("s3://artifacts/%s/1.0.0/schema.json", runID)},
+			{Kind: "manifest_yaml", URI: fmt.Sprintf("s3://artifacts/%s/1.0.0/manifest.yaml", runID)},
 		},
 	}
 }
@@ -369,7 +371,7 @@ func (s *OrchestrationService) ListSkillVersions(skillID string) SkillVersionLis
 				SourceHash: "abc123",
 				SchemaHash: "def456",
 				Artifacts: []ArtifactRef{
-					{Kind: "skill_md", URI: "s3://artifacts/skill_001/1.0.0/skill.md"},
+					{Kind: "skill_md", URI: fmt.Sprintf("s3://artifacts/%s/1.0.0/skill.md", skillID)},
 				},
 				CreatedAt: time.Now().UTC().Add(-24 * time.Hour),
 				Promoted:  true,
@@ -380,7 +382,7 @@ func (s *OrchestrationService) ListSkillVersions(skillID string) SkillVersionLis
 				SourceHash: "xyz789",
 				SchemaHash: "ghi012",
 				Artifacts: []ArtifactRef{
-					{Kind: "skill_md", URI: "s3://artifacts/skill_001/1.1.0/skill.md"},
+					{Kind: "skill_md", URI: fmt.Sprintf("s3://artifacts/%s/1.1.0/skill.md", skillID)},
 				},
 				CreatedAt: time.Now().UTC(),
 				Promoted:  false,

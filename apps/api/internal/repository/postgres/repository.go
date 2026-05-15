@@ -147,7 +147,7 @@ func (r *Repository) GetSkill(id string) (server.Skill, bool) {
 
 // CreateSkill inserts a draft skill record.
 func (r *Repository) CreateSkill(req server.CreateSkillRequest) server.Skill {
-	id := fmt.Sprintf("skill_%d", time.Now().UnixNano())
+	id := uuid.New().String()
 	now := time.Now().UTC()
 	item := server.Skill{
 		ID:             id,

@@ -70,18 +70,56 @@ func (m *mockReloader) SetFallbackChains(chains map[llm.Model][]gateway.Fallback
 	m.lastChains = chains
 }
 
-func TestFallbackChainHandler_List(t *testing.T) {
+func setupHandler() (*FallbackChainHandler, *mockFallbackChainRepo, *mockReloader) {
 	repo := newMockRepo()
+	reloader := &mockReloader{}
+	h := NewFallbackChainHandler(repo, reloader, nil)
+	return h, repo, reloader
+}
+
+// setupMux creates a test mux with the handler routes registered (no auth).
+func setupMux(h *FallbackChainHandler) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/admin/fallback-chains", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.list(w, r)
+		case http.MethodPost:
+			h.create(w, r)
+		default:
+			writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		}
+	})
+	mux.HandleFunc("/api/v1/admin/fallback-chains/", func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Path[len("/api/v1/admin/fallback-chains/"):]
+		if id == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "ID is required")
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			h.get(w, r, id)
+		case http.MethodPut:
+			h.update(w, r, id)
+		case http.MethodDelete:
+			h.delete(w, r, id)
+		default:
+			writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		}
+	})
+	return mux
+}
+
+func TestFallbackChainHandler_List(t *testing.T) {
+	h, repo, _ := setupHandler()
 	repo.CreateFallbackChain(FallbackChainDTO{Model: "gpt-4o", IsEnabled: true, Targets: []FallbackTargetDTO{
 		{Provider: "anthropic", Model: "claude-sonnet-4", Priority: 0, IsEnabled: true},
 	}})
 
-	reloader := &mockReloader{}
-	h := NewFallbackChainHandler(repo, reloader)
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	mux := setupMux(h)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/fallback-chains", nil)
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, req)
+	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -89,9 +127,7 @@ func TestFallbackChainHandler_List(t *testing.T) {
 }
 
 func TestFallbackChainHandler_Create(t *testing.T) {
-	repo := newMockRepo()
-	reloader := &mockReloader{}
-	h := NewFallbackChainHandler(repo, reloader)
+	h, _, reloader := setupHandler()
 
 	body, _ := json.Marshal(createFallbackChainRequest{
 		Model:     "gpt-4o",
@@ -101,9 +137,10 @@ func TestFallbackChainHandler_Create(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	mux := setupMux(h)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/fallback-chains", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, req)
+	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
@@ -119,15 +156,14 @@ func TestFallbackChainHandler_Create(t *testing.T) {
 }
 
 func TestFallbackChainHandler_Create_MissingModel(t *testing.T) {
-	repo := newMockRepo()
-	reloader := &mockReloader{}
-	h := NewFallbackChainHandler(repo, reloader)
+	h, _, _ := setupHandler()
 
 	body, _ := json.Marshal(createFallbackChainRequest{})
 
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	mux := setupMux(h)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/fallback-chains", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, req)
+	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
@@ -135,11 +171,8 @@ func TestFallbackChainHandler_Create_MissingModel(t *testing.T) {
 }
 
 func TestFallbackChainHandler_Update(t *testing.T) {
-	repo := newMockRepo()
+	h, repo, reloader := setupHandler()
 	created, _ := repo.CreateFallbackChain(FallbackChainDTO{Model: "gpt-4o", IsEnabled: true})
-
-	reloader := &mockReloader{}
-	h := NewFallbackChainHandler(repo, reloader)
 
 	body, _ := json.Marshal(updateFallbackChainRequest{
 		Targets: []FallbackTargetDTO{
@@ -148,9 +181,10 @@ func TestFallbackChainHandler_Update(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPut, "/"+created.ID, bytes.NewReader(body))
+	mux := setupMux(h)
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/fallback-chains/"+created.ID, bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, req)
+	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
@@ -163,15 +197,13 @@ func TestFallbackChainHandler_Update(t *testing.T) {
 }
 
 func TestFallbackChainHandler_Delete(t *testing.T) {
-	repo := newMockRepo()
+	h, repo, _ := setupHandler()
 	created, _ := repo.CreateFallbackChain(FallbackChainDTO{Model: "gpt-4o", IsEnabled: true})
 
-	reloader := &mockReloader{}
-	h := NewFallbackChainHandler(repo, reloader)
-
-	req := httptest.NewRequest(http.MethodDelete, "/"+created.ID, nil)
+	mux := setupMux(h)
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/fallback-chains/"+created.ID, nil)
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, req)
+	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -185,13 +217,12 @@ func TestFallbackChainHandler_Delete(t *testing.T) {
 }
 
 func TestFallbackChainHandler_Get_NotFound(t *testing.T) {
-	repo := newMockRepo()
-	reloader := &mockReloader{}
-	h := NewFallbackChainHandler(repo, reloader)
+	h, _, _ := setupHandler()
 
-	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)
+	mux := setupMux(h)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/fallback-chains/nonexistent", nil)
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, req)
+	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
@@ -199,34 +230,29 @@ func TestFallbackChainHandler_Get_NotFound(t *testing.T) {
 }
 
 func TestFallbackChain_ReloadChains_DisabledChain(t *testing.T) {
-	repo := newMockRepo()
+	h, repo, _ := setupHandler()
 	repo.CreateFallbackChain(FallbackChainDTO{Model: "gpt-4o", IsEnabled: false, Targets: []FallbackTargetDTO{
 		{Provider: "anthropic", Model: "claude-sonnet-4", IsEnabled: true},
 	}})
 
-	reloader := &mockReloader{}
-	h := NewFallbackChainHandler(repo, reloader)
-
 	h.reloadChains()
 
 	// Disabled chain should not be in the reloaded chains
-	if len(reloader.lastChains) != 0 {
+	if len(h.reloader.(*mockReloader).lastChains) != 0 {
 		t.Fatal("expected no chains when all are disabled")
 	}
 }
 
 func TestFallbackChain_ReloadChains_DisabledTarget(t *testing.T) {
-	repo := newMockRepo()
+	h, repo, _ := setupHandler()
 	repo.CreateFallbackChain(FallbackChainDTO{Model: "gpt-4o", IsEnabled: true, Targets: []FallbackTargetDTO{
 		{Provider: "anthropic", Model: "claude-sonnet-4", IsEnabled: false},
 		{Provider: "ollama", Model: "qwen2.5", IsEnabled: true},
 	}})
 
-	reloader := &mockReloader{}
-	h := NewFallbackChainHandler(repo, reloader)
-
 	h.reloadChains()
 
+	reloader := h.reloader.(*mockReloader)
 	chain := reloader.lastChains[llm.Model("gpt-4o")]
 	if len(chain) != 1 {
 		t.Fatalf("expected 1 target (disabled one filtered), got %d", len(chain))

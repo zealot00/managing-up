@@ -905,6 +905,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 	fallbackChainHandler := handlers.NewFallbackChainHandler(
 		&fallbackChainRepoAdapter{repo: repo},
 		fallbackRouter,
+		authMW,
 	)
 	userHandler := handlers.NewUserHandler(&handlers.UserHandlerRepoAdapter{
 		GetUserByIDFn:           repo.GetUserByID,
@@ -966,7 +967,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 			slog.Error("failed to parse GATEWAY_FALLBACK_CHAINS", "error", err)
 		} else {
 			fallbackRouter.SetFallbackChains(chains)
-			slog.Info("configured fallback chains", "chain_count", len(chains))
+			slog.Info("configured fallback chains from env", "chain_count", len(chains))
 			for model, targets := range chains {
 				names := make([]string, len(targets))
 				for i, t := range targets {
@@ -975,6 +976,40 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 				slog.Info("fallback chain", "model", model, "targets", names)
 			}
 		}
+	}
+
+	// Load persisted fallback chains from DB so they survive restarts.
+	// DB chains override env chains for the same model, but env-only models are preserved.
+	if dbChains, err := repo.ListFallbackChains(); err == nil && len(dbChains) > 0 {
+		current := fallbackRouter.GetFallbackChains()
+		if current == nil {
+			current = make(map[llm.Model][]gateway.FallbackTarget)
+		}
+		loaded := 0
+		for _, c := range dbChains {
+			if !c.IsEnabled {
+				continue
+			}
+			var targets []gateway.FallbackTarget
+			for _, t := range c.Targets {
+				if t.IsEnabled {
+					targets = append(targets, gateway.FallbackTarget{
+						Provider: llm.Provider(t.Provider),
+						Model:    llm.Model(t.Model),
+					})
+				}
+			}
+			if len(targets) > 0 {
+				current[llm.Model(c.Model)] = targets
+				loaded++
+			}
+		}
+		if loaded > 0 {
+			fallbackRouter.SetFallbackChains(current)
+			slog.Info("loaded fallback chains from database", "chain_count", loaded)
+		}
+	} else if err != nil {
+		slog.Warn("failed to load fallback chains from database", "error", err)
 	}
 
 	srv := &Server{
