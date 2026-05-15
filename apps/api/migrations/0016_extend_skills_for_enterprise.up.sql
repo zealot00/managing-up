@@ -62,10 +62,11 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_skill_versions_skill ON skill_versions(skill_id);
 
 -- Skill Dependencies
+-- skills.id is TEXT, so FK columns must be TEXT not UUID
 CREATE TABLE IF NOT EXISTS skill_dependencies (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    skill_id            UUID NOT NULL,
-    dependency_skill_id UUID NOT NULL,
+    skill_id            TEXT NOT NULL,
+    dependency_skill_id TEXT NOT NULL,
     version_constraint   VARCHAR(100) NOT NULL,
     created_at          TIMESTAMP DEFAULT NOW(),
     CONSTRAINT fk_skill_deps_skill FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE,
@@ -86,7 +87,7 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS skill_ratings (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    skill_id    UUID NOT NULL,
+    skill_id    TEXT NOT NULL,
     user_id     TEXT NOT NULL,
     rating      INTEGER NOT NULL,
     comment     TEXT,
@@ -109,7 +110,7 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS skill_installs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    skill_id        UUID NOT NULL,
+    skill_id        TEXT NOT NULL,
     user_id         TEXT,
     version         VARCHAR(50) NOT NULL,
     environment     VARCHAR(50) DEFAULT 'production',
@@ -136,7 +137,7 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS skill_publish_approvals (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    skill_id                UUID NOT NULL,
+    skill_id                TEXT NOT NULL,
     version                 VARCHAR(50) NOT NULL,
     status                  VARCHAR(50) DEFAULT 'pending',
     submitted_by            TEXT NOT NULL,
