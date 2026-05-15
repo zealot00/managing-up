@@ -50,5 +50,6 @@ DO $$ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_mcp_catalog_server_id ON mcp_router_catalog(server_id);
-CREATE INDEX IF NOT EXISTS idx_mcp_catalog_enabled ON mcp_router_catalog(enabled);
+-- 0015 schema has "status" not "enabled"; skip enabled index if column absent
+DO $$ BEGIN CREATE INDEX IF NOT EXISTS idx_mcp_catalog_enabled ON mcp_router_catalog(enabled); EXCEPTION WHEN undefined_column THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_mcp_catalog_use_count ON mcp_router_catalog(use_count DESC);
