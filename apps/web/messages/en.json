@@ -87,7 +87,9 @@
     "sehModule": "SEH Module",
     "sehDatasets": "SEH Datasets",
     "sehRuns": "SEH Runs",
-    "sehPolicies": "SEH Policies"
+    "sehPolicies": "SEH Policies",
+    "profile": "Profile",
+    "preferences": "Preferences"
   },
   "skills": {
     "title": "Skills",
@@ -616,6 +618,49 @@
     "createFailed": "Failed to create fallback chain",
     "deleteFailed": "Failed to delete fallback chain",
     "updateFailed": "Failed to update fallback chain"
+  },
+  "userDropdown": {
+    "administrator": "Administrator",
+    "profileSettings": "Profile Settings",
+    "preferences": "Preferences",
+    "logout": "Log out"
+  },
+  "profile": {
+    "title": "Profile Settings",
+    "eyebrow": "Account",
+    "lede": "View your account information and change your password.",
+    "userInfo": "User Information",
+    "username": "Username",
+    "role": "Role",
+    "createdAt": "Created",
+    "changePassword": "Change Password",
+    "currentPassword": "Current password",
+    "currentPasswordPlaceholder": "Enter current password",
+    "newPassword": "New password",
+    "newPasswordPlaceholder": "Enter new password (min 6 characters)",
+    "confirmPassword": "Confirm new password",
+    "confirmPasswordPlaceholder": "Re-enter new password",
+    "updating": "Updating...",
+    "updatePassword": "Update Password",
+    "passwordMismatch": "New passwords do not match.",
+    "passwordUpdated": "Password updated successfully.",
+    "passwordUpdateFailed": "Failed to update password.",
+    "incorrectPassword": "Current password is incorrect."
+  },
+  "preferences": {
+    "title": "Preferences",
+    "eyebrow": "Settings",
+    "lede": "Customize your application experience.",
+    "language": "Display Language",
+    "languageDesc": "Choose the language for the interface.",
+    "langEN": "English",
+    "langZH": "中文",
+    "sidebar": "Sidebar",
+    "sidebarCollapsed": "Collapse sidebar by default",
+    "sidebarCollapsedDesc": "Start with the sidebar collapsed when loading the app.",
+    "saving": "Saving...",
+    "saved": "Preferences saved.",
+    "saveFailed": "Failed to save preferences."
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",

@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useMobileSidebar } from "./MobileSidebarProvider";
 import UserDropdown from "../app/components/UserDropdown";
 import Tooltip from "../app/components/Tooltip";
+import { getUserPreferences } from "../app/lib/user-api";
 import {
   LayoutDashboard,
   Package,
@@ -91,6 +92,21 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+
+  // Load sidebar collapsed preference from backend
+  useEffect(() => {
+    async function loadPrefs() {
+      try {
+        const prefs = await getUserPreferences();
+        if (prefs.sidebar_collapsed) {
+          setCollapsed(true);
+        }
+      } catch {
+        // use default (not collapsed)
+      }
+    }
+    void loadPrefs();
+  }, []);
 
   async function handleLogout() {
     await logout();

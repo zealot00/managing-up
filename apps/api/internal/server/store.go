@@ -30,6 +30,7 @@ type store struct {
 	userBudgets         map[string]UserBudget
 	mcpServers          map[string]MCPServer
 	fallbackChains      map[string]FallbackChain
+	userPreferences     map[string]models.UserPreferences
 	skillDependencies   []SkillDependency
 	skillRatings        []SkillRating
 	skillInstalls       []SkillInstall
@@ -1387,5 +1388,59 @@ func (s *store) DeleteFallbackChain(id string) error {
 	defer s.mu.Unlock()
 
 	delete(s.fallbackChains, id)
+	return nil
+}
+
+func (s *store) GetUserPreferences(userID string) (models.UserPreferences, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.userPreferences == nil {
+		return models.UserPreferences{UserID: userID, Language: "en", SidebarCollapsed: false}, false
+	}
+
+	prefs, ok := s.userPreferences[userID]
+	if !ok {
+		return models.UserPreferences{UserID: userID, Language: "en", SidebarCollapsed: false}, false
+	}
+	return prefs, true
+}
+
+func (s *store) UpdateUserPreferences(userID string, req models.UpdatePreferencesRequest) (models.UserPreferences, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.userPreferences == nil {
+		s.userPreferences = make(map[string]models.UserPreferences)
+	}
+
+	current, ok := s.userPreferences[userID]
+	if !ok {
+		current = models.UserPreferences{UserID: userID, Language: "en", SidebarCollapsed: false}
+	}
+
+	if req.Language != nil {
+		current.Language = *req.Language
+	}
+	if req.SidebarCollapsed != nil {
+		current.SidebarCollapsed = *req.SidebarCollapsed
+	}
+	current.UpdatedAt = time.Now()
+
+	s.userPreferences[userID] = current
+	return current, nil
+}
+
+func (s *store) UpdateUserPassword(userID string, passwordHash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	user, ok := s.users[userID]
+	if !ok {
+		return fmt.Errorf("user not found")
+	}
+	user.PasswordHash = passwordHash
+	user.UpdatedAt = time.Now()
+	s.users[userID] = user
 	return nil
 }

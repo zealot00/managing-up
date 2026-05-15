@@ -818,6 +818,7 @@ type Server struct {
 	skillEnterpriseSvc  *service.SkillEnterpriseService
 	bridgeHandler      *bridge.Handler
 	fallbackChainHandler *handlers.FallbackChainHandler
+	userHandler          *handlers.UserHandler
 	mcpRegistry         *executors.MCPRegistry
 	closeFn            func() error
 }
@@ -905,6 +906,12 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		&fallbackChainRepoAdapter{repo: repo},
 		fallbackRouter,
 	)
+	userHandler := handlers.NewUserHandler(&handlers.UserHandlerRepoAdapter{
+		GetUserByIDFn:           repo.GetUserByID,
+		UpdateUserPasswordFn:    repo.UpdateUserPassword,
+		GetUserPreferencesFn:    repo.GetUserPreferences,
+		UpdateUserPreferencesFn: repo.UpdateUserPreferences,
+	})
 	providerKeys := map[llm.Provider]string{
 		llm.ProviderOpenAI:    os.Getenv("GATEWAY_OPENAI_API_KEY"),
 		llm.ProviderAnthropic: os.Getenv("GATEWAY_ANTHROPIC_API_KEY"),
@@ -998,6 +1005,7 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 		skillEnterpriseSvc:  service.NewSkillEnterpriseService(repoToSkillRepoAdapter{repo}),
 		bridgeHandler:       bridgeHandler,
 		fallbackChainHandler: fallbackChainHandler,
+		userHandler:           userHandler,
 		mcpRegistry:         mcpRegistry,
 	}
 
@@ -1087,6 +1095,11 @@ mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
 	srv.bridgeHandler.RegisterRoutes(mux)
 
 	srv.fallbackChainHandler.RegisterRoutes(mux)
+
+	// User profile & preferences (require auth)
+	mux.Handle("/api/v1/user/profile", authMW.RequireAuth(http.HandlerFunc(srv.userHandler.GetProfile)))
+	mux.Handle("/api/v1/user/password", authMW.RequireAuth(http.HandlerFunc(srv.userHandler.ChangePassword)))
+	mux.Handle("/api/v1/user/preferences", authMW.RequireAuth(http.HandlerFunc(srv.userHandler.HandlePreferences)))
 
 	mux.Handle("/metrics", promhttp.Handler())
 

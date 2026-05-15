@@ -23,6 +23,8 @@ export default function AdminHeader() {
     "/experiments": t("experiments"),
     "/replays": t("replays"),
     "/gateway": t("gateway"),
+    "/profile": t("profile"),
+    "/preferences": t("preferences"),
     "/seh": t("sehModule"),
     "/sweeps": t("sweeps"),
   };

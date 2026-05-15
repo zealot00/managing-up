@@ -3218,6 +3218,56 @@ func (r *Repository) DeleteFallbackChain(id string) error {
 	return err
 }
 
+func (r *Repository) GetUserPreferences(userID string) (models.UserPreferences, bool) {
+	query := `
+		SELECT user_id, language, sidebar_collapsed, updated_at
+		FROM user_preferences
+		WHERE user_id = $1
+	`
+	var prefs models.UserPreferences
+	err := r.db.QueryRow(query, userID).Scan(&prefs.UserID, &prefs.Language, &prefs.SidebarCollapsed, &prefs.UpdatedAt)
+	if err != nil {
+		return models.UserPreferences{UserID: userID, Language: "en", SidebarCollapsed: false}, false
+	}
+	return prefs, true
+}
+
+func (r *Repository) UpdateUserPreferences(userID string, req models.UpdatePreferencesRequest) (models.UserPreferences, error) {
+	// First, get current preferences (or defaults)
+	current, _ := r.GetUserPreferences(userID)
+
+	language := current.Language
+	sidebarCollapsed := current.SidebarCollapsed
+
+	if req.Language != nil {
+		language = *req.Language
+	}
+	if req.SidebarCollapsed != nil {
+		sidebarCollapsed = *req.SidebarCollapsed
+	}
+
+	query := `
+		INSERT INTO user_preferences (user_id, language, sidebar_collapsed, updated_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (user_id) DO UPDATE SET
+			language = EXCLUDED.language,
+			sidebar_collapsed = EXCLUDED.sidebar_collapsed,
+			updated_at = EXCLUDED.updated_at
+	`
+	_, err := r.db.Exec(query, userID, language, sidebarCollapsed)
+	if err != nil {
+		return models.UserPreferences{}, err
+	}
+
+	prefs, _ := r.GetUserPreferences(userID)
+	return prefs, nil
+}
+
+func (r *Repository) UpdateUserPassword(userID string, passwordHash string) error {
+	_, err := r.db.Exec(`UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`, passwordHash, userID)
+	return err
+}
+
 func nullFloat64(v float64) sql.NullFloat64 {
 	if v == 0 {
 		return sql.NullFloat64{}
