@@ -1058,7 +1058,9 @@ mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
 	mux.HandleFunc("/api/v1/snapshots/list", srv.snapshotsHandler.ListSnapshots)
 
 	mux.HandleFunc("/api/v1/policies", srv.policiesHandler.ListPolicies)
+	mux.HandleFunc("/api/v1/policies/create", srv.policiesHandler.CreatePolicy)
 	mux.HandleFunc("/api/v1/policies/", srv.policiesHandler.GetPolicy)
+	mux.HandleFunc("/api/v1/policies/update/", srv.policiesHandler.UpdatePolicy)
 
 	mux.HandleFunc("/api/v1/sweeps", srv.sweepHandler.ListSweeps)
 	mux.HandleFunc("/api/v1/sweeps/", srv.sweepHandler.GetSweep)
