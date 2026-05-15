@@ -14,19 +14,24 @@ ALTER TABLE skills ADD COLUMN IF NOT EXISTS draft_source VARCHAR(50) DEFAULT 'ma
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS draft_source_meta JSONB DEFAULT '{}';
 ALTER TABLE skills ADD COLUMN IF NOT EXISTS created_by TEXT;
 
+-- Clean up orphaned FK references before adding constraints
+UPDATE skills SET published_by = NULL WHERE published_by IS NOT NULL AND published_by NOT IN (SELECT id FROM users);
+UPDATE skills SET created_by   = NULL WHERE created_by   IS NOT NULL AND created_by   NOT IN (SELECT id FROM users);
+
+-- Use WHEN OTHERS to catch both duplicate_object AND foreign_key_violation
 DO $$ BEGIN
     ALTER TABLE skills ADD CONSTRAINT fk_skills_published_by FOREIGN KEY (published_by) REFERENCES users(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 DO $$ BEGIN
     ALTER TABLE skills ADD CONSTRAINT fk_skills_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 DO $$ BEGIN
     ALTER TABLE skills ADD CONSTRAINT chk_skills_trust CHECK (trust_score >= 0 AND trust_score <= 1);
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_skills_category ON skills(category);
@@ -39,9 +44,12 @@ ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS changelog TEXT;
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS sop_version VARCHAR(50);
 ALTER TABLE skill_versions ADD COLUMN IF NOT EXISTS approved_by TEXT;
 
+-- Clean orphaned FK references for approved_by
+UPDATE skill_versions SET approved_by = NULL WHERE approved_by IS NOT NULL AND approved_by NOT IN (SELECT id FROM users);
+
 DO $$ BEGIN
     ALTER TABLE skill_versions ADD CONSTRAINT fk_skill_versions_approved_by FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_skill_versions_skill ON skill_versions(skill_id);
@@ -63,6 +71,12 @@ CREATE INDEX IF NOT EXISTS idx_skill_deps_skill ON skill_dependencies(skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_deps_dep ON skill_dependencies(dependency_skill_id);
 
 -- Skill Ratings
+-- Clean orphaned user_id references before creating table (in case table already exists from partial run)
+DO $$ BEGIN
+    UPDATE skill_ratings SET user_id = NULL WHERE user_id NOT IN (SELECT id FROM users);
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS skill_ratings (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id    UUID NOT NULL,
@@ -81,6 +95,11 @@ CREATE INDEX IF NOT EXISTS idx_skill_ratings_skill ON skill_ratings(skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_ratings_user ON skill_ratings(user_id);
 
 -- Skill Installs
+DO $$ BEGIN
+    UPDATE skill_installs SET user_id = NULL WHERE user_id IS NOT NULL AND user_id NOT IN (SELECT id FROM users);
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS skill_installs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id        UUID NOT NULL,
@@ -99,6 +118,15 @@ CREATE INDEX IF NOT EXISTS idx_skill_installs_user ON skill_installs(user_id);
 CREATE INDEX IF NOT EXISTS idx_skill_installs_env ON skill_installs(environment);
 
 -- Skill Publish Approvals
+DO $$ BEGIN
+    UPDATE skill_publish_approvals SET submitted_by = NULL WHERE submitted_by NOT IN (SELECT id FROM users);
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
+DO $$ BEGIN
+    UPDATE skill_publish_approvals SET reviewed_by = NULL WHERE reviewed_by IS NOT NULL AND reviewed_by NOT IN (SELECT id FROM users);
+EXCEPTION WHEN undefined_table THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS skill_publish_approvals (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     skill_id                UUID NOT NULL,
