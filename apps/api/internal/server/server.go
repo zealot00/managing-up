@@ -1057,10 +1057,26 @@ func NewWithRepository(cfg config.Config, repo Repository, closeFn func() error,
 mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
 	mux.HandleFunc("/api/v1/snapshots/list", srv.snapshotsHandler.ListSnapshots)
 
-	mux.HandleFunc("/api/v1/policies", srv.policiesHandler.ListPolicies)
-	mux.HandleFunc("/api/v1/policies/create", srv.policiesHandler.CreatePolicy)
-	mux.HandleFunc("/api/v1/policies/", srv.policiesHandler.GetPolicy)
-	mux.HandleFunc("/api/v1/policies/update/", srv.policiesHandler.UpdatePolicy)
+	mux.HandleFunc("/api/v1/policies", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			srv.policiesHandler.ListPolicies(w, r)
+		case http.MethodPost:
+			srv.policiesHandler.CreatePolicy(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/v1/policies/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			srv.policiesHandler.GetPolicy(w, r)
+		case http.MethodPut, http.MethodPost:
+			srv.policiesHandler.UpdatePolicy(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	mux.HandleFunc("/api/v1/sweeps", srv.sweepHandler.ListSweeps)
 	mux.HandleFunc("/api/v1/sweeps/", srv.sweepHandler.GetSweep)
@@ -1070,8 +1086,7 @@ mux.HandleFunc("/api/v1/snapshots", srv.snapshotsHandler.GetLatestSnapshot)
 
 	srv.bridgeHandler.RegisterRoutes(mux)
 
-	mux.Handle("/api/v1/admin/fallback-chains", srv.fallbackChainHandler)
-	mux.Handle("/api/v1/admin/fallback-chains/", srv.fallbackChainHandler)
+	srv.fallbackChainHandler.RegisterRoutes(mux)
 
 	mux.Handle("/metrics", promhttp.Handler())
 

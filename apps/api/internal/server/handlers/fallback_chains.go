@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/zealot/managing-up/apps/api/internal/gateway"
@@ -56,10 +57,9 @@ func NewFallbackChainHandler(repo FallbackChainRepo, reloader FallbackChainReloa
 	return &FallbackChainHandler{repo: repo, reloader: reloader}
 }
 
-// ServeHTTP routes requests to the appropriate handler method.
-func (h *FallbackChainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch {
-	case r.URL.Path == "/" || r.URL.Path == "":
+// RegisterRoutes registers fallback chain endpoints on the mux.
+func (h *FallbackChainHandler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/api/v1/admin/fallback-chains", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			h.list(w, r)
@@ -68,25 +68,27 @@ func (h *FallbackChainHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		default:
 			writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
 		}
-		return
-	}
+	})
 
-	// Path like /{id}
-	id := r.URL.Path
-	if len(id) > 0 && id[0] == '/' {
-		id = id[1:]
-	}
+	mux.HandleFunc("/api/v1/admin/fallback-chains/", func(w http.ResponseWriter, r *http.Request) {
+		// Extract ID from path: /api/v1/admin/fallback-chains/{id}
+		id := strings.TrimPrefix(r.URL.Path, "/api/v1/admin/fallback-chains/")
+		if id == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "ID is required")
+			return
+		}
 
-	switch r.Method {
-	case http.MethodGet:
-		h.get(w, r, id)
-	case http.MethodPut:
-		h.update(w, r, id)
-	case http.MethodDelete:
-		h.delete(w, r, id)
-	default:
-		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
-	}
+		switch r.Method {
+		case http.MethodGet:
+			h.get(w, r, id)
+		case http.MethodPut:
+			h.update(w, r, id)
+		case http.MethodDelete:
+			h.delete(w, r, id)
+		default:
+			writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		}
+	})
 }
 
 func (h *FallbackChainHandler) list(w http.ResponseWriter, r *http.Request) {

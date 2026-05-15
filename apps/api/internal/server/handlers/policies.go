@@ -157,7 +157,7 @@ func (h *PoliciesHandler) CreatePolicy(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PoliciesHandler) UpdatePolicy(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
+	if r.Method != http.MethodPut && r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "")
 		return
 	}
