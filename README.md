@@ -75,6 +75,9 @@ managing-up 是一个 AI 系统的**质检部门 + 照妖镜**。
 | **Trace 回放 Replay** | "线上出问题了"，你说"回放一下当时" |
 | **量化报告 Reporting** | "效率提升1000%"，你说"数据依据呢" |
 | **CI 集成 Gate** | 想上线？先问问我同不同意 |
+| **Provider Fallback** | 主模型挂了？自动切到备用，服务不中断 |
+| **MCP 全链路** | Server管理 + Proxy代理 + Router路由 + 权限控制 |
+| **超参扫描 Sweep** | 多维参数组合实验，找到最优配置 |
 
 ---
 
@@ -113,7 +116,13 @@ managing-up 是一个 AI 系统的**质检部门 + 照妖镜**。
 │                                                             │
 │  ┌─────────────────────────────────────────────┐          │
 │  │              LLM Gateway                     │          │
-│  │  (OpenAI/Anthropic 兼容, 限流, 熔断, 预算)  │          │
+│  │  (OpenAI/Anthropic 兼容, 限流, 熔断, 预算,   │          │
+│  │   Fallback 灾备)                             │          │
+│  └─────────────────────────────────────────────┘          │
+│                                                             │
+│  ┌─────────────────────────────────────────────┐          │
+│  │         MCP Ecosystem                        │          │
+│  │  Server管理 → Proxy代理 → Router路由 → 权限  │          │
 │  └─────────────────────────────────────────────┘          │
 │                                                             │
 │  ┌─────────────┐  ┌──────────────────────────────────┐    │
@@ -361,8 +370,55 @@ curl http://localhost:8080/api/v1/gateway/usage/users
 - **API Key 认证**: Bearer Token / x-api-key
 - **使用统计**: 按 Provider/Model/User 聚合
 - **费用追踪**: 基于模型定价自动计算成本
-- **限流**: 每 Key 每分钟请求限制
+- **限流**: Redis 分布式每 Key 每分钟请求限制
+- **熔断器**: Redis 实现的指数退避熔断保护
+- **预算控制**: 原子 check-and-decrement 预算检查
 - **重试机制**: 指数退避自动重试
+- **Provider Fallback**: 多级灾备降级，主 Provider 失败自动切换到备用
+- **Fallback Chain 管理**: 数据库配置 + 热更新 + 进程重启自动加载
+
+---
+
+## Provider Fallback 灾备降级
+
+当主用 LLM 提供商不可用时，自动切换到备用提供商，确保服务持续可用。
+
+### 配置方式
+
+**方式一：数据库配置（推荐）**
+
+通过 `/fallback-chains` 管理页面或 API 配置，支持热更新，无需重启。
+
+```bash
+# 创建 Fallback Chain
+curl -X POST http://localhost:8080/api/v1/admin/fallback-chains \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "is_enabled": true,
+    "targets": [
+      {"provider": "anthropic", "model": "claude-sonnet-4", "priority": 0, "is_enabled": true},
+      {"provider": "ollama", "model": "qwen2.5", "priority": 1, "is_enabled": true}
+    ]
+  }'
+```
+
+**方式二：环境变量**
+
+```bash
+GATEWAY_FALLBACK_CHAINS='{"gpt-4o": ["anthropic:claude-sonnet-4", "ollama:qwen2.5"]}'
+```
+
+### API 端点
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/v1/admin/fallback-chains` | 列出所有 Chain | Required |
+| POST | `/api/v1/admin/fallback-chains` | 创建 Chain | Required |
+| GET | `/api/v1/admin/fallback-chains/{id}` | Chain 详情 | Required |
+| PUT | `/api/v1/admin/fallback-chains/{id}` | 更新 Chain | Required |
+| DELETE | `/api/v1/admin/fallback-chains/{id}` | 删除 Chain | Required |
 
 ---
 
@@ -443,6 +499,28 @@ curl -X POST http://localhost:8080/api/v1/mcp-servers/{id}/approve \
 - **参数验证**: 拒绝包含 shell 元字符的参数
 - **Header 验证**: HTTP 传输头不能包含 CRLF 注入
 - **连接验证**: 批准前自动验证 MCP 服务器可访问
+- **权限控制**: 调用工具前验证 user/api_key 对该 MCP Server 的访问权限
+
+---
+
+## MCP Proxy 代理网关
+
+MCP Proxy 是完整的 MCP 协议代理，拦截 Agent 请求实现认证、权限过滤和工具命名空间隔离。
+
+### 核心能力
+
+- **认证集成**: 复用 Gateway API Key 认证
+- **权限过滤**: 仅返回用户有权限访问的工具列表
+- **工具命名空间**: `{server_name}__{tool_name}` 格式避免冲突
+- **协议代理**: 透明代理 MCP JSON-RPC 请求
+
+### 接入方式
+
+```
+Agent → MCP Proxy (认证 + 过滤) → 后端 MCP Servers
+```
+
+端点: `/mcp`（标准 MCP 协议）
 
 ---
 
@@ -798,10 +876,24 @@ curl -X POST http://localhost:8080/api/v1/gateway/bridge/import \
 
 | 路径 | 功能 | 说明 |
 |------|------|------|
-| `/gateway/sessions` | Session 历史 | 查看所有 Gateway Session 记录和 Policy 决策 |
-| `/skills/snapshots` | Snapshot 历史 | 查看 Skill 版本的评测结果和 Regression Gate 状态 |
-| `/evaluations` | 评估引擎 | 管理任务、执行、指标，可运行评估和查看结果 |
-| `/mcp-router` | MCP 路由仪表盘 | 查看路由目录、服务器状态、信任评分 |
+| `/dashboard` | 仪表盘 | 统计概览 |
+| `/skills` | 技能管理 | CRUD + 市场 + 依赖 |
+| `/executions` | 执行记录 | 执行追踪 + 审批 |
+| `/tasks` | 任务定义 | 结构化测试用例 |
+| `/evaluations` | 评估引擎 | 指标 + 评分 + 运行 |
+| `/experiments` | 实验对比 | A/B 对比 |
+| `/approvals` | 审批中心 | 人工审批 |
+| `/replays` | 回放快照 | 确定性回放 |
+| `/gateway` | Gateway 管理 | API Key + 用量统计 + 提供商 |
+| `/mcp` | MCP Server 管理 | CRUD + 审批 + 健康检查 |
+| `/mcp-router` | MCP Router 仪表盘 | 路由目录 + 监控 + Session |
+| `/mcp-router/metrics` | Prometheus 监控 | 请求延迟 + 错误率 |
+| `/mcp-router/sessions` | Session 历史 | 路由会话追踪 |
+| `/fallback-chains` | Fallback Chain 管理 | CRUD + 热更新 + 启停 |
+| `/policies` | 策略管理 | 规则编辑 + 版本控制 |
+| `/sweeps` | 超参矩阵 | 创建矩阵实验 + 结果可视化 |
+| `/profile` | 个人资料 | 修改密码 |
+| `/preferences` | 偏好设置 | 语言 + 侧边栏 |
 
 ### 使用示例
 
@@ -1006,18 +1098,20 @@ managing-up/
 │   │   │   └── updatepw/        # Password reset utility
 │   │   ├── internal/
 │   │   │   ├── server/          # HTTP handlers + routing
-│   │   │   │   └── handlers/    # Auth handler
+│   │   │   │   └── handlers/    # Auth, FallbackChain, MCP, User, etc.
 │   │   │   ├── service/         # Domain logic
 │   │   │   ├── engine/          # Execution engine + trace + replay
 │   │   │   │   └── executors/  # MCP client + registry
 │   │   │   ├── evaluator/       # Evaluators + evaluation runner
 │   │   │   ├── generator/       # LLM skill generator (SOP → YAML)
-│   │   │   ├── gateway/         # LLM Gateway (OpenAI/Anthropic compatible)
+│   │   │   ├── gateway/         # LLM Gateway + Fallback + Router + Retry
 │   │   │   ├── llm/             # LLM provider clients (10 providers)
+│   │   │   ├── mcpproxy/        # MCP Proxy (auth + tool filter)
 │   │   │   ├── orchestrator/    # SOP-to-Skill orchestrator
 │   │   │   ├── seh/             # SEH module
+│   │   │   ├── models/          # Domain models (User, Preferences)
 │   │   │   └── repository/      # PostgreSQL repository
-│   │   └── migrations/          # SQL migrations (0001-0012)
+│   │   └── migrations/          # SQL migrations (0001-0028)
 │   └── web/
 │       └── app/                 # Next.js frontend
 │           ├── components/      # Reusable UI components
@@ -1043,8 +1137,12 @@ managing-up/
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| MCP Server Management | ✅ | CRUD + approve workflow + validation |
+| MCP Server Management | ✅ | CRUD + approve workflow + validation + permissions |
+| MCP Proxy | ✅ | 认证 + 权限过滤 + 工具命名空间 |
 | MCP Router | ✅ | 无状态接入层 + 智能路由 + Prometheus |
+| MCP Resources/Prompts | ✅ | 资源读取 + 模板 + 订阅 + Prompt 管理 |
+| MCP Streaming Invoke | ✅ | SSE 流式工具调用 |
+| MCP Health Check | ✅ | 单个/全部 MCP Server 健康检查 |
 | Skill Registry | ✅ | CRUD + version control |
 | Skill Repository | ✅ | Enterprise extensions + market + dependencies |
 | Execution Engine | ✅ | State machine with checkpoints |
@@ -1052,33 +1150,28 @@ managing-up/
 | Skill Generator | ✅ | SOP document → YAML spec |
 | LLM Integration | ✅ | 10 providers |
 | LLM Gateway | ✅ | OpenAI/Anthropic compatible, streaming, cost tracking |
+| Provider Fallback | ✅ | 多级 Fallback Chain + 熔断器 + DB 热更新 + 重启自动加载 |
+| Fallback Chain Admin | ✅ | /fallback-chains CRUD + auth protected |
 | Task Definitions | ✅ | Structured test cases |
 | Experiment Tracking | ✅ | A/B comparison runs |
 | Evaluation Pipeline | ✅ | Multiple evaluator types |
 | Trace Replay | ✅ | Deterministic reproduction |
+| Sweep Engine | ✅ | Model × Temperature × MaxTokens × Prompt 矩阵 |
+| Policy Versions | ✅ | 策略规则编辑 + 版本管理 |
+| Gateway Sessions | ✅ | Session 追踪 + Policy 决策 |
+| Capability Snapshots | ✅ | 评测结果 + Regression Gate |
+| Memory Hub | ✅ | 跨会话记忆存储与检索 |
+| Bridge Adapter | ✅ | OpenAPI 导入 + 响应优化 |
+| User Profile & Preferences | ✅ | 修改密码 + 语言偏好 + 侧边栏状态持久化 |
+| UUID Primary Keys | ✅ | skills.id / mcp_servers.id 已迁移为 UUID |
+| Schema Migrations | ✅ | 幂等迁移 + schema_migrations 版本追踪 (0001-0028) |
 | Python SDK | ✅ | PyPI package |
 | TypeScript SDK | ✅ | npm package |
 | PostgreSQL Persistence | ✅ | With migrations (required) |
-| Agent SDKs | ✅ | Python + TypeScript |
 | Unit Tests | ✅ | All packages passing |
-| Admin Panel UI | ✅ | Sidebar layout, dark theme |
+| Admin Panel UI | ✅ | Sidebar layout, dark theme, i18n (中/EN) |
 | Usage Statistics | ✅ | Token ranking, cost tracking, charts |
 | Login Tips | ✅ | Database-driven quotes/tips |
-| TanStack Query | ✅ | Declarative data fetching + caching |
-| React Hook Form + Zod | ✅ | Real-time inline form validation |
-| Bulk Actions | ✅ | Checkbox selection + batch operations |
-| Data Pagination | ✅ | LoadMore on Executions/Tasks/Evaluations |
-| Data Formatters | ✅ | Relative time, duration, text truncation |
-| Skeleton Loading | ✅ | ListSkeleton/CardGridSkeleton + keepPreviousData |
-| MCP Router Dashboard | ✅ | /mcp-router 路由概览仪表盘 |
-| MCP Router Metrics | ✅ | /mcp-router/metrics Prometheus 监控 |
-| Skill Market | ✅ | /skills/market 市场浏览 |
-| My Skills | ✅ | /skills/my-skills 我的 Skills |
-| Gateway Sessions | ✅ | /gateway/sessions Session 历史 + Policy 决策 |
-| Skill Snapshots | ✅ | /skills/snapshots 评测结果 + Regression Gate |
-| Evaluations Dashboard | ✅ | /evaluations 评估引擎 Dashboard 布局 |
-| Memory Hub | ✅ | 跨会话记忆存储与检索 |
-| Bridge Adapter | ✅ | OpenAPI 导入 + 响应优化 |
 
 ---
 
