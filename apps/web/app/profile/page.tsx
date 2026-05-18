@@ -138,8 +138,9 @@ export default function ProfilePage() {
         <form onSubmit={handlePasswordChange} style={{ padding: "var(--space-4)" }}>
           <div style={{ display: "grid", gap: "var(--space-4)", maxWidth: 400 }}>
             <div>
-              <label className="form-label">{t("currentPassword")}</label>
+              <label className="form-label" htmlFor="current-password">{t("currentPassword")}</label>
               <input
+                id="current-password"
                 type="password"
                 className="form-input"
                 value={currentPassword}
@@ -149,8 +150,9 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <label className="form-label">{t("newPassword")}</label>
+              <label className="form-label" htmlFor="new-password">{t("newPassword")}</label>
               <input
+                id="new-password"
                 type="password"
                 className="form-input"
                 value={newPassword}
@@ -166,8 +168,9 @@ export default function ProfilePage() {
               )}
             </div>
             <div>
-              <label className="form-label">{t("confirmPassword")}</label>
+              <label className="form-label" htmlFor="confirm-password">{t("confirmPassword")}</label>
               <input
+                id="confirm-password"
                 type="password"
                 className="form-input"
                 value={confirmPassword}

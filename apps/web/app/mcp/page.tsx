@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../../context/AuthContext";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { useToast } from "../../components/ToastProvider";
 import Breadcrumb from "../../components/Breadcrumb";
 import {
@@ -36,6 +37,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+import { Spinner } from "../components/ui/Spinner";
 
 const STATUS_CONFIG: Record<string, { label: string; badgeClass: string; icon: React.ReactNode }> = {
   approved: {
@@ -310,7 +312,7 @@ export default function MCPPage() {
       </div>
 
       {error && (
-        <div className="form-error" style={{ marginBottom: 16 }}>
+        <div className="form-error" style={{ marginBottom: 16 }} role="alert">
           {error}
         </div>
       )}
@@ -394,8 +396,8 @@ export default function MCPPage() {
               <button type="button" className="btn btn-secondary" onClick={resetForm}>
                 {tc("cancel")}
               </button>
-              <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                {isSubmitting ? t("creating") : t("create")}
+              <button type="submit" className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {isSubmitting ? <><Spinner size="sm" /> {t("creating")}</> : t("create")}
               </button>
             </div>
           </form>
@@ -525,6 +527,7 @@ export default function MCPPage() {
                             className="btn btn-ghost btn-sm"
                             onClick={() => toggleExpanded(server.id)}
                             aria-label={isExpanded ? "Collapse" : "Expand"}
+                            aria-expanded={isExpanded}
                           >
                             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                           </button>
@@ -578,54 +581,35 @@ export default function MCPPage() {
                           </button>
                         </td>
                         <td>
-                          {isDeleting ? (
-                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                              <span style={{ fontSize: "var(--text-xs)", color: "var(--danger)" }}>Confirm?</span>
-                              <button
-                                className="btn btn-sm"
-                                style={{ background: "var(--danger)", color: "#fff", border: "none" }}
-                                onClick={() => void handleDelete(server.id)}
-                              >
-                                {tc("delete")}
-                              </button>
-                              <button
-                                className="btn btn-sm btn-secondary"
-                                onClick={() => setDeletingId(null)}
-                              >
-                                {tc("cancel")}
-                              </button>
-                            </div>
-                          ) : (
-                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                              {isPending && (
-                                <>
-                                  <button
-                                    className="btn btn-sm"
-                                    style={{ background: "var(--success)", color: "#fff", border: "none" }}
-                                    disabled={isApproving}
-                                    onClick={() => void handleApprove(server.id, "approved")}
-                                  >
-                                    {isApproving ? "..." : t("approve")}
-                                  </button>
-                                  <button
-                                    className="btn btn-sm"
-                                    style={{ background: "var(--danger)", color: "#fff", border: "none" }}
-                                    disabled={isApproving}
-                                    onClick={() => void handleApprove(server.id, "rejected")}
-                                  >
-                                    {isApproving ? "..." : t("reject")}
-                                  </button>
-                                </>
-                              )}
-                              <button
-                                className="btn btn-sm btn-ghost"
-                                onClick={() => setDeletingId(server.id)}
-                                aria-label={`Delete ${server.name}`}
-                              >
-                                <Trash2 size={14} aria-hidden="true" />
-                              </button>
-                            </div>
-                          )}
+                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                            {isPending && (
+                              <>
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ background: "var(--success)", color: "#fff", border: "none" }}
+                                  disabled={isApproving}
+                                  onClick={() => void handleApprove(server.id, "approved")}
+                                >
+                                  {isApproving ? "..." : t("approve")}
+                                </button>
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ background: "var(--danger)", color: "#fff", border: "none" }}
+                                  disabled={isApproving}
+                                  onClick={() => void handleApprove(server.id, "rejected")}
+                                >
+                                  {isApproving ? "..." : t("reject")}
+                                </button>
+                              </>
+                            )}
+                            <button
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => setDeletingId(server.id)}
+                              aria-label={`Delete ${server.name}`}
+                            >
+                              <Trash2 size={14} aria-hidden="true" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                       {isExpanded && (
@@ -693,10 +677,12 @@ export default function MCPPage() {
                                     />
                                   </div>
                                   <div style={{ marginBottom: 8 }}>
+                                    <label className="form-label" htmlFor={`invoke-params-${server.id}`} style={{ fontSize: "var(--text-xs)", marginBottom: 4, display: "block" }}>Parameters (JSON)</label>
                                     <textarea
+                                      id={`invoke-params-${server.id}`}
                                       className="form-input"
                                       style={{ width: "100%", minHeight: 60, fontFamily: "'IBM Plex Mono', monospace", fontSize: "var(--text-xs)" }}
-                                      placeholder='Parameters (JSON, e.g., {"path": "/tmp/test.txt"})'
+                                      placeholder='{"path": "/tmp/test.txt"}'
                                       value={invokeParams}
                                       onChange={(e) => setInvokeParams(e.target.value)}
                                     />
@@ -730,6 +716,17 @@ export default function MCPPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deletingId !== null}
+        onClose={() => setDeletingId(null)}
+        onConfirm={() => deletingId && handleDelete(deletingId)}
+        title={tc("deleteConfirmTitle", { name: servers.find(s => s.id === deletingId)?.name || "" })}
+        description={tc("deleteConfirmDescription")}
+        confirmText={tc("delete")}
+        cancelText={tc("cancel")}
+        variant="danger"
+      />
     </div>
   );
 }

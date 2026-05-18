@@ -5,6 +5,7 @@ import AdminHeader from "../components/AdminHeader";
 import { AuthProvider } from "../context/AuthContext";
 import Providers from "./providers";
 import { MobileSidebarProvider } from "../components/MobileSidebarProvider";
+import { getLocale } from "next-intl/server";
 
 export const metadata: Metadata = {
   title: "managing-up — 向上管理",
@@ -14,25 +15,28 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body>
+        <a href="#main-content" className="skip-link">Skip to main content</a>
         <AuthProvider>
           <Providers>
             <MobileSidebarProvider>
               <div className="admin-layout">
                 <Sidebar />
-                <div className="admin-main">
+                <main className="admin-main">
                   <AdminHeader />
-                  <div className="admin-content">
+                  <div id="main-content" className="admin-content">
                     {children}
                   </div>
-                </div>
+                </main>
               </div>
             </MobileSidebarProvider>
           </Providers>

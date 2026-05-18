@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useToast } from "../../components/ToastProvider";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import Breadcrumb from "../../components/Breadcrumb";
 import {
   FallbackChain,
@@ -13,14 +14,17 @@ import {
 } from "../lib/fallback-api";
 import {
   ArrowDownUp,
+  CheckCircle,
   ChevronDown,
   ChevronRight,
+  XCircle,
   Plus,
   Trash2,
   X,
   Power,
   PowerOff,
 } from "lucide-react";
+import { Spinner } from "../components/ui/Spinner";
 
 const PROVIDERS = [
   "openai",
@@ -193,7 +197,7 @@ export default function FallbackChainsPage() {
       </div>
 
       {error && (
-        <div className="form-error" style={{ marginBottom: 16 }}>
+        <div className="form-error" style={{ marginBottom: 16 }} role="alert">
           {error}
         </div>
       )}
@@ -229,7 +233,7 @@ export default function FallbackChainsPage() {
 
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <label className="form-label">{t("targets")}</label>
+                <label className="form-label" id="fc-targets-label">{t("targets")}</label>
                 <button
                   type="button"
                   className="btn btn-sm btn-secondary"
@@ -246,6 +250,7 @@ export default function FallbackChainsPage() {
                     value={target.provider}
                     onChange={(e) => updateTargetRow(index, "provider", e.target.value)}
                     style={{ minWidth: 120 }}
+                    aria-label={`${t("provider")} ${index + 1}`}
                   >
                     {PROVIDERS.map((p) => (
                       <option key={p} value={p}>{p}</option>
@@ -257,6 +262,7 @@ export default function FallbackChainsPage() {
                     onChange={(e) => updateTargetRow(index, "model", e.target.value)}
                     placeholder={t("targetModelPlaceholder")}
                     style={{ flex: 1 }}
+                    aria-label={`${t("model")} ${index + 1}`}
                   />
                   <input
                     className="form-input"
@@ -266,6 +272,7 @@ export default function FallbackChainsPage() {
                     placeholder={t("priority")}
                     style={{ width: 80 }}
                     min={1}
+                    aria-label={`${t("priority")} ${index + 1}`}
                   />
                   {formTargets.length > 1 && (
                     <button
@@ -285,8 +292,8 @@ export default function FallbackChainsPage() {
               <button type="button" className="btn btn-secondary" onClick={resetForm}>
                 {tc("cancel")}
               </button>
-              <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                {isSubmitting ? t("creating") : t("create")}
+              <button type="submit" className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {isSubmitting ? <><Spinner size="sm" /> {t("creating")}</> : t("create")}
               </button>
             </div>
           </form>
@@ -337,6 +344,7 @@ export default function FallbackChainsPage() {
                             className="btn btn-ghost btn-sm"
                             onClick={() => toggleExpanded(chain.id)}
                             aria-label={isExpanded ? "Collapse" : "Expand"}
+                            aria-expanded={isExpanded}
                           >
                             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                           </button>
@@ -353,6 +361,7 @@ export default function FallbackChainsPage() {
                         </td>
                         <td>
                           <span className={chain.is_enabled ? "badge badge-completed" : "badge badge-pending"} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            {chain.is_enabled ? <CheckCircle size={12} aria-hidden="true" /> : <XCircle size={12} aria-hidden="true" />}
                             {chain.is_enabled ? t("enabled") : t("disabled")}
                           </span>
                         </td>
@@ -372,32 +381,13 @@ export default function FallbackChainsPage() {
                           </button>
                         </td>
                         <td>
-                          {isDeleting ? (
-                            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                              <span style={{ fontSize: "var(--text-xs)", color: "var(--danger)" }}>{tc("confirm")}?</span>
-                              <button
-                                className="btn btn-sm"
-                                style={{ background: "var(--danger)", color: "#fff", border: "none" }}
-                                onClick={() => void handleDelete(chain.id)}
-                              >
-                                {tc("delete")}
-                              </button>
-                              <button
-                                className="btn btn-sm btn-secondary"
-                                onClick={() => setDeletingId(null)}
-                              >
-                                {tc("cancel")}
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              className="btn btn-sm btn-ghost"
-                              onClick={() => setDeletingId(chain.id)}
-                              aria-label={`Delete ${chain.model}`}
-                            >
-                              <Trash2 size={14} aria-hidden="true" />
-                            </button>
-                          )}
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            onClick={() => setDeletingId(chain.id)}
+                            aria-label={`Delete ${chain.model}`}
+                          >
+                            <Trash2 size={14} aria-hidden="true" />
+                          </button>
                         </td>
                       </tr>
                       {isExpanded && (
@@ -455,6 +445,17 @@ export default function FallbackChainsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deletingId !== null}
+        onClose={() => setDeletingId(null)}
+        onConfirm={() => deletingId && handleDelete(deletingId)}
+        title={tc("deleteConfirmTitle", { name: chains.find(c => c.id === deletingId)?.model || "" })}
+        description={tc("deleteConfirmDescription")}
+        confirmText={tc("delete")}
+        cancelText={tc("cancel")}
+        variant="danger"
+      />
     </div>
   );
 }
