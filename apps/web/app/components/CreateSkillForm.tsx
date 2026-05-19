@@ -49,31 +49,43 @@ export default function CreateSkillForm() {
       {createSkillMutation.error && <p className="form-error">{createSkillMutation.error.message}</p>}
 
       <div className="form-fields">
-        <label className="form-label">
-          {t("skillName")}
+        <label className="form-label" htmlFor="name">
+          <span className="flex items-center gap-1">
+            {t("skillName")}
+            <span className="text-red-500 text-sm" aria-hidden="true">*</span>
+            <span className="sr-only">(required)</span>
+          </span>
           <input
             type="text"
+            id="name"
             {...register("name")}
             placeholder={t("skillNamePlaceholder")}
             className={`form-input ${errors.name ? "border-red-500" : ""}`}
+            aria-required="true"
           />
           {errors.name && <p className="form-error">{errors.name.message}</p>}
         </label>
 
-        <label className="form-label">
-          {t("ownerTeam")}
+        <label className="form-label" htmlFor="owner_team">
+          <span className="flex items-center gap-1">
+            {t("ownerTeam")}
+            <span className="text-red-500 text-sm" aria-hidden="true">*</span>
+            <span className="sr-only">(required)</span>
+          </span>
           <input
             type="text"
+            id="owner_team"
             {...register("owner_team")}
             placeholder={t("ownerTeamPlaceholder")}
             className={`form-input ${errors.owner_team ? "border-red-500" : ""}`}
+            aria-required="true"
           />
           {errors.owner_team && <p className="form-error">{errors.owner_team.message}</p>}
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="risk_level">
           {t("riskLevel")}
-          <select {...register("risk_level")} className="form-select">
+          <select id="risk_level" {...register("risk_level")} className="form-select">
             <option value="low">{t("low")}</option>
             <option value="medium">{t("medium")}</option>
             <option value="high">{t("high")}</option>

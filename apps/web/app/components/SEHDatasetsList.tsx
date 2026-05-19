@@ -12,11 +12,12 @@ type Props = {
   datasets: Dataset[];
   total: number;
   hasMore: boolean;
+  error?: boolean;
 };
 
 const PAGE_SIZE = 20;
 
-export default function SEHDatasetsList({ datasets, total, hasMore }: Props) {
+export default function SEHDatasetsList({ datasets, total, hasMore, error }: Props) {
   const t = useTranslations("seh");
   const tc = useTranslations("common");
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,6 +49,12 @@ export default function SEHDatasetsList({ datasets, total, hasMore }: Props) {
         description={t("datasetsPageLede")}
       />
 
+      {error ? (
+        <div className="panel" role="alert">
+          <p className="form-error">{t("apiUnavailable")}</p>
+          <p className="empty-note">{t("apiUnavailableDesc")}</p>
+        </div>
+      ) : (
       <section className="panel">
         <div className="panel-header">
           <p className="section-kicker">SEH</p>
@@ -55,13 +62,25 @@ export default function SEHDatasetsList({ datasets, total, hasMore }: Props) {
         </div>
 
         <div style={{ padding: "var(--space-4)" }}>
-          <div className="search-bar">
+          <div className="search-bar" style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
             <input
               type="text"
               placeholder={t("searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+              style={{ flex: 1 }}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => { setSearchQuery(""); setPage(1); }}
+                className="btn btn-ghost btn-sm"
+                aria-label="Clear search"
+                style={{ padding: "var(--space-2)" }}
+              >
+                ×
+              </button>
+            )}
           </div>
 
           <div className="table-wrapper">
@@ -73,11 +92,11 @@ export default function SEHDatasetsList({ datasets, total, hasMore }: Props) {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Version</th>
-                    <th>Owner</th>
-                    <th>Cases</th>
-                    <th>Dataset ID</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Version</th>
+                    <th scope="col">Owner</th>
+                    <th scope="col">Cases</th>
+                    <th scope="col">Dataset ID</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -124,6 +143,7 @@ export default function SEHDatasetsList({ datasets, total, hasMore }: Props) {
           )}
         </div>
       </section>
+      )}
     </main>
   );
 }

@@ -193,12 +193,12 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Version</th>
-                      <th>Owner</th>
-                      <th>Cases</th>
-                      <th>Dataset ID</th>
-                      <th>Actions</th>
+                      <th scope="col">Name</th>
+                      <th scope="col">Version</th>
+                      <th scope="col">Owner</th>
+                      <th scope="col">Cases</th>
+                      <th scope="col">Dataset ID</th>
+                      <th scope="col">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -248,12 +248,12 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Skill</th>
-                      <th>Dataset</th>
-                      <th>Score</th>
-                      <th>Success Rate</th>
-                      <th>Run ID</th>
-                      <th>Actions</th>
+                      <th scope="col">Skill</th>
+                      <th scope="col">Dataset</th>
+                      <th scope="col">Score</th>
+                      <th scope="col">Success Rate</th>
+                      <th scope="col">Run ID</th>
+                      <th scope="col">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -307,12 +307,12 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Provenance</th>
-                      <th>Min Diversity</th>
-                      <th>Min Golden</th>
-                      <th>Policy ID</th>
-                      <th>Actions</th>
+                      <th scope="col">Name</th>
+                      <th scope="col">Provenance</th>
+                      <th scope="col">Min Diversity</th>
+                      <th scope="col">Min Golden</th>
+                      <th scope="col">Policy ID</th>
+                      <th scope="col">Actions</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -37,10 +37,19 @@ export default function Breadcrumb() {
       gateway: t("gateway"),
       providers: t("providers"),
       mcp: t("mcp"),
+      "mcp-router": t("mcpRouter"),
+      metrics: t("mcpRouterMetrics"),
+      sessions: t("mcpRouterSessions"),
       seh: t("sehModule"),
       datasets: t("sehDatasets"),
       runs: t("sehRuns"),
       policies: t("sehPolicies"),
+      capabilities: t("capabilities"),
+      sweeps: t("sweeps"),
+      traces: t("traces"),
+      market: t("market"),
+      "my-skills": t("mySkills"),
+      snapshots: t("snapshots"),
       "from-trace": t("taskBuilder"),
       "fallback-chains": t("fallbackChains"),
     };
@@ -63,7 +72,7 @@ export default function Breadcrumb() {
 
         if (isLast) {
           return (
-            <span key={crumb.label} className="toprail-chip">
+            <span key={crumb.label} className="toprail-chip" aria-current="page">
               {crumb.label}
             </span>
           );

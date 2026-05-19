@@ -54,7 +54,7 @@ export default function LoginPageClient() {
             <img src="/logo.svg" alt="managing-up" className="login-logo" />
             <div className="login-brand-text">
               <span className="login-brand-name">MANAGING UP</span>
-              <span className="login-brand-sub">{t("subtitle").split(" ")[0]}</span>
+              <span className="login-brand-sub">{t("subtitleShort")}</span>
             </div>
           </div>
 

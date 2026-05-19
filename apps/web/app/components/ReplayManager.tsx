@@ -52,8 +52,8 @@ export default function ReplayManager({ snapshots }: Props) {
             <div key={execId} style={{ marginBottom: "var(--space-8)" }}>
               <div className="panel">
                 <div className="panel-header">
-                  <p className="section-kicker">{t("executions").split(" ").slice(0, 1).join("")}</p>
-                  <h2 className="panel-title">{execId.slice(0, 32)}... ({snaps.length} {t("title").split(" ").slice(1).join("")})</h2>
+                  <p className="section-kicker">{t("executionsShort")}</p>
+                  <h2 className="panel-title">{execId.slice(0, 32)}... ({snaps.length} {t("snapshotsShort")})</h2>
                 </div>
                 <div className="eval-grid">
                   {snaps.map((snap) => (
@@ -65,18 +65,18 @@ export default function ReplayManager({ snapshots }: Props) {
                     >
                       <div className="eval-card-header">
                         <div>
-                          <h3 className="eval-card-title">{t("snapshotDetail").split(" ")[0]} {snap.id.slice(0, 12)}</h3>
+                          <h3 className="eval-card-title">{t("snapshot")} {snap.id.slice(0, 12)}</h3>
                           <p className="eval-card-meta">
-                            {t("stepIndex").split(" ")[0]} {snap.step_index}
+                            {t("step")} {snap.step_index}
                           </p>
                         </div>
                         <span className="badge badge-muted">
-                          {t("stepIndex").split(" ")[0]} {snap.step_index}
+                          {t("step")} {snap.step_index}
                         </span>
                       </div>
                       <div className="detail-grid">
                         <div className="detail-row">
-                          <span className="detail-label">{t("skill").split(" ")[0]}</span>
+                          <span className="detail-label">{tc("skillLabel")}</span>
                           <span className="detail-value">{snap.skill_id}</span>
                         </div>
                         <div className="detail-row">
@@ -84,7 +84,7 @@ export default function ReplayManager({ snapshots }: Props) {
                           <span className="detail-value">{snap.skill_version}</span>
                         </div>
                         <div className="detail-row">
-                          <span className="detail-label">{t("deterministicSeed").split(" ")[0]}</span>
+                          <span className="detail-label">{t("deterministic")}</span>
                           <span className="detail-value" style={{ fontFamily: "monospace", fontSize: "var(--text-xs)" }}>
                             {snap.deterministic_seed}
                           </span>

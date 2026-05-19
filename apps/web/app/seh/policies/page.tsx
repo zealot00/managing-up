@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { getSEHPolicies } from "../../lib/seh-api";
+import Breadcrumb from "../../../components/Breadcrumb";
+import { PageHeader } from "../../components/layout/PageHeader";
 
 export default async function SEHPoliciesPage() {
   const t = await getTranslations("seh");
@@ -9,16 +10,13 @@ export default async function SEHPoliciesPage() {
   const policies = await getSEHPolicies().catch(() => []);
 
   return (
-    <main className="shell">
-      <section className="toprail">
-        <Link href="/seh" className="toprail-link">← {tc("back")} to SEH</Link>
-      </section>
-
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">SEH</p>
-        <h1>{t("policies")}</h1>
-        <p className="lede">{t("policiesPageLede")}</p>
-      </header>
+    <>
+      <Breadcrumb />
+      <PageHeader
+        eyebrow="SEH"
+        title={t("policies")}
+        description={t("policiesPageLede")}
+      />
 
       <section className="panel">
         <div className="panel-header">
@@ -32,11 +30,11 @@ export default async function SEHPoliciesPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Provenance</th>
-                  <th>Min Diversity</th>
-                  <th>Min Golden</th>
-                  <th>Policy ID</th>
+<th scope="col">Name</th>
+                    <th scope="col">Provenance</th>
+                    <th scope="col">Min Diversity</th>
+                    <th scope="col">Min Golden</th>
+                    <th scope="col">Policy ID</th>
                 </tr>
               </thead>
               <tbody>
@@ -56,6 +54,6 @@ export default async function SEHPoliciesPage() {
           </div>
         )}
       </section>
-    </main>
+    </>
   );
 }

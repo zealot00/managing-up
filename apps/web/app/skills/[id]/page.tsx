@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { getSkill, getSkillVersions, getSkillSpec } from "../../lib/api";
+import Breadcrumb from "../../../components/Breadcrumb";
+import { PageHeader } from "../../components/layout/PageHeader";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -18,27 +19,24 @@ export default async function SkillDetailPage({ params }: Props) {
     notFound();
   }
 
-  const versionsData = await getSkillVersions();
+  const versionsData = await getSkillVersions().catch(() => ({ items: [] as Array<{ id: string; skill_id: string; version: string; status: string; change_summary: string; approval_required: boolean; created_at: string }> }));
   const versions = versionsData.items.filter((v) => v.skill_id === id);
 
-  const specData = await getSkillSpec(id);
+  const specData = await getSkillSpec(id).catch(() => ({ spec_yaml: "" }));
 
   return (
-    <main className="shell">
-      <section className="toprail">
-        <Link href="/skills" className="toprail-link">
-          ← {t("back")}
-        </Link>
-      </section>
-
-      <section className="hero-page hero-compact">
-        <p className="eyebrow">{t("eyebrow")}</p>
-        <h1>{skill.name}</h1>
-        <p className="lede">
-          {skill.owner_team} · {skill.risk_level} risk ·{" "}
-          <span className={`badge badge-${skill.status}`}>{skill.status}</span>
-        </p>
-      </section>
+    <>
+      <Breadcrumb />
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={skill.name}
+        description={
+          <>
+            {skill.owner_team} · {skill.risk_level} risk ·{" "}
+            <span className={`badge badge-${skill.status}`}>{skill.status}</span>
+          </>
+        }
+      />
 
       <section className="panel-grid panel-grid-wide">
         <article className="panel">
@@ -110,6 +108,6 @@ export default async function SkillDetailPage({ params }: Props) {
           <pre className="json-block">{specData.spec_yaml}</pre>
         </article>
       </section>
-    </main>
+    </>
   );
 }

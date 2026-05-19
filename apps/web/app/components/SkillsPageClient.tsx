@@ -73,11 +73,11 @@ export default function SkillsPageClient() {
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Owner</th>
-                      <th>Risk Level</th>
-                      <th>Version</th>
-                      <th>Status</th>
+<th scope="col">Name</th>
+                    <th scope="col">Owner</th>
+                    <th scope="col">Risk Level</th>
+                    <th scope="col">Version</th>
+                    <th scope="col">Status</th>
                     </tr>
                   </thead>
                   <tbody>

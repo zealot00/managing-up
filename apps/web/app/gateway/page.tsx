@@ -2,9 +2,9 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
+import { Key } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
-  createGatewayKey,
   GatewayKeyMeta,
   GatewayUsageRow,
   GatewayUserUsageRow,
@@ -14,6 +14,11 @@ import {
   revokeGatewayKey,
 } from "../lib/gateway-api";
 import BarChart from "../components/BarChart";
+import Breadcrumb from "../../components/Breadcrumb";
+import { PageHeader } from "../components/layout/PageHeader";
+import { EmptyState } from "../components/layout/EmptyState";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { CreateKeyDialog } from "./CreateKeyDialog";
 
 function sumBy<T>(items: T[], selector: (item: T) => number): number {
   return items.reduce((acc, item) => acc + selector(item), 0);
@@ -39,15 +44,14 @@ export default function GatewayPage() {
   const [usage, setUsage] = useState<GatewayUsageRow[]>([]);
   const [usageByUsers, setUsageByUsers] = useState<GatewayUserUsageRow[]>([]);
 
-  const [keyName, setKeyName] = useState("default");
-  const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [adminUserID, setAdminUserID] = useState("");
 
   const [activeDetail, setActiveDetail] = useState<DetailView>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<GatewayKeyMeta | null>(null);
+  const [revokeSuccess, setRevokeSuccess] = useState(false);
 
   const totalRequests = useMemo(() => sumBy(usage, (item) => item.request_count), [usage]);
   const totalTokens = useMemo(() => sumBy(usage, (item) => item.total_tokens), [usage]);
@@ -129,28 +133,13 @@ export default function GatewayPage() {
     }
   }, [isAuthLoading, isAdmin]);
 
-  async function handleCreateKey(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!keyName.trim()) return;
-
-    setIsSubmitting(true);
+  async function handleRevokeKey() {
+    if (!revokeTarget) return;
     setError(null);
     try {
-      const resp = await createGatewayKey(keyName.trim());
-      setNewKeyValue(resp.key);
-      setKeyName("default");
-      await loadData({ preserveError: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create key");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleRevokeKey(id: string) {
-    setError(null);
-    try {
-      await revokeGatewayKey(id);
+      await revokeGatewayKey(revokeTarget.id);
+      setRevokeSuccess(true);
+      setTimeout(() => setRevokeSuccess(false), 3000);
       await loadData({ preserveError: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to revoke key");
@@ -183,10 +172,9 @@ export default function GatewayPage() {
             </div>
           ))}
         </div>
-        <div className="skeleton-grid">
-          {[1, 2].map((i) => (
-            <div key={i} className="skeleton-card" />
-          ))}
+        <div className="gateway-layout">
+          <div className="skeleton-card" />
+          <div className="skeleton-card" />
         </div>
       </>
     );
@@ -194,12 +182,26 @@ export default function GatewayPage() {
 
   return (
     <>
+      <Breadcrumb />
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        description={t("lede")}
+      />
+
       {error && (
-        <div className="dashboard-section" style={{ borderColor: "var(--ink-strong)", background: "rgba(0,0,0,0.03)" }}>
+        <div className="dashboard-section" style={{ borderColor: "var(--ink-strong)", background: "rgba(0,0,0,0.03)" }} role="alert">
           <p className="form-error">{error}</p>
         </div>
       )}
 
+      {revokeSuccess && (
+        <div className="gateway-success-notice" role="status">
+          {t("revokeSuccess")}
+        </div>
+      )}
+
+      {/* ── Stat Cards + Detail Panel ── */}
       <div className="dashboard-stats">
         {statCards.map((card) => (
           <article
@@ -211,7 +213,7 @@ export default function GatewayPage() {
             <div className="dashboard-stat-icon">{card.icon}</div>
             <div className="dashboard-stat-value">{card.value}</div>
             <div className="dashboard-stat-label">{card.label}</div>
-            <div className="dashboard-stat-expand">CLICK FOR DETAILS</div>
+            <div className="dashboard-stat-expand">{t("clickForDetails")}</div>
           </article>
         ))}
       </div>
@@ -219,48 +221,124 @@ export default function GatewayPage() {
       {activeCard && (
         <div className="dashboard-section dashboard-detail-panel">
           <div className="dashboard-section-header">
-            <h2 className="dashboard-section-title">{activeCard.label} — Detail Breakdown</h2>
+            <h2 className="dashboard-section-title">{activeCard.label} {t("detailBreakdown")}</h2>
             <button
               className="dashboard-detail-close"
               onClick={() => setActiveDetail(null)}
             >
-              ✕ CLOSE
+              {t("closeDetails")}
             </button>
           </div>
           <BarChart
             data={activeCard.detail}
-            title={`By Provider / Model (Top 10)`}
+            title={t("byProviderModel")}
             valuePrefix={activeCard.id === "cost" ? "$" : ""}
-            valueSuffix={activeCard.id !== "cost" ? " tokens" : ""}
+            valueSuffix={activeCard.id !== "cost" ? t("tokensSuffix") : ""}
           />
         </div>
       )}
 
-      <form className="gateway-filter-form" onSubmit={handleApplyFilter}>
-        <div className="gateway-filter-row">
-          <div className="gateway-filter-field">
-            <label className="form-label" htmlFor="gateway-from">{t("startDate")}</label>
-            <input
-              id="gateway-from"
-              type="date"
-              className="form-input"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-            />
+      {/* ── Two-Column Layout: Keys + Usage ── */}
+      <div className="gateway-layout">
+        {/* Left: Key Management */}
+        <div className="dashboard-section">
+          <div className="gateway-keys-header">
+            <h2 className="dashboard-section-title">{t("keyManagement")}</h2>
+            {keys.length > 0 && (
+              <button className="gateway-button-create" onClick={() => setCreateDialogOpen(true)}>
+                {t("newKey")}
+              </button>
+            )}
           </div>
-          <div className="gateway-filter-field">
-            <label className="form-label" htmlFor="gateway-to">{t("endDate")}</label>
-            <input
-              id="gateway-to"
-              type="date"
-              className="form-input"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
+          {keys.length === 0 ? (
+            <EmptyState
+              icon={<Key size={32} />}
+              title={t("emptyTitle")}
+              description={t("emptyDesc")}
+              action={
+                <button className="gateway-button-create" onClick={() => setCreateDialogOpen(true)}>
+                  {t("createFirstKey")}
+                </button>
+              }
             />
+          ) : (
+            <div className="gateway-table-wrapper">
+              <table className="gateway-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{tc("name")}</th>
+                    <th scope="col">{t("keyPrefix")}</th>
+                    <th scope="col">{tc("status")}</th>
+                    <th scope="col"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {keys.map((key) => (
+                    <tr key={key.id} className={key.revoked_at ? "revoked-row" : undefined}>
+                      <td>
+                        {key.name}
+                        <span className="text-muted" style={{ display: "block", fontSize: "var(--text-xs)" }}>
+                          {new Date(key.created_at).toLocaleDateString()}
+                        </span>
+                      </td>
+                      <td className="cell-mono">{key.key_prefix}...</td>
+                      <td>
+                        <span className={`badge ${key.revoked_at ? "badge-failed" : "badge-completed"}`}>
+                          {key.revoked_at ? t("revoked") : tc("status")}
+                        </span>
+                      </td>
+                      <td>
+                        {!key.revoked_at && (
+                          <button className="gateway-button-secondary" onClick={() => setRevokeTarget(key)}>
+                            {t("revoke")}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Usage Analytics */}
+        <div className="dashboard-section">
+          <div className="dashboard-section-header">
+            <h2 className="dashboard-section-title">{t("usageAnalytics")}</h2>
           </div>
+
+          <form className="gateway-filter-form" onSubmit={handleApplyFilter}>
+            <div className="gateway-filter-row">
+              <div className="gateway-filter-field">
+                <label className="form-label" htmlFor="gateway-from">{t("startDate")}</label>
+                <input
+                  id="gateway-from"
+                  type="date"
+                  className="form-input"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                />
+              </div>
+              <div className="gateway-filter-field">
+                <label className="form-label" htmlFor="gateway-to">{t("endDate")}</label>
+                <input
+                  id="gateway-to"
+                  type="date"
+                  className="form-input"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                />
+              </div>
+              <div className="gateway-filter-submit">
+                <button className="gateway-button-secondary" type="submit">{t("apply")}</button>
+              </div>
+            </div>
+          </form>
+
           {isAdmin && (
-            <div className="gateway-filter-field">
-              <label className="form-label" htmlFor="gateway-user-id">{t("user")} ID (admin)</label>
+            <div className="gateway-filter-field" style={{ marginBottom: "var(--space-4)" }}>
+              <label className="form-label" htmlFor="gateway-user-id">{t("user")} ID</label>
               <input
                 id="gateway-user-id"
                 className="form-input"
@@ -270,176 +348,27 @@ export default function GatewayPage() {
               />
             </div>
           )}
-          <div className="gateway-filter-submit">
-            <button className="form-submit" type="submit">{t("apply")}</button>
-          </div>
-        </div>
-      </form>
 
-      {isAdmin && tokenRankingData.length > 0 && (
-        <div className="chart-grid">
-          <div className="dashboard-section">
-            <BarChart
-              data={tokenRankingData}
-              title={t("userUsage")}
-              valueSuffix=" tokens"
-            />
-          </div>
-          <div className="dashboard-section">
-            <BarChart
-              data={costByProviderData}
-              title={t("cost") + " " + t("providerUsage")}
-              valuePrefix="$"
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="dashboard-section">
-        <div className="dashboard-section-header">
-          <h2 className="dashboard-section-title">{t("providerUsage")}</h2>
-        </div>
-        {usage.length === 0 ? (
-          <p className="empty-note">{t("noUsage")}</p>
-        ) : (
-          <div className="gateway-table-wrapper">
-            <table className="gateway-table">
-              <thead>
-                <tr>
-                  <th>{t("client")}</th>
-                  <th>{t("provider")}</th>
-                  <th>{t("model")}</th>
-                  <th>{t("requests")}</th>
-                  <th>{t("promptTokens").split(" ")[0]}</th>
-                  <th>{t("completionTokens").split(" ")[0]}</th>
-                  <th>{t("totalTokens").split(" ")[0]}</th>
-                  <th>{t("cost")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usage.map((row) => (
-                  <tr key={`${row.client_name}:${row.provider}:${row.model}`}>
-                    <td>{row.client_name || '-'}</td>
-                    <td>{row.provider}</td>
-                    <td>{row.model}</td>
-                    <td>{row.request_count.toLocaleString()}</td>
-                    <td>{row.prompt_tokens.toLocaleString()}</td>
-                    <td>{row.completion_tokens.toLocaleString()}</td>
-                    <td>{row.total_tokens.toLocaleString()}</td>
-                    <td>{formatCurrency(row.total_cost)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className="dashboard-section">
-        <div className="dashboard-section-header">
-          <div>
-            <h2 className="dashboard-section-title">{t("keyManagement")}</h2>
-          </div>
-        </div>
-        <div className="gateway-keys-grid">
-          <div className="gateway-keys-form">
-            <form className="form-fields" onSubmit={handleCreateKey}>
-              <label className="form-label" htmlFor="gateway-key-name">
-                {t("keyName")}
-              </label>
-              <input
-                id="gateway-key-name"
-                className="form-input"
-                value={keyName}
-                onChange={(e) => setKeyName(e.target.value)}
-                placeholder={t("keyNamePlaceholder")}
-                disabled={isSubmitting}
-              />
-              <button className="form-submit" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? t("creating") : t("newKey")}
-              </button>
-            </form>
-            {newKeyValue && (
-              <div className="gateway-secret">
-                <p className="gateway-secret-title">{t("secretWarning")}</p>
-                <code className="gateway-secret-code">{newKeyValue}</code>
-              </div>
-            )}
-          </div>
-          <div className="gateway-keys-list">
-            {keys.length === 0 ? (
-              <p className="empty-note">{t("noKeys")}</p>
-            ) : (
-              <div className="table-wrapper">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>{tc("name")}</th>
-                      <th>{tc("keyPrefix")}</th>
-                      <th>{tc("createdAt")}</th>
-                      <th>{tc("lastUsed")}</th>
-                      <th>{tc("status")}</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {keys.map((key) => (
-                      <tr key={key.id}>
-                        <td>{key.name}</td>
-                        <td>{key.key_prefix}...</td>
-                        <td>{new Date(key.created_at).toLocaleString()}</td>
-                        <td>{key.last_used_at ? new Date(key.last_used_at).toLocaleString() : "-"}</td>
-                        <td>
-                          <span className={`badge ${key.revoked_at ? "badge-failed" : "badge-completed"}`}>
-                            {key.revoked_at ? t("revoke") : tc("status")}
-                          </span>
-                        </td>
-                        <td>
-                          {!key.revoked_at && (
-                            <button className="gateway-button-secondary" onClick={() => void handleRevokeKey(key.id)}>
-                              {t("revoke")}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {isAdmin && (
-        <div className="dashboard-section">
-          <div className="dashboard-section-header">
-            <h2 className="dashboard-section-title">{t("userUsage")}</h2>
-          </div>
-          {usageByUsers.length === 0 ? (
+          {usage.length === 0 ? (
             <p className="empty-note">{t("noUsage")}</p>
           ) : (
             <div className="gateway-table-wrapper">
               <table className="gateway-table">
                 <thead>
                   <tr>
-                    <th>{t("user")}</th>
-                    <th>{t("user")} ID</th>
-                    <th>{t("requests")}</th>
-                    <th>{t("promptTokens").split(" ")[0]}</th>
-                    <th>{t("completionTokens").split(" ")[0]}</th>
-                    <th>{t("totalTokens").split(" ")[0]}</th>
-                    <th>{t("cost")}</th>
+                    <th scope="col">{t("provider")}</th>
+                    <th scope="col">{t("model")}</th>
+                    <th scope="col">{t("requests")}</th>
+                    <th scope="col">{t("tokens")}</th>
+                    <th scope="col">{t("cost")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {usageByUsers.map((row) => (
-                    <tr key={row.user_id}>
-                      <td>{row.username}</td>
-                      <td>{row.user_id}</td>
+                  {usage.map((row) => (
+                    <tr key={`${row.client_name}:${row.provider}:${row.model}`}>
+                      <td>{row.provider}</td>
+                      <td>{row.model}</td>
                       <td>{row.request_count.toLocaleString()}</td>
-                      <td>{row.prompt_tokens.toLocaleString()}</td>
-                      <td>{row.completion_tokens.toLocaleString()}</td>
                       <td>{row.total_tokens.toLocaleString()}</td>
                       <td>{formatCurrency(row.total_cost)}</td>
                     </tr>
@@ -448,8 +377,63 @@ export default function GatewayPage() {
               </table>
             </div>
           )}
+
+          {isAdmin && usageByUsers.length > 0 && (
+            <>
+              <h3 className="dashboard-section-title" style={{ marginTop: "var(--space-5)" }}>{t("userUsage")}</h3>
+              <div className="gateway-table-wrapper">
+                <table className="gateway-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">{t("user")}</th>
+                      <th scope="col">{t("requests")}</th>
+                      <th scope="col">{t("tokens")}</th>
+                      <th scope="col">{t("cost")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usageByUsers.map((row) => (
+                      <tr key={row.user_id}>
+                        <td>{row.username || row.user_id}</td>
+                        <td>{row.request_count.toLocaleString()}</td>
+                        <td>{row.total_tokens.toLocaleString()}</td>
+                        <td>{formatCurrency(row.total_cost)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {isAdmin && tokenRankingData.length > 0 && (
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <BarChart
+                data={costByProviderData}
+                title={t("cost") + " " + t("providerUsage")}
+                valuePrefix="$"
+              />
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      <CreateKeyDialog
+        isOpen={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onCreated={() => void loadData({ preserveError: true })}
+        existingKeys={keys}
+      />
+
+      <ConfirmDialog
+        isOpen={revokeTarget !== null}
+        onClose={() => setRevokeTarget(null)}
+        onConfirm={handleRevokeKey}
+        title={t("revokeConfirmTitle")}
+        description={revokeTarget ? t("revokeConfirmDesc", { name: revokeTarget.name }) : undefined}
+        confirmText={t("revoke")}
+        variant="danger"
+      />
     </>
   );
 }

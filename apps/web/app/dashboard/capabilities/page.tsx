@@ -3,6 +3,8 @@ import { getTranslations } from "next-intl/server";
 import { getCapabilities } from "../../lib/api";
 import RadarChart from "../../../components/RadarChart";
 import type { RadarChartData } from "../../../components/RadarChart";
+import Breadcrumb from "../../../components/Breadcrumb";
+import { PageHeader } from "../../components/layout/PageHeader";
 
 function SkeletonCapabilitiesPage() {
   return (
@@ -34,20 +36,6 @@ function SkeletonCapabilitiesPage() {
   );
 }
 
-function ErrorPanel({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <main className="error-shell">
-      <div className="error-panel">
-        <h2>Failed to load capabilities</h2>
-        <p>{message}</p>
-        <button onClick={onRetry} className="btn-retry">
-          Retry
-        </button>
-      </div>
-    </main>
-  );
-}
-
 interface CapabilitiesPageProps {
   searchParams: Promise<{ experiments?: string }>;
 }
@@ -55,7 +43,24 @@ interface CapabilitiesPageProps {
 async function CapabilitiesContent({ searchParams }: CapabilitiesPageProps) {
   const t = await getTranslations("dashboard");
   const params = await searchParams;
-  const { data: capabilities } = await getCapabilities();
+  let capabilities;
+  try {
+    ({ data: capabilities } = await getCapabilities());
+  } catch {
+    return (
+      <>
+        <Breadcrumb />
+        <PageHeader
+          eyebrow={t("capabilities")}
+          title={t("skillHealth")}
+          description="Multi-dimensional capability visualization with experiment comparison."
+        />
+        <div className="panel" role="alert">
+          <p className="form-error">Failed to load capabilities</p>
+        </div>
+      </>
+    );
+  }
 
   const uniqueExperiments = Array.from(
     new Map(
@@ -99,14 +104,13 @@ async function CapabilitiesContent({ searchParams }: CapabilitiesPageProps) {
   }));
 
   return (
-    <main className="shell">
-      <section className="hero-page hero-compact">
-        <p className="eyebrow">{t("capabilities")}</p>
-        <h1>{t("skillHealth")}</h1>
-        <p className="lede">
-          Multi-dimensional capability visualization with experiment comparison.
-        </p>
-      </section>
+    <>
+      <Breadcrumb />
+      <PageHeader
+        eyebrow={t("capabilities")}
+        title={t("skillHealth")}
+        description="Multi-dimensional capability visualization with experiment comparison."
+      />
 
       <div className="panel" style={{ marginBottom: "18px" }}>
         <div style={{ marginBottom: "16px" }}>
@@ -159,7 +163,7 @@ async function CapabilitiesContent({ searchParams }: CapabilitiesPageProps) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "18px" }}>
+      <div className="eval-grid">
         {capabilities.map((cap) => {
           const latestScore = cap.scores.find(
             (s) => s.experimentId === selectedExperimentIds[0]
@@ -176,7 +180,7 @@ async function CapabilitiesContent({ searchParams }: CapabilitiesPageProps) {
           return (
             <article key={cap.name} className="panel">
               <p className="section-kicker">{cap.name}</p>
-              <strong style={{ display: "block", fontSize: "2rem", color: "var(--ink-strong)", marginTop: "8px" }}>
+              <strong className="stat-value-lg" style={{ marginTop: "8px" }}>
                 {scoreValue.toFixed(1)}
               </strong>
               <div className="score-bar">
@@ -185,14 +189,14 @@ async function CapabilitiesContent({ searchParams }: CapabilitiesPageProps) {
                   style={{ width: `${scorePercent}%` }}
                 />
               </div>
-              <p style={{ margin: "12px 0 0", fontSize: "0.8rem", color: "var(--muted)" }}>
+              <p className="text-muted" style={{ margin: "12px 0 0", fontSize: "0.8rem" }}>
                 Sample size: {cap.sampleSize.toLocaleString()}
               </p>
             </article>
           );
         })}
       </div>
-    </main>
+    </>
   );
 }
 

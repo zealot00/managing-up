@@ -2,52 +2,53 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { listSnapshots, getSnapshot, SkillCapabilitySnapshot } from "../lib/gateway-api";
 import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
 import { ListSkeleton } from "./layout/Skeleton";
 import { Badge } from "./ui/Badge";
+import { Search } from "lucide-react";
 
 const PAGE_SIZE = 20;
 
-function SnapshotCard({ snapshot }: { snapshot: SkillCapabilitySnapshot }) {
+function SnapshotCard({ snapshot, t }: { snapshot: SkillCapabilitySnapshot; t: ReturnType<typeof useTranslations<"snapshots">> }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+    <div className="list-card" style={{ flexDirection: "column", alignItems: "stretch" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
           <Badge variant={snapshot.passed ? "succeeded" : "failed"}>
-            {snapshot.passed ? "PASSED" : "FAILED"}
+            {snapshot.passed ? t("passed") : t("failed")}
           </Badge>
-          <Badge variant="outline" className="bg-blue-50 text-blue-700">
-            {snapshot.snapshot_type}
-          </Badge>
+          <Badge variant="draft">{snapshot.snapshot_type}</Badge>
         </div>
-        <span className="text-sm text-gray-500">
+        <span className="text-muted">
           {new Date(snapshot.evaluated_at).toLocaleString()}
         </span>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-sm mb-2">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-2)", fontSize: "var(--text-sm)", marginBottom: "var(--space-2)" }}>
         <div>
-          <span className="text-gray-500">Skill:</span>{" "}
+          <span className="text-muted">{t("skill")}:</span>{" "}
           <span className="font-mono">{snapshot.skill_id}</span>
         </div>
         <div>
-          <span className="text-gray-500">Version:</span> <span>{snapshot.version}</span>
+          <span className="text-muted">{t("version")}:</span> <span>{snapshot.version}</span>
         </div>
         <div>
-          <span className="text-gray-500">Score:</span>{" "}
-          <span className="font-semibold">{snapshot.overall_score.toFixed(2)}</span>
+          <span className="text-muted">{t("score")}:</span>{" "}
+          <span style={{ fontWeight: 600 }}>{snapshot.overall_score.toFixed(2)}</span>
         </div>
       </div>
       {snapshot.dataset_id && (
-        <div className="text-sm text-gray-500 mb-2">
-          Dataset: <span className="font-mono">{snapshot.dataset_id}</span>
+        <div className="text-muted" style={{ marginBottom: "var(--space-2)" }}>
+          {t("dataset")}: <span className="font-mono">{snapshot.dataset_id}</span>
         </div>
       )}
-      <div className="border-t border-gray-100 pt-2">
-        <div className="text-sm text-gray-500 mb-1">Metrics:</div>
-        <div className="flex flex-wrap gap-2">
+      <div style={{ borderTop: "1px solid var(--line)", paddingTop: "var(--space-2)" }}>
+        <div className="text-muted" style={{ marginBottom: "var(--space-1)" }}>{t("metrics")}:</div>
+        <div className="tags">
           {Object.entries(snapshot.metrics).map(([key, value]) => (
-            <span key={key} className="text-xs bg-gray-100 px-2 py-1 rounded">
+            <span key={key} className="tag">
               {key}: {typeof value === "number" ? value.toFixed(3) : value}
             </span>
           ))}
@@ -57,7 +58,7 @@ function SnapshotCard({ snapshot }: { snapshot: SkillCapabilitySnapshot }) {
   );
 }
 
-function SnapshotChecker() {
+function SnapshotChecker({ t }: { t: ReturnType<typeof useTranslations<"snapshots">> }) {
   const [skillId, setSkillId] = useState("");
   const [version, setVersion] = useState("");
 
@@ -75,51 +76,52 @@ function SnapshotChecker() {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-      <h3 className="text-sm font-medium mb-2">Check Skill Snapshot</h3>
-      <form onSubmit={handleCheck} className="flex items-end gap-2">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Skill ID</label>
+    <div className="panel" style={{ marginBottom: "var(--space-5)" }}>
+      <h3 style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: "var(--space-3)" }}>{t("checkSnapshot")}</h3>
+      <form onSubmit={handleCheck} style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-3)" }}>
+        <div className="form-group">
+          <label className="form-label" htmlFor="check-skill-id">{t("skillId")}</label>
           <input
+            id="check-skill-id"
             type="text"
             value={skillId}
             onChange={(e) => setSkillId(e.target.value)}
             placeholder="skill_xxx"
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="form-input"
           />
         </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Version</label>
+        <div className="form-group">
+          <label className="form-label" htmlFor="check-version">{t("version")}</label>
           <input
+            id="check-version"
             type="text"
             value={version}
             onChange={(e) => setVersion(e.target.value)}
             placeholder="1.0.0"
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="form-input"
           />
         </div>
         <button
           type="submit"
           disabled={!skillId || !version}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+          className="btn btn-primary btn-sm"
         >
-          Check
+          {t("check")}
         </button>
       </form>
-      {isLoading && <div className="mt-2 text-sm text-gray-500">Loading...</div>}
+      {isLoading && <div className="loading-pulse loading-pulse-medium" style={{ width: 80, height: 14, marginTop: "var(--space-2)" }} />}
       {snapshotResult && (
-        <div className="mt-2">
+        <div style={{ marginTop: "var(--space-2)" }}>
           {snapshotResult.found ? (
             snapshotResult.snapshot?.passed ? (
-              <div className="text-sm text-green-600">Snapshot exists and PASSED</div>
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--success)" }}>{t("snapshotPassed")}</div>
             ) : (
-              <div className="text-sm text-red-600">
-                Snapshot exists but FAILED (score:{" "}
-                {snapshotResult.snapshot?.overall_score.toFixed(2)})
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--danger)" }}>
+                {t("snapshotFailed", { score: (snapshotResult.snapshot?.overall_score ?? 0).toFixed(2) })}
               </div>
             )
           ) : (
-            <div className="text-sm text-gray-500">No passed snapshot found for this version</div>
+            <div className="text-muted">{t("noSnapshotFound")}</div>
           )}
         </div>
       )}
@@ -128,10 +130,11 @@ function SnapshotChecker() {
 }
 
 export default function SnapshotHistoryClient() {
+  const t = useTranslations("snapshots");
   const [skillFilter, setSkillFilter] = useState("");
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
-  const { data: snapshotsData, isLoading } = useQuery({
+  const { data: snapshotsData, isLoading, isError } = useQuery({
     queryKey: ["snapshots", skillFilter],
     queryFn: () => listSnapshots({ skill_id: skillFilter, limit: 100 }),
     enabled: !!skillFilter,
@@ -143,53 +146,66 @@ export default function SnapshotHistoryClient() {
   const hasMore = displayCount < snapshots.length;
 
   return (
-    <div className="space-y-4">
+    <>
       <PageHeader
-        title="Skill Capability Snapshots"
-        description="View skill evaluation snapshots and regression gate results"
+        title={t("title")}
+        description={t("description")}
       />
 
-      <SnapshotChecker />
+      <SnapshotChecker t={t} />
 
-      <div className="flex items-center gap-4">
-        <input
-          type="text"
-          placeholder="Filter by skill ID..."
-          value={skillFilter}
-          onChange={(e) => setSkillFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+        <div className="form-group" style={{ flex: 1, maxWidth: 400 }}>
+          <div style={{ position: "relative" }}>
+            <Search size={16} className="search-icon" />
+            <input
+              type="text"
+              placeholder={t("filterBySkillId")}
+              value={skillFilter}
+              onChange={(e) => setSkillFilter(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        </div>
       </div>
 
       {!skillFilter ? (
-        <div className="text-center py-12 text-gray-500">
-          Enter a skill ID above to view snapshots
-        </div>
+        <EmptyState
+          icon={<Search size={32} />}
+          title={t("enterSkillId")}
+          description={t("enterSkillIdDesc")}
+        />
       ) : isLoading ? (
         <ListSkeleton rows={5} />
-      ) : snapshots.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          No snapshots found for this skill
+      ) : isError ? (
+        <div className="panel" role="alert">
+          <p className="form-error">{t("noSnapshots")}</p>
         </div>
+      ) : snapshots.length === 0 ? (
+        <EmptyState
+          icon={<Search size={32} />}
+          title={t("noSnapshots")}
+          description={t("noSnapshotsDesc")}
+        />
       ) : (
         <>
-          <div className="space-y-3">
+          <div className="list" style={{ marginTop: "var(--space-5)" }}>
             {displayedSnapshots.map((snapshot) => (
-              <SnapshotCard key={snapshot.id} snapshot={snapshot} />
+              <SnapshotCard key={snapshot.id} snapshot={snapshot} t={t} />
             ))}
           </div>
           {hasMore && (
-            <div className="flex justify-center">
+            <div style={{ display: "flex", justifyContent: "center", marginTop: "var(--space-5)" }}>
               <button
                 onClick={() => setDisplayCount((c) => c + PAGE_SIZE)}
-                className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800"
+                className="btn btn-ghost btn-sm"
               >
-                Load more
+                {t("loadMore")}
               </button>
             </div>
           )}
         </>
       )}
-    </div>
+    </>
   );
 }

@@ -1,13 +1,17 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { getMCPRouterCatalog, matchMCPRouter, type MCPRouterCatalogEntry } from "../lib/api";
 import { PageHeader } from "../components/layout/PageHeader";
 import { EmptyState } from "../components/layout/EmptyState";
+import Breadcrumb from "../../components/Breadcrumb";
 import { useState } from "react";
+import { Server } from "lucide-react";
 
 export function MCPRouterDashboardClient() {
-  const { data: catalog, isLoading } = useQuery({
+  const t = useTranslations("mcpRouter");
+  const { data: catalog, isLoading, isError } = useQuery({
     queryKey: ["mcp-router-catalog"],
     queryFn: getMCPRouterCatalog,
   });
@@ -19,59 +23,102 @@ export function MCPRouterDashboardClient() {
     totalUse: catalog?.reduce((sum, s) => sum + s.use_count, 0) ?? 0,
   };
 
+  if (isLoading) {
+    return (
+      <>
+        <Breadcrumb />
+        <PageHeader
+          eyebrow={t("eyebrow")}
+          title={t("title")}
+          description={t("description")}
+        />
+        <div className="dashboard-stats">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="dashboard-stat-card">
+              <div className="loading-pulse loading-pulse-medium" style={{ width: 60, height: 16, marginBottom: 8 }} />
+              <div className="loading-pulse" style={{ width: 40, height: 28 }} />
+            </div>
+          ))}
+        </div>
+        <div className="skeleton-grid">
+          {[1, 2].map((i) => (
+            <div key={i} className="skeleton-card" />
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  if (isError) {
+    return (
+      <>
+        <Breadcrumb />
+        <PageHeader
+          eyebrow={t("eyebrow")}
+          title={t("title")}
+          description={t("description")}
+        />
+        <div className="panel" role="alert">
+          <p className="form-error">{t("noServers")}</p>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
+      <Breadcrumb />
       <PageHeader
-        eyebrow="Operations"
-        title="MCP Router"
-        description="Route agent requests to the best MCP server based on task type, tags, and trust score."
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+        description={t("description")}
       />
 
       <div className="dashboard-stats">
         <article className="dashboard-stat-card">
           <div className="dashboard-stat-value">{stats.total}</div>
-          <div className="dashboard-stat-label">Total Servers</div>
+          <div className="dashboard-stat-label">{t("totalServers")}</div>
         </article>
         <article className="dashboard-stat-card">
           <div className="dashboard-stat-value">{stats.active}</div>
-          <div className="dashboard-stat-label">Active</div>
+          <div className="dashboard-stat-label">{t("active")}</div>
         </article>
         <article className="dashboard-stat-card">
           <div className="dashboard-stat-value">{stats.avgTrust.toFixed(2)}</div>
-          <div className="dashboard-stat-label">Avg Trust Score</div>
+          <div className="dashboard-stat-label">{t("avgTrustScore")}</div>
         </article>
         <article className="dashboard-stat-card">
           <div className="dashboard-stat-value">{stats.totalUse}</div>
-          <div className="dashboard-stat-label">Total Invocations</div>
+          <div className="dashboard-stat-label">{t("totalInvocations")}</div>
         </article>
       </div>
 
       <div className="panel">
         <div className="panel-header">
-          <p className="section-kicker">Routing</p>
-          <h2 className="panel-title">Route Test</h2>
+          <p className="section-kicker">{t("routing")}</p>
+          <h2 className="panel-title">{t("routeTest")}</h2>
         </div>
-        <RouteTestPanel />
+        <RouteTestPanel t={t} />
       </div>
 
       <div className="panel">
         <div className="panel-header">
-          <p className="section-kicker">Catalog</p>
-          <h2 className="panel-title">Router Catalog</h2>
+          <p className="section-kicker">{t("catalog")}</p>
+          <h2 className="panel-title">{t("routerCatalog")}</h2>
         </div>
         {isLoading ? (
-          <p className="empty-note">Loading...</p>
+          <div className="skeleton-card" />
         ) : catalog && catalog.length > 0 ? (
           <div className="table-wrapper">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Transport</th>
-                  <th>Task Types</th>
-                  <th>Trust</th>
-                  <th>Invocations</th>
-                  <th>Status</th>
+<th scope="col">{t("name")}</th>
+                    <th scope="col">{t("transport")}</th>
+                    <th scope="col">{t("taskTypes")}</th>
+                    <th scope="col">{t("trust")}</th>
+                    <th scope="col">{t("invocations")}</th>
+                    <th scope="col">{t("status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -80,14 +127,14 @@ export function MCPRouterDashboardClient() {
                     <td>
                       <strong>{server.name}</strong>
                       {server.description && (
-                        <><br /><span style={{ color: "var(--muted)", fontSize: "var(--text-xs)" }}>{server.description}</span></>
+                        <><br /><span className="text-muted">{server.description}</span></>
                       )}
                     </td>
                     <td><span className="badge badge-muted">{server.transport_type}</span></td>
                     <td>
                       {server.task_types?.length ? (
                         server.task_types.map((type) => (
-                          <span key={type} className="badge badge-draft" style={{ marginRight: "var(--space-1)" }}>{type}</span>
+                          <span key={type} className="badge badge-draft">{type}</span>
                         ))
                       ) : "—"}
                     </td>
@@ -104,14 +151,14 @@ export function MCPRouterDashboardClient() {
             </table>
           </div>
         ) : (
-          <EmptyState title="No servers in catalog" description="Approve MCP servers to add them to the router." />
+          <EmptyState icon={<Server size={32} />} title={t("noServers")} description={t("noServersDesc")} />
         )}
       </div>
     </>
   );
 }
 
-function RouteTestPanel() {
+function RouteTestPanel({ t }: { t: ReturnType<typeof useTranslations<"mcpRouter">> }) {
   const [taskType, setTaskType] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [result, setResult] = useState<{ matched: boolean; server_name?: string; score?: number } | null>(null);
@@ -141,23 +188,23 @@ function RouteTestPanel() {
     <form onSubmit={handleTest}>
       <div className="form-fields">
         <label className="form-label">
-          Task Type
-          <input className="form-input" type="text" value={taskType} onChange={(e) => setTaskType(e.target.value)} placeholder="e.g. code_generation" />
+          {t("taskType")}
+          <input className="form-input" type="text" value={taskType} onChange={(e) => setTaskType(e.target.value)} placeholder={t("taskTypePlaceholder")} />
         </label>
         <label className="form-label">
-          Tags (comma-separated)
-          <input className="form-input" type="text" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="e.g. python,backend" />
+          {t("tags")}
+          <input className="form-input" type="text" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder={t("tagsPlaceholder")} />
         </label>
       </div>
-      <button type="submit" className="form-submit" disabled={!taskType || testing} style={{ marginTop: "var(--space-4)" }}>
-        {testing ? "Testing..." : "Test Route"}
+      <button type="submit" className="btn btn-primary btn-sm" disabled={!taskType || testing}>
+        {testing ? t("testing") : t("testRoute")}
       </button>
       {result && (
-        <div style={{ marginTop: "var(--space-4)", padding: "var(--space-4)", border: "1px solid var(--line)", borderRadius: "var(--radius-md)" }}>
+        <div className="notice-box">
           {result.matched ? (
-            <p>Matched: <strong>{result.server_name}</strong> (score: {result.score?.toFixed(2)})</p>
+            <p>{t("matched")}: <strong>{result.server_name}</strong> (score: {result.score?.toFixed(2)})</p>
           ) : (
-            <p style={{ color: "var(--muted)" }}>No matching server found.</p>
+            <p className="text-muted">{t("noMatch")}</p>
           )}
         </div>
       )}

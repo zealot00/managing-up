@@ -67,20 +67,26 @@ export default function CreateMetricForm({ onCreated }: Props) {
       {createMetricMutation.error && <p className="form-error">{createMetricMutation.error.message}</p>}
 
       <div className="form-fields">
-        <label className="form-label">
-          {t("metricName")}
+        <label className="form-label" htmlFor="name">
+          <span className="flex items-center gap-1">
+            {t("metricName")}
+            <span className="text-red-500 text-sm" aria-hidden="true">*</span>
+            <span className="sr-only">(required)</span>
+          </span>
           <input
             type="text"
+            id="name"
             {...register("name")}
             placeholder={t("metricNamePlaceholder")}
             className={`form-input ${errors.name ? "border-red-500" : ""}`}
+            aria-required="true"
           />
           {errors.name && <p className="form-error">{errors.name.message}</p>}
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="type">
           {t("metricType")}
-          <select {...register("type")} className="form-select">
+          <select id="type" {...register("type")} className="form-select">
             <option value="exact_match">{t("exactMatch")}</option>
             <option value="llm_judge">{t("llmJudge")}</option>
             <option value="custom">{t("custom")}</option>
@@ -88,9 +94,10 @@ export default function CreateMetricForm({ onCreated }: Props) {
           {errors.type && <p className="form-error">{errors.type.message}</p>}
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="config">
           {t("config")}
           <textarea
+            id="config"
             {...register("config")}
             placeholder={t("configPlaceholder")}
             rows={3}

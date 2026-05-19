@@ -183,6 +183,12 @@ export default function Sidebar() {
                         style={{ position: "relative" }}
                         onMouseEnter={() => setHoveredItem(item.href)}
                         onMouseLeave={() => setHoveredItem(null)}
+                        onFocus={() => setHoveredItem(item.href)}
+                        onBlur={(e) => {
+                          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                            setHoveredItem(null);
+                          }
+                        }}
                       >
                         <Link
                           href={item.href}
@@ -266,6 +272,7 @@ export default function Sidebar() {
                         }
                         handleLinkClick();
                       }}
+                      aria-expanded={hasChildren ? isExpanded : undefined}
                     >
                       <span className="sidebar-link-icon">{item.icon}</span>
                       <span className="sidebar-link-label">{t(item.labelKey)}</span>

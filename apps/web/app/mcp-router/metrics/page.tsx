@@ -1,43 +1,82 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { getMCPRouterCatalog } from "../../lib/api";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { EmptyState } from "../../components/layout/EmptyState";
+import Breadcrumb from "../../../components/Breadcrumb";
+import { BarChart3 } from "lucide-react";
 
 export default function MCPRouterMetricsPage() {
-  const { data: catalog, isLoading } = useQuery({
+  const t = useTranslations("mcpRouter");
+  const { data: catalog, isLoading, isError } = useQuery({
     queryKey: ["mcp-router-catalog"],
     queryFn: getMCPRouterCatalog,
   });
 
   const sortedByUseCount = [...(catalog ?? [])].sort((a, b) => b.use_count - a.use_count);
 
+  if (isLoading) {
+    return (
+      <>
+        <Breadcrumb />
+        <PageHeader
+          eyebrow={t("eyebrow")}
+          title={t("metricsTitle")}
+          description={t("metricsDescription")}
+        />
+        <div className="skeleton-grid">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="skeleton-card" />
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  if (isError) {
+    return (
+      <>
+        <Breadcrumb />
+        <PageHeader
+          eyebrow={t("eyebrow")}
+          title={t("metricsTitle")}
+          description={t("metricsDescription")}
+        />
+        <div className="panel" role="alert">
+          <p className="form-error">{t("noServerData")}</p>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
+      <Breadcrumb />
       <PageHeader
-        eyebrow="Operations"
-        title="MCP Router Metrics"
-        description="Usage statistics and trust score distribution for routed MCP servers."
+        eyebrow={t("eyebrow")}
+        title={t("metricsTitle")}
+        description={t("metricsDescription")}
       />
 
       <div className="panel">
         <div className="panel-header">
-          <p className="section-kicker">Usage</p>
-          <h2 className="panel-title">Server Usage Ranking</h2>
+          <p className="section-kicker">{t("usage")}</p>
+          <h2 className="panel-title">{t("serverUsageRanking")}</h2>
         </div>
         {isLoading ? (
-          <p className="empty-note">Loading...</p>
+          <div className="skeleton-card" />
         ) : sortedByUseCount.length > 0 ? (
           <div className="table-wrapper">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Rank</th>
-                  <th>Server</th>
-                  <th>Transport</th>
-                  <th>Trust Score</th>
-                  <th>Invocations</th>
+<th scope="col">{t("rank")}</th>
+                    <th scope="col">{t("server")}</th>
+                    <th scope="col">{t("transport")}</th>
+                    <th scope="col">{t("trustScore")}</th>
+                    <th scope="col">{t("invocations")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -54,23 +93,23 @@ export default function MCPRouterMetricsPage() {
             </table>
           </div>
         ) : (
-          <EmptyState title="No server data" description="No MCP servers have been routed yet." />
+          <EmptyState icon={<BarChart3 size={32} />} title={t("noServerData")} description={t("noServerDataDesc")} />
         )}
       </div>
 
       <div className="panel">
         <div className="panel-header">
-          <p className="section-kicker">Distribution</p>
-          <h2 className="panel-title">Trust Score Distribution</h2>
+          <p className="section-kicker">{t("distribution")}</p>
+          <h2 className="panel-title">{t("trustScoreDistribution")}</h2>
         </div>
         {catalog && catalog.length > 0 ? (
           <div className="table-wrapper">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Server</th>
-                  <th>Trust Score</th>
-                  <th>Bar</th>
+                  <th>{t("server")}</th>
+                  <th>{t("trustScore")}</th>
+                  <th>{t("bar")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -79,14 +118,11 @@ export default function MCPRouterMetricsPage() {
                     <td>{server.name}</td>
                     <td>{server.trust_score.toFixed(2)}</td>
                     <td style={{ width: "40%" }}>
-                      <div style={{ background: "var(--surface)", borderRadius: "var(--radius-full)", height: "0.5rem", overflow: "hidden" }}>
+                      <div className="progress-bar">
                         <div
+                          className="progress-bar-fill"
                           style={{
-                            height: "100%",
-                            background: "var(--primary)",
-                            borderRadius: "var(--radius-full)",
                             width: `${Math.max(server.trust_score * 100, 2)}%`,
-                            transition: "width 0.3s ease",
                           }}
                         />
                       </div>
@@ -97,42 +133,42 @@ export default function MCPRouterMetricsPage() {
             </table>
           </div>
         ) : (
-          <EmptyState title="No data" />
+          <EmptyState icon={<BarChart3 size={32} />} title={t("noData")} />
         )}
       </div>
 
       <div className="panel">
         <div className="panel-header">
-          <p className="section-kicker">Observability</p>
-          <h2 className="panel-title">Prometheus Metrics</h2>
+          <p className="section-kicker">{t("observability")}</p>
+          <h2 className="panel-title">{t("prometheusMetrics")}</h2>
         </div>
-        <p style={{ color: "var(--muted)", fontSize: "var(--text-sm)", marginBottom: "var(--space-5)" }}>
-          Detailed metrics are exposed in Prometheus format at the <code>/metrics</code> endpoint.
+        <p className="text-muted" style={{ marginBottom: "var(--space-5)" }}>
+          {t("prometheusDesc")}
         </p>
         <div className="table-wrapper">
           <table className="table">
             <thead>
               <tr>
-                <th>Metric</th>
-                <th>Name</th>
-                <th>Description</th>
+                <th>{t("metric")}</th>
+                <th>{t("metricName")}</th>
+                <th>{t("metricDescription")}</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong>Total Requests</strong></td>
+                <td><strong>{t("totalRequests")}</strong></td>
                 <td><code>mcp_router_requests_total</code></td>
-                <td style={{ color: "var(--muted)" }}>Counter of all MCP router requests</td>
+                <td className="text-muted">{t("totalRequestsDesc")}</td>
               </tr>
               <tr>
-                <td><strong>Request Duration</strong></td>
+                <td><strong>{t("requestDuration")}</strong></td>
                 <td><code>mcp_router_request_duration_seconds</code></td>
-                <td style={{ color: "var(--muted)" }}>Histogram of request latency</td>
+                <td className="text-muted">{t("requestDurationDesc")}</td>
               </tr>
               <tr>
-                <td><strong>Match Failures</strong></td>
+                <td><strong>{t("matchFailures")}</strong></td>
                 <td><code>mcp_router_match_failures_total</code></td>
-                <td style={{ color: "var(--muted)" }}>Counter of route match failures</td>
+                <td className="text-muted">{t("matchFailuresDesc")}</td>
               </tr>
             </tbody>
           </table>

@@ -199,8 +199,8 @@ function TaskPreview({ task }: { task: Task }) {
               <thead>
                 <tr>
                   <th style={{ width: 40 }}>#</th>
-                  <th>Input / Prompt</th>
-                  <th>Expected Output</th>
+                  <th scope="col">Input / Prompt</th>
+                  <th scope="col">Expected Output</th>
                 </tr>
               </thead>
               <tbody>

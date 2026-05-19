@@ -53,20 +53,27 @@ export default function CreateExperimentForm({ tasks, onCreated }: Props) {
       {createExperimentMutation.error && <p className="form-error">{createExperimentMutation.error.message}</p>}
 
       <div className="form-fields">
-        <label className="form-label">
-          {t("experimentName")}
+        <label className="form-label" htmlFor="name">
+          <span className="flex items-center gap-1">
+            {t("experimentName")}
+            <span className="text-red-500 text-sm" aria-hidden="true">*</span>
+            <span className="sr-only">(required)</span>
+          </span>
           <input
             type="text"
+            id="name"
             {...register("name")}
             placeholder={t("experimentNamePlaceholder")}
             className={`form-input ${errors.name ? "border-red-500" : ""}`}
+            aria-required="true"
           />
           {errors.name && <p className="form-error">{errors.name.message}</p>}
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="description">
           {tc("description")}
           <textarea
+            id="description"
             {...register("description")}
             placeholder="What are you testing?"
             rows={2}
@@ -74,20 +81,22 @@ export default function CreateExperimentForm({ tasks, onCreated }: Props) {
           />
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="task_ids">
           {t("taskIds")}
           <input
             type="text"
+            id="task_ids"
             {...register("task_ids")}
             placeholder={t("taskIdsPlaceholder")}
             className="form-input"
           />
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="agent_ids">
           {t("agentIds")}
           <input
             type="text"
+            id="agent_ids"
             {...register("agent_ids")}
             placeholder={t("agentIdsPlaceholder")}
             className="form-input"

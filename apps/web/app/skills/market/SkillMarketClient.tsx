@@ -1,64 +1,96 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { getSkillMarket } from "../../lib/api";
 import { Badge } from "../../components/ui/Badge";
 import { Card } from "../../components/ui/Card";
+import { PageHeader } from "../../components/layout/PageHeader";
+import { EmptyState } from "../../components/layout/EmptyState";
+import { CardGridSkeleton } from "../../components/layout/Skeleton";
+import { Package } from "lucide-react";
 
 export function SkillMarketClient() {
-  const { data: skills, isLoading } = useQuery({
+  const t = useTranslations("skillMarket");
+  const { data: skills, isLoading, isError } = useQuery({
     queryKey: ["skill-market"],
     queryFn: () => getSkillMarket({}),
   });
 
   if (isLoading) {
-    return <div className="p-6">Loading...</div>;
+    return (
+      <>
+        <PageHeader title={t("title")} description={t("description")} />
+        <CardGridSkeleton count={6} columns={3} />
+      </>
+    );
+  }
+
+  if (isError) {
+    return (
+      <>
+        <PageHeader title={t("title")} description={t("description")} />
+        <div className="panel" role="alert">
+          <p className="form-error">{t("noSkills")}</p>
+        </div>
+      </>
+    );
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Skill Market</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {skills?.map((skill) => (
-          <Card key={skill.id} className="p-4">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-semibold">{skill.name}</h3>
-              {skill.verified && (
-                <Badge variant="success">Verified</Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted mb-3">{skill.description}</p>
-            
-            <div className="flex flex-wrap gap-1 mb-3">
-              {skill.tags?.map((tag) => (
-                <Badge key={tag} variant="outline">{tag}</Badge>
-              ))}
-            </div>
-            
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted">
-                Trust: {skill.trust_score.toFixed(2)}
-              </span>
-              {skill.avg_rating > 0 && (
-                <span>⭐ {skill.avg_rating.toFixed(1)} ({skill.rating_count})</span>
-              )}
-            </div>
-            
-            {skill.sop_name && (
-              <div className="mt-2 text-xs text-muted">
-                SOP: {skill.sop_name}
+    <>
+      <PageHeader title={t("title")} description={t("description")} />
+
+      {skills && skills.length > 0 ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+            gap: "var(--space-5)",
+          }}
+        >
+          {skills.map((skill) => (
+            <Card key={skill.id}>
+              <div className="card-header">
+                <h3 className="card-title">{skill.name}</h3>
+                {skill.verified && <Badge variant="completed">{t("verified")}</Badge>}
               </div>
-            )}
-          </Card>
-        ))}
-      </div>
-      
-      {(!skills || skills.length === 0) && (
-        <div className="text-center py-12 text-muted">
-          No skills found in the market.
+              <p className="card-description">{skill.description}</p>
+
+              {skill.tags && skill.tags.length > 0 && (
+                <div className="tags">
+                  {skill.tags.map((tag) => (
+                    <span key={tag} className="tag">{tag}</span>
+                  ))}
+                </div>
+              )}
+
+              <div className="card-footer">
+                <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)" }}>
+                  {t("trust")}: {skill.trust_score.toFixed(2)}
+                </span>
+                {skill.avg_rating > 0 && (
+                  <span style={{ fontSize: "var(--text-sm)" }}>
+                    ⭐ {skill.avg_rating.toFixed(1)} ({skill.rating_count})
+                  </span>
+                )}
+              </div>
+
+              {skill.sop_name && (
+                <div style={{ marginTop: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                  {t("sop")}: {skill.sop_name}
+                </div>
+              )}
+            </Card>
+          ))}
         </div>
+      ) : (
+        <EmptyState
+          icon={<Package size={32} />}
+          title={t("noSkills")}
+          description={t("noSkillsDesc")}
+        />
       )}
-    </div>
+    </>
   );
 }
