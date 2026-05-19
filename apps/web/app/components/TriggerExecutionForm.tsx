@@ -82,11 +82,17 @@ export default function TriggerExecutionForm({ skills }: Props) {
           )}
 
           <div className="form-fields">
-            <label className="form-label">
-              {t("skill")}
+            <label className="form-label" htmlFor="skill_id">
+              <span className="flex items-center gap-1">
+                {t("skill")}
+                <span className="text-red-500 text-sm" aria-hidden="true">*</span>
+                <span className="sr-only">(required)</span>
+              </span>
               <select
+                id="skill_id"
                 {...register("skill_id")}
                 className={`form-select ${errors.skill_id ? "border-red-500" : ""}`}
+                aria-required="true"
               >
                 <option value="">{t("selectSkill")}</option>
                 {skills.map((s) => (
@@ -98,20 +104,27 @@ export default function TriggerExecutionForm({ skills }: Props) {
               {errors.skill_id && <p className="form-error">{errors.skill_id.message}</p>}
             </label>
 
-            <label className="form-label">
-              {t("triggeredBy")}
+            <label className="form-label" htmlFor="triggered_by">
+              <span className="flex items-center gap-1">
+                {t("triggeredBy")}
+                <span className="text-red-500 text-sm" aria-hidden="true">*</span>
+                <span className="sr-only">(required)</span>
+              </span>
               <input
                 type="text"
+                id="triggered_by"
                 {...register("triggered_by")}
                 placeholder={t("triggeredByPlaceholder")}
                 className={`form-input ${errors.triggered_by ? "border-red-500" : ""}`}
+                aria-required="true"
               />
               {errors.triggered_by && <p className="form-error">{errors.triggered_by.message}</p>}
             </label>
 
-            <label className="form-label">
+            <label className="form-label" htmlFor="input">
               {t("input")}
               <textarea
+                id="input"
                 {...register("input")}
                 placeholder={t("inputPlaceholder")}
                 rows={3}

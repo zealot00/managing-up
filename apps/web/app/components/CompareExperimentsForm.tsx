@@ -62,9 +62,10 @@ export default function CompareExperimentsForm({ experiments }: Props) {
       <form onSubmit={handleSubmit}>
         <div className="form-fields">
           <div className="form-row">
-            <label className="form-label">
+            <label className="form-label" htmlFor="exp_a">
               {t("experimentA")}
               <select
+                id="exp_a"
                 value={expA}
                 onChange={(e) => setExpA(e.target.value)}
                 className="form-select"
@@ -78,9 +79,10 @@ export default function CompareExperimentsForm({ experiments }: Props) {
               </select>
             </label>
 
-            <label className="form-label">
+            <label className="form-label" htmlFor="exp_b">
               {t("experimentB")}
               <select
+                id="exp_b"
                 value={expB}
                 onChange={(e) => setExpB(e.target.value)}
                 className="form-select"
@@ -127,10 +129,10 @@ export default function CompareExperimentsForm({ experiments }: Props) {
               <table className="gateway-table">
                 <thead>
                   <tr>
-                    <th>{t("taskIds").split("(")[0].trim()}</th>
-                    <th>{t("aScore")}</th>
-                    <th>{t("bScore")}</th>
-                    <th>{t("delta")}</th>
+                    <th scope="col">{t("taskIdsShort")}</th>
+                    <th scope="col">{t("aScore")}</th>
+                    <th scope="col">{t("bScore")}</th>
+                    <th scope="col">{t("delta")}</th>
                   </tr>
                 </thead>
                 <tbody>

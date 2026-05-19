@@ -322,7 +322,7 @@ export default function FallbackChainsPage() {
             <table className="gateway-table">
               <thead>
                 <tr>
-                  <th style={{ width: 40 }}></th>
+                  <th scope="col"></th>
                   <th>{t("model")}</th>
                   <th style={{ width: 100 }}>{tc("status")}</th>
                   <th style={{ width: 100 }}>{t("targetCount")}</th>
@@ -402,11 +402,11 @@ export default function FallbackChainsPage() {
                               <table className="gateway-table" style={{ fontSize: "var(--text-xs)" }}>
                                 <thead>
                                   <tr>
-                                    <th>{t("priority")}</th>
-                                    <th>{t("provider")}</th>
-                                    <th>{t("model")}</th>
-                                    <th>{t("weight")}</th>
-                                    <th>{tc("status")}</th>
+                                    <th scope="col">{t("priority")}</th>
+                                    <th scope="col">{t("provider")}</th>
+                                    <th scope="col">{t("model")}</th>
+                                    <th scope="col">{t("weight")}</th>
+                                    <th scope="col">{tc("status")}</th>
                                   </tr>
                                 </thead>
                                 <tbody>

@@ -63,15 +63,16 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">
-        <label className="form-label">
-          {t("taskOverview").split("(")[0].trim()}
+        <label className="form-label" htmlFor="task_id">
+          {t("taskOverviewShort")}
           <select
+            id="task_id"
             value={taskId}
             onChange={(e) => setTaskId(e.target.value)}
             required
             className="form-select"
           >
-            <option value="">{t("select").split("...")[0]}...</option>
+            <option value="">{tc("select")}...</option>
             {tasks.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -80,10 +81,11 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
           </select>
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="agent_id">
           {t("agentId")}
           <input
             type="text"
+            id="agent_id"
             value={agentId}
             onChange={(e) => setAgentId(e.target.value)}
             placeholder={t("agentIdPlaceholder")}
@@ -92,20 +94,21 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
           />
         </label>
 
-        <label className="form-label">
-          {t("input").split("(")[0].trim()}
+        <label className="form-label" htmlFor="eval_input">
+          {t("input")}
           <textarea
+            id="eval_input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder='{"query": "test input"}'
-            rows={3}
+            placeholder={t("inputPlaceholder")}
+            rows={2}
             className="form-textarea"
           />
         </label>
       </div>
 
       <button type="submit" disabled={runEvaluationMutation.isPending} className="form-submit">
-        {runEvaluationMutation.isPending ? t("running") : t("run")}
+        {runEvaluationMutation.isPending ? t("starting") : t("startEvaluation")}
       </button>
     </form>
   );

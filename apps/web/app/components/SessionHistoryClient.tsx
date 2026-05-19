@@ -2,69 +2,73 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { listGatewaySessions, GatewaySession } from "../lib/gateway-api";
 import { PageHeader } from "./layout/PageHeader";
+import { EmptyState } from "./layout/EmptyState";
 import { ListSkeleton } from "./layout/Skeleton";
+import { Badge } from "./ui/Badge";
+import { Search } from "lucide-react";
 
 const PAGE_SIZE = 20;
 
-function SessionCard({ session }: { session: GatewaySession }) {
-  const riskColors: Record<string, string> = {
-    low: "bg-green-100 text-green-800",
-    medium: "bg-yellow-100 text-yellow-800",
-    high: "bg-red-100 text-red-800",
-    critical: "bg-red-600 text-white",
-  };
+const riskBadgeVariant: Record<string, "low" | "high" | "pending" | "draft"> = {
+  low: "low",
+  medium: "pending",
+  high: "high",
+  critical: "high",
+};
 
-  const statusColors: Record<string, string> = {
-    active: "bg-blue-100 text-blue-800",
-    completed: "bg-gray-100 text-gray-800",
-    cancelled: "bg-red-100 text-red-800",
-  };
+const statusBadgeVariant: Record<string, "active" | "completed" | "failed" | "draft"> = {
+  active: "active",
+  completed: "completed",
+  cancelled: "failed",
+};
 
+function SessionCard({ session, t }: { session: GatewaySession; t: ReturnType<typeof useTranslations<"sessionHistory">> }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-sm text-gray-600">{session.id.slice(0, 8)}</span>
-          <span className={`px-2 py-0.5 rounded text-xs font-medium ${riskColors[session.risk_level] || "bg-gray-100 text-gray-800"}`}>
+    <div className="list-card" style={{ flexDirection: "column", alignItems: "stretch" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <span className="cell-mono">
+            {session.id.slice(0, 8)}
+          </span>
+          <Badge variant={riskBadgeVariant[session.risk_level] || "draft"}>
             {session.risk_level}
-          </span>
-          <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[session.status] || "bg-gray-100 text-gray-800"}`}>
+          </Badge>
+          <Badge variant={statusBadgeVariant[session.status] || "draft"}>
             {session.status}
-          </span>
+          </Badge>
         </div>
-        <span className="text-sm text-gray-500">
+        <span className="text-muted">
           {new Date(session.started_at).toLocaleString()}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-sm">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
         <div>
-          <span className="text-gray-500">Agent:</span>{" "}
+          <span className="text-muted">{t("agent")}:</span>{" "}
           <span className="font-mono">{session.agent_id}</span>
         </div>
         <div>
-          <span className="text-gray-500">Correlation:</span>{" "}
+          <span className="text-muted">{t("correlation")}:</span>{" "}
           <span className="font-mono">{session.correlation_id.slice(0, 8)}...</span>
         </div>
         <div>
-          <span className="text-gray-500">Type:</span> <span>{session.session_type}</span>
+          <span className="text-muted">{t("type")}:</span> <span>{session.session_type}</span>
         </div>
         <div>
-          <span className="text-gray-500">Task:</span>{" "}
-          <span>
-            {(session.task_intent as { task_type?: string })?.task_type || "N/A"}
-          </span>
+          <span className="text-muted">{t("task")}:</span>{" "}
+          <span>{(session.task_intent as { task_type?: string })?.task_type || t("na")}</span>
         </div>
       </div>
       {session.policy_decision && (
-        <div className="mt-2 pt-2 border-t border-gray-100">
-          <span className="text-sm text-gray-500">Policy: </span>
-          <span className="text-sm">
+        <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--line)", fontSize: "var(--text-sm)" }}>
+          <span className="text-muted">{t("policy")}: </span>
+          <span style={{ fontWeight: 600, color: (session.policy_decision as { allowed?: boolean })?.allowed === false ? "var(--danger)" : "var(--success)" }}>
             {(session.policy_decision as { allowed?: boolean; reasons?: string[] })
               ?.allowed === false
-              ? "DENIED"
-              : "ALLOWED"}
+              ? t("denied")
+              : t("allowed")}
           </span>
         </div>
       )}
@@ -73,10 +77,11 @@ function SessionCard({ session }: { session: GatewaySession }) {
 }
 
 export default function SessionHistoryClient() {
+  const t = useTranslations("sessionHistory");
   const [agentFilter, setAgentFilter] = useState("");
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
-  const { data: sessionsData, isLoading } = useQuery({
+  const { data: sessionsData, isLoading, isError } = useQuery({
     queryKey: ["gateway-sessions", agentFilter],
     queryFn: () => listGatewaySessions({ agent_id: agentFilter || undefined, limit: 100 }),
   });
@@ -87,47 +92,58 @@ export default function SessionHistoryClient() {
   const hasMore = displayCount < sessions.length;
 
   return (
-    <div className="space-y-4">
+    <>
       <PageHeader
-        title="Gateway Sessions"
-        description="View gateway session history and policy decisions"
+        title={t("title")}
+        description={t("description")}
       />
 
-      <div className="flex items-center gap-4">
-        <input
-          type="text"
-          placeholder="Filter by agent ID..."
-          value={agentFilter}
-          onChange={(e) => setAgentFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+        <div className="form-group" style={{ flex: 1, maxWidth: 400 }}>
+          <div style={{ position: "relative" }}>
+            <Search size={16} className="search-icon" />
+            <input
+              type="text"
+              placeholder={t("filterByAgentId")}
+              value={agentFilter}
+              onChange={(e) => setAgentFilter(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
         <ListSkeleton rows={5} />
-      ) : sessions.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          No sessions found
+      ) : isError ? (
+        <div className="panel" role="alert">
+          <p className="form-error">{t("noSessions")}</p>
         </div>
+      ) : sessions.length === 0 ? (
+        <EmptyState
+          icon={<Search size={32} />}
+          title={t("noSessions")}
+          description={t("noSessionsDesc")}
+        />
       ) : (
         <>
-          <div className="space-y-3">
+          <div className="list" style={{ marginTop: "var(--space-5)" }}>
             {displayedSessions.map((session) => (
-              <SessionCard key={session.id} session={session} />
+              <SessionCard key={session.id} session={session} t={t} />
             ))}
           </div>
           {hasMore && (
-            <div className="flex justify-center">
+            <div style={{ display: "flex", justifyContent: "center", marginTop: "var(--space-5)" }}>
               <button
                 onClick={() => setDisplayCount((c) => c + PAGE_SIZE)}
-                className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800"
+                className="btn btn-ghost btn-sm"
               >
-                Load more
+                {t("loadMore")}
               </button>
             </div>
           )}
         </>
       )}
-    </div>
+    </>
   );
 }

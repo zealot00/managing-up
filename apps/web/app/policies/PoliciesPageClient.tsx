@@ -304,9 +304,9 @@ export default function PoliciesPageClient() {
               <thead>
                 <tr>
                   <th style={{ width: 40 }}></th>
-                  <th>{t("name")}</th>
-                  <th>{t("version")}</th>
-                  <th>{t("rules")}</th>
+<th scope="col">{t("name")}</th>
+                    <th scope="col">{t("version")}</th>
+                    <th scope="col">{t("rules")}</th>
                   <th style={{ width: 100 }}>{t("status")}</th>
                 </tr>
               </thead>

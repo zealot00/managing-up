@@ -29,7 +29,7 @@ export default function ReplayDetail({ snapshot, onClose }: Props) {
           <span className="detail-value">{snapshot.execution_id}</span>
         </div>
         <div className="detail-row">
-          <span className="detail-label">{t("skill").split(" ")[0]}</span>
+          <span className="detail-label">{tc("skillLabel")}</span>
           <span className="detail-value">{snapshot.skill_id}</span>
         </div>
         <div className="detail-row">

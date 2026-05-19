@@ -503,8 +503,8 @@ export default function MCPPage() {
                 <tr>
                   <th style={{ width: 40 }}></th>
                   <th style={{ width: 200 }}>Name</th>
-                  <th>Transport</th>
-                  <th>Connection</th>
+<th scope="col">Transport</th>
+                    <th scope="col">Connection</th>
                   <th style={{ width: 100 }}>Status</th>
                   <th style={{ width: 80 }}>Enabled</th>
                   <th style={{ width: 200 }}>Actions</th>

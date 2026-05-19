@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getExecution, getTraces } from "../../lib/api";
 import { ExecutionDetailHeader } from "./ExecutionDetailHeader";
+import Breadcrumb from "../../../components/Breadcrumb";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -29,11 +30,8 @@ export default async function ExecutionDetailPage({ params }: Props) {
   };
 
   return (
-    <main className="shell">
-      <section className="toprail">
-        <a href="/executions">{tc("back")} to {tc("executions")}</a>
-      </section>
-
+    <>
+      <Breadcrumb />
       <ExecutionDetailHeader
         eyebrow={t("eyebrow")}
         execution={execution}
@@ -43,7 +41,7 @@ export default async function ExecutionDetailPage({ params }: Props) {
         <article className="panel">
           <div className="panel-header">
             <p className="section-kicker">{t("runs")}</p>
-            <h2>Run details</h2>
+            <h2>{t("runDetails")}</h2>
           </div>
           <div className="detail-grid">
             <div className="detail-row">
@@ -51,11 +49,11 @@ export default async function ExecutionDetailPage({ params }: Props) {
               <span className="detail-value">{execution.id}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">{t("skill").split(" ")[0]} ID</span>
+              <span className="detail-label">{t("skillId")}</span>
               <span className="detail-value">{execution.skill_id}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">{t("skill").split(" ")[0]} {tc("name")}</span>
+              <span className="detail-label">{t("skillName")}</span>
               <span className="detail-value">{execution.skill_name}</span>
             </div>
             <div className="detail-row">
@@ -69,7 +67,7 @@ export default async function ExecutionDetailPage({ params }: Props) {
               <span className="detail-value">{execution.triggered_by}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Started at</span>
+              <span className="detail-label">{t("startedAt")}</span>
               <span className="detail-value">{execution.started_at}</span>
             </div>
             <div className="detail-row">
@@ -82,7 +80,7 @@ export default async function ExecutionDetailPage({ params }: Props) {
         <article className="panel">
           <div className="panel-header">
             <p className="section-kicker">{t("runs")}</p>
-            <h2>{t("input").split("(")[0].trim()} payload</h2>
+            <h2>{t("inputPayload")}</h2>
           </div>
           <pre className="json-block">
             {Object.keys(execution.input || {}).length > 0
@@ -94,10 +92,10 @@ export default async function ExecutionDetailPage({ params }: Props) {
         <article className="panel">
           <div className="panel-header">
             <p className="section-kicker">{t("runs")}</p>
-            <h2>Trace timeline</h2>
+            <h2>{t("traceTimeline")}</h2>
           </div>
           {traces.length === 0 ? (
-            <p className="text-muted">No trace events recorded.</p>
+            <p className="text-muted">{t("noTraceEvents")}</p>
           ) : (
             <div className="list">
               {traces.map((event) => (
@@ -110,7 +108,7 @@ export default async function ExecutionDetailPage({ params }: Props) {
                       {formatTimestamp(event.timestamp)}
                     </p>
                     <details>
-                      <summary>Event data</summary>
+                      <summary>{t("eventData")}</summary>
                       <pre className="json-block json-small">
                         {JSON.stringify(event.event_data, null, 2)}
                       </pre>
@@ -122,6 +120,6 @@ export default async function ExecutionDetailPage({ params }: Props) {
           )}
         </article>
       </section>
-    </main>
+    </>
   );
 }

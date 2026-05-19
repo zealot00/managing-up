@@ -3,6 +3,8 @@ import { getTranslations } from "next-intl/server";
 import { getExecution, getTraces } from "../../../lib/api";
 import type { Execution, TraceEvent } from "../../../lib/api";
 import { PageSkeleton } from "../../../components/layout/Skeleton";
+import Breadcrumb from "../../../../components/Breadcrumb";
+import { PageHeader } from "../../../components/layout/PageHeader";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -60,7 +62,7 @@ function TraceEventCard({ event }: { event: TraceEvent }) {
         <p className="trace-type">{formatEventType(event.event_type)}</p>
         <p className="trace-time">{formatTime(event.timestamp)}</p>
         {event.step_id && (
-          <p style={{ margin: "6px 0 0", fontSize: "0.82rem", color: "var(--muted)" }}>
+          <p className="text-muted" style={{ margin: "6px 0 0", fontSize: "0.82rem" }}>
             Step: {event.step_id}
           </p>
         )}
@@ -93,33 +95,27 @@ async function TraceContent({ id }: { id: string }) {
   }
 
   return (
-    <main className="shell">
-      <section className="toprail">
-        <a className="toprail-link" href="/executions">
-          ← {tc("executions")}
-        </a>
-        <a className="toprail-link" href="/">
-          {tc("dashboard")}
-        </a>
-      </section>
+    <>
+      <Breadcrumb />
 
       {execution ? (
         <>
-          <section className="hero-page hero-compact" style={{ marginBottom: 24 }}>
-            <p className="eyebrow">{t("eyebrow")}</p>
-            <h1>{execution.skill_name}</h1>
-            <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center" }}>
-              <span className={`badge badge-${execution.status}`}>{execution.status}</span>
-              <span style={{ color: "var(--muted)", fontSize: "0.85rem" }}>
+          <PageHeader
+            eyebrow={t("eyebrow")}
+            title={execution.skill_name}
+            description={
+              <>
+                <span className={`badge badge-${execution.status}`}>{execution.status}</span>
+                {" · "}
                 {tc("id")}: {execution.id}
-              </span>
-            </div>
-          </section>
+              </>
+            }
+          />
 
           <article className="panel">
             <div className="panel-header">
-              <p className="section-kicker">Timeline</p>
-              <h2>Execution Events</h2>
+              <p className="section-kicker">{t("traceTimeline")}</p>
+              <h2>{t("runDetails")}</h2>
             </div>
             {traces.length > 0 ? (
               <div className="trace-timeline">
@@ -128,19 +124,17 @@ async function TraceContent({ id }: { id: string }) {
                 ))}
               </div>
             ) : (
-              <p style={{ color: "var(--muted)", marginTop: 16 }}>
-                No trace events recorded yet. Traces are captured when execution tracing is enabled.
-              </p>
+              <p className="empty-note">{t("noTraceEvents")}</p>
             )}
           </article>
 
-          <article className="panel" style={{ marginTop: 18 }}>
+          <article className="panel">
             <div className="panel-header">
-              <h2>Execution Details</h2>
+              <h2>{t("runDetails")}</h2>
             </div>
             <div className="detail-grid">
               <div className="detail-row">
-                <span className="detail-label">{t("skill").split(" ")[0]} ID</span>
+                <span className="detail-label">{t("skillId")}</span>
                 <span className="detail-value">{execution.skill_id}</span>
               </div>
               <div className="detail-row">
@@ -152,7 +146,7 @@ async function TraceContent({ id }: { id: string }) {
                 <span className="detail-value">{execution.triggered_by}</span>
               </div>
               <div className="detail-row">
-                <span className="detail-label">Started At</span>
+                <span className="detail-label">{t("startedAt")}</span>
                 <span className="detail-value">{new Date(execution.started_at).toLocaleString()}</span>
               </div>
               <div className="detail-row">
@@ -163,14 +157,12 @@ async function TraceContent({ id }: { id: string }) {
           </article>
         </>
       ) : (
-        <article className="panel" style={{ marginTop: 24 }}>
-          <h2 style={{ color: "var(--ink-strong)" }}>Execution not found</h2>
-          <p style={{ color: "var(--muted)", marginTop: 8 }}>
-            Could not load execution data. Make sure the backend is running.
-          </p>
+        <article className="panel">
+          <h2>{tc("notFound")}</h2>
+          <p className="empty-note">{t("noTraceEvents")}</p>
         </article>
       )}
-    </main>
+    </>
   );
 }
 

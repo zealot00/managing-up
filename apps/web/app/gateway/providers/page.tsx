@@ -243,7 +243,7 @@ function ProviderTable({
           <thead>
             <tr>
               <th style={{ width: 140 }}>{t("provider")}</th>
-              <th>{t("modelPattern")}</th>
+              <th scope="col">{t("modelPattern")}</th>
               <th style={{ width: 120 }}>{t("monthlyLimit")}</th>
               <th style={{ width: 90 }}>{tc("status")}</th>
               <th style={{ width: 100 }}>{tc("createdAt")}</th>

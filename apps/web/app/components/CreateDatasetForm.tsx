@@ -52,42 +52,61 @@ export default function CreateDatasetForm({ onCreated }: Props) {
       {createDatasetMutation.error && <p className="form-error">{createDatasetMutation.error.message}</p>}
 
       <div className="form-fields">
-        <label className="form-label">
-          {t("datasetName")}
+        <label className="form-label" htmlFor="name">
+          <span className="flex items-center gap-1">
+            {t("datasetName")}
+            <span className="text-red-500 text-sm" aria-hidden="true">*</span>
+            <span className="sr-only">(required)</span>
+          </span>
           <input
             type="text"
+            id="name"
             {...register("name")}
             placeholder={t("datasetNamePlaceholder")}
             className={`form-input ${errors.name ? "border-red-500" : ""}`}
+            aria-required="true"
           />
           {errors.name && <p className="form-error">{errors.name.message}</p>}
         </label>
 
-        <label className="form-label">
-          {t("datasetVersion")}
+        <label className="form-label" htmlFor="version">
+          <span className="flex items-center gap-1">
+            {t("datasetVersion")}
+            <span className="text-red-500 text-sm" aria-hidden="true">*</span>
+            <span className="sr-only">(required)</span>
+          </span>
           <input
             type="text"
+            id="version"
             {...register("version")}
             placeholder={t("datasetVersionPlaceholder")}
             className={`form-input ${errors.version ? "border-red-500" : ""}`}
+            aria-required="true"
           />
           {errors.version && <p className="form-error">{errors.version.message}</p>}
         </label>
 
-        <label className="form-label">
-          {t("datasetOwner")}
+        <label className="form-label" htmlFor="owner">
+          <span className="flex items-center gap-1">
+            {t("datasetOwner")}
+            <span className="text-red-500 text-sm" aria-hidden="true">*</span>
+            <span className="sr-only">(required)</span>
+          </span>
           <input
             type="text"
+            id="owner"
             {...register("owner")}
             placeholder={t("datasetOwnerPlaceholder")}
             className={`form-input ${errors.owner ? "border-red-500" : ""}`}
+            aria-required="true"
           />
           {errors.owner && <p className="form-error">{errors.owner.message}</p>}
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="description">
           {t("datasetDescription")}
           <textarea
+            id="description"
             {...register("description")}
             placeholder={t("datasetDescriptionPlaceholder")}
             rows={2}

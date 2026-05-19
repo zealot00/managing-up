@@ -85,28 +85,36 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
       {updateMutation.isError && <p className="form-error">{updateMutation.error?.message}</p>}
 
       <div className="form-fields">
-        <label className="form-label">
-          {t("taskName")}
+        <label className="form-label" htmlFor="name">
+          <span className="flex items-center gap-1">
+            {t("taskName")}
+            <span className="text-red-500 text-sm" aria-hidden="true">*</span>
+            <span className="sr-only">(required)</span>
+          </span>
           <input
             type="text"
+            id="name"
             {...register("name")}
+            placeholder={t("taskNamePlaceholder")}
             className={`form-input ${errors.name ? "border-red-500" : ""}`}
+            aria-required="true"
           />
           {errors.name && <p className="form-error">{errors.name.message}</p>}
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="description">
           {t("description")}
           <textarea
+            id="description"
             {...register("description")}
             rows={2}
             className="form-textarea"
           />
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="skill_id">
           {t("linkedSkill")}
-          <select {...register("skill_id")} className="form-select">
+          <select id="skill_id" {...register("skill_id")} className="form-select">
             <option value="">{t("noSkill")}</option>
             {skills.map((s) => (
               <option key={s.id} value={s.id}>
@@ -116,27 +124,30 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
           </select>
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="difficulty">
           {t("difficulty")}
-          <select {...register("difficulty")} className="form-select">
+          <select id="difficulty" {...register("difficulty")} className="form-select">
             <option value="easy">{t("easy")}</option>
             <option value="medium">{t("medium")}</option>
             <option value="hard">{t("hard")}</option>
           </select>
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="tags">
           {t("tags")}
           <input
             type="text"
+            id="tags"
             {...register("tags")}
+            placeholder={t("tagsPlaceholder")}
             className="form-input"
           />
         </label>
 
-        <label className="form-label">
+        <label className="form-label" htmlFor="test_cases">
           {t("testCases")}
           <textarea
+            id="test_cases"
             {...register("test_cases")}
             rows={3}
             className="form-textarea"
@@ -146,11 +157,11 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
       </div>
 
       <div className="form-actions">
+        <button type="button" onClick={onCancel} className="form-cancel">
+          {t("cancel")}
+        </button>
         <button type="submit" disabled={isSubmitting} className="form-submit" style={{ flex: 1 }}>
           {isSubmitting ? t("saving") : t("saveChanges")}
-        </button>
-        <button type="button" onClick={onCancel} className="btn btn-secondary" style={{ flex: 1 }}>
-          {t("cancel")}
         </button>
       </div>
     </form>

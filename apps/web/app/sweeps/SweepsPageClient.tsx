@@ -486,7 +486,7 @@ export default function SweepsPageClient() {
             <table className="gateway-table">
               <thead>
                 <tr>
-                  <th style={{ width: 40 }}></th>
+                  <th scope="col"></th>
                   <th>{t("name")}</th>
                   <th>{t("taskID")}</th>
                   <th>{t("progress")}</th>
@@ -596,12 +596,12 @@ export default function SweepsPageClient() {
                                 <table className="gateway-table" style={{ fontSize: "var(--text-xs)" }}>
                                   <thead>
                                     <tr>
-                                      <th>{t("model")}</th>
-                                      <th>{t("temperature")}</th>
-                                      <th>{t("maxTokens")}</th>
-                                      <th>{t("prompt")}</th>
-                                      <th>{t("status")}</th>
-                                      <th>{t("score")}</th>
+                                      <th scope="col">{t("model")}</th>
+                                      <th scope="col">{t("temperature")}</th>
+                                      <th scope="col">{t("maxTokens")}</th>
+                                      <th scope="col">{t("prompt")}</th>
+                                      <th scope="col">{t("status")}</th>
+                                      <th scope="col">{t("score")}</th>
                                     </tr>
                                   </thead>
                                   <tbody>
