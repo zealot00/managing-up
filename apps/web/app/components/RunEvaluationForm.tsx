@@ -55,11 +55,6 @@ export default function RunEvaluationForm({ tasks, onCreated }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="form-panel">
-      <div className="panel-header">
-        <p className="section-kicker">{t("eyebrow")}</p>
-        <h2>{t("runEvaluation")}</h2>
-      </div>
-
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-fields">

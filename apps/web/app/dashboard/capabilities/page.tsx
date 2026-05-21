@@ -9,13 +9,7 @@ import { PageHeader } from "../../components/layout/PageHeader";
 function SkeletonCapabilitiesPage() {
   return (
     <main className="shell">
-      <section className="hero-page hero-compact">
-        <p className="eyebrow">Capabilities</p>
-        <h1>Radar Dashboard</h1>
-        <p className="lede">
-          Multi-dimensional capability visualization with experiment comparison.
-        </p>
-      </section>
+      <PageHeader eyebrow="Capabilities" title="Radar Dashboard" description="Multi-dimensional capability visualization with experiment comparison." />
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "18px", marginBottom: "18px" }}>
         <div className="panel" style={{ minHeight: 520 }}>

@@ -15,6 +15,7 @@ export default function MCPSessionsPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["mcp-sessions", agentFilter],
     queryFn: () => listMCPSessions(agentFilter || undefined, 100),
+    refetchInterval: 30_000,
   });
 
   const sessions = data?.items ?? [];

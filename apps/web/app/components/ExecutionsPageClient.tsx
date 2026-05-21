@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Skill, createExecution, getExecutions, getSkills } from "../lib/api";
 import { useApiMutation } from "../lib/use-mutations";
+import { useDebounce } from "../hooks/use-debounce";
 import { useTranslations } from "next-intl";
 import { useToast } from "../../components/ToastProvider";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
+import { QueryError } from "./layout/QueryError";
 import { FormModal } from "./ui/FormModal";
+import { RefreshIndicator } from "./ui/RefreshIndicator";
 import { ListSkeleton } from "./layout/Skeleton";
 import { LoadMore } from "./ui/LoadMore";
 
@@ -18,6 +21,7 @@ const PAGE_SIZE = 20;
 export default function ExecutionsPageClient() {
   const t = useTranslations("executions");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const toast = useToast();
   const [showModal, setShowModal] = useState(false);
   const [skillId, setSkillId] = useState("");
@@ -25,12 +29,14 @@ export default function ExecutionsPageClient() {
   const [input, setInput] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
-  const { data: executionsData, isLoading, isFetching } = useQuery({
+  const { data: executionsData, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["executions"],
     queryFn: getExecutions,
     placeholderData: (previousData) => previousData,
+    refetchInterval: 10_000,
   });
 
   const executions = executionsData ?? { items: [] };
@@ -57,12 +63,12 @@ export default function ExecutionsPageClient() {
   const filteredExecutions = useMemo(() => {
     return executions.items.filter((exec) => {
       const matchesStatus = statusFilter === "all" || exec.status === statusFilter;
-      const matchesSearch = searchQuery === "" ||
-        exec.skill_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        exec.triggered_by.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = debouncedSearchQuery === "" ||
+        exec.skill_name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        exec.triggered_by.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
       return matchesStatus && matchesSearch;
     });
-  }, [executions.items, statusFilter, searchQuery]);
+  }, [executions.items, statusFilter, debouncedSearchQuery]);
 
   const displayedExecutions = filteredExecutions.slice(0, displayCount);
   const hasMore = displayCount < filteredExecutions.length;
@@ -80,7 +86,7 @@ export default function ExecutionsPageClient() {
       try {
         parsedInput = JSON.parse(input);
       } catch {
-        toast.error(tc("errors.inputInvalid"));
+        toast.error(te("inputInvalid"));
         return;
       }
     }
@@ -99,12 +105,15 @@ export default function ExecutionsPageClient() {
         title={t("title")}
         description={t("lede")}
         actions={
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowModal(true)}
-          >
-            + {t("triggerExecution")}
-          </button>
+          <>
+            <RefreshIndicator isFetching={isFetching} isLoading={isLoading} />
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowModal(true)}
+            >
+              + {t("triggerExecution")}
+            </button>
+          </>
         }
       />
 
@@ -153,6 +162,8 @@ export default function ExecutionsPageClient() {
 
       {isLoading ? (
         <ListSkeleton rows={5} />
+      ) : isError ? (
+        <QueryError onRetry={() => refetch()} />
       ) : (
         <div style={{ opacity: isFetching && !isLoading ? 0.5 : 1, transition: "opacity 0.2s" }}>
           <section className="panel">

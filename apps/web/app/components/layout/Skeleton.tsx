@@ -127,18 +127,13 @@ export function PageSkeleton({
   return (
     <main className="shell">
       {showHeader && (
-        <header
-          className="hero-page hero-compact"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-          }}
-        >
-          <div>
-            <Skeleton width={80} height={12} style={{ marginBottom: "var(--space-3)" }} />
-            <Skeleton width={280} height={28} style={{ marginBottom: "var(--space-3)" }} />
-            <Skeleton width={400} height={16} />
+        <header className="page-header">
+          <div className="page-header-text">
+            <div className="page-header-title-row">
+              <Skeleton width={80} height={12} />
+              <Skeleton width={200} height={24} />
+            </div>
+            <Skeleton width={400} height={14} style={{ marginTop: "var(--space-1)" }} />
           </div>
           {headerActions && <Skeleton width={140} height={40} borderRadius="var(--radius-sm)" />}
         </header>

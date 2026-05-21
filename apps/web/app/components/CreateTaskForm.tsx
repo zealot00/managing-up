@@ -62,11 +62,6 @@ export default function CreateTaskForm({ skills, onCreated }: Props) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
-      <div className="panel-header">
-        <p className="section-kicker">{t("eyebrow")}</p>
-        <h2>{t("createTask")}</h2>
-      </div>
-
       {createMutation.isError && <p className="form-error">{createMutation.error?.message}</p>}
 
       <div className="form-fields">

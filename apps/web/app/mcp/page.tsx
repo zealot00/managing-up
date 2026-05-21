@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../../context/AuthContext";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { Drawer } from "../components/ui/Drawer";
 import { useToast } from "../../components/ToastProvider";
 import Breadcrumb from "../../components/Breadcrumb";
 import {
@@ -36,8 +37,10 @@ import {
   Key,
   ChevronDown,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { Spinner } from "../components/ui/Spinner";
+import Tooltip from "../components/Tooltip";
 
 const STATUS_CONFIG: Record<string, { label: string; badgeClass: string; icon: React.ReactNode }> = {
   approved: {
@@ -73,9 +76,10 @@ export default function MCPPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [expandedServerId, setExpandedServerId] = useState<string | null>(null);
   const [serverPermissions, setServerPermissions] = useState<Record<string, MCPServerPermission[]>>({});
 
@@ -122,7 +126,7 @@ export default function MCPPage() {
     setFormTransportType("stdio");
     setFormCommand("");
     setFormURL("");
-    setShowCreateForm(false);
+    setShowCreateDrawer(false);
   }
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
@@ -181,6 +185,7 @@ export default function MCPPage() {
   }
 
   async function handleToggleEnabled(server: MCPServer) {
+    setTogglingId(server.id);
     try {
       await updateMCPServer(server.id, {
         is_enabled: !server.is_enabled,
@@ -188,6 +193,8 @@ export default function MCPPage() {
       await loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update MCP server");
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -303,7 +310,7 @@ export default function MCPPage() {
         <div className="page-header-actions">
           <button
             className="btn btn-primary"
-            onClick={() => setShowCreateForm(true)}
+            onClick={() => setShowCreateDrawer(true)}
           >
             <Plus size={16} aria-hidden="true" />
             {t("newServer")}
@@ -317,92 +324,76 @@ export default function MCPPage() {
         </div>
       )}
 
-      {showCreateForm && (
-        <div className="form-panel">
-          <div className="form-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <p className="section-kicker">{t("title")}</p>
-              <h2 className="form-title">{t("createServer")}</h2>
-            </div>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={resetForm}
-              aria-label={tc("close")}
+      <Drawer isOpen={showCreateDrawer} onClose={() => setShowCreateDrawer(false)} title={t("createServer") || "Create MCP Server"}>
+        <form className="form-fields" onSubmit={handleCreate}>
+          <div>
+            <label className="form-label" htmlFor="mcp-name">{t("serverName")}</label>
+            <input
+              id="mcp-name"
+              className="form-input"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              placeholder={t("serverNamePlaceholder")}
+              required
+            />
+          </div>
+          <div>
+            <label className="form-label" htmlFor="mcp-desc">{tc("description")}</label>
+            <input
+              id="mcp-desc"
+              className="form-input"
+              value={formDescription}
+              onChange={(e) => setFormDescription(e.target.value)}
+              placeholder={t("serverDescPlaceholder")}
+            />
+          </div>
+          <div>
+            <label className="form-label" htmlFor="mcp-transport">{t("transport")}</label>
+            <select
+              id="mcp-transport"
+              className="form-select"
+              value={formTransportType}
+              onChange={(e) => setFormTransportType(e.target.value)}
             >
-              <X size={18} aria-hidden="true" />
+              <option value="stdio">{t("transportStdio")}</option>
+              <option value="sse">{t("transportSSE")}</option>
+            </select>
+          </div>
+          {formTransportType === "stdio" && (
+            <div>
+              <label className="form-label" htmlFor="mcp-command">{t("command")}</label>
+              <input
+                id="mcp-command"
+                className="form-input"
+                value={formCommand}
+                onChange={(e) => setFormCommand(e.target.value)}
+                placeholder={t("commandPlaceholder")}
+              />
+            </div>
+          )}
+          {formTransportType === "sse" && (
+            <div>
+              <label className="form-label" htmlFor="mcp-url">{t("url")}</label>
+              <input
+                id="mcp-url"
+                className="form-input"
+                type="url"
+                value={formURL}
+                onChange={(e) => setFormURL(e.target.value)}
+                placeholder={t("urlPlaceholder")}
+              />
+            </div>
+          )}
+          <div className="form-actions">
+            <button type="button" className="btn btn-secondary" onClick={resetForm}>
+              {tc("cancel")}
+            </button>
+            <button type="submit" className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {isSubmitting ? <><Spinner size="sm" /> {t("creating")}</> : t("create")}
             </button>
           </div>
-          <form className="form-fields" onSubmit={handleCreate}>
-            <div>
-              <label className="form-label" htmlFor="mcp-name">{t("serverName")}</label>
-              <input
-                id="mcp-name"
-                className="form-input"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                placeholder={t("serverNamePlaceholder")}
-                required
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="form-label" htmlFor="mcp-desc">{tc("description")}</label>
-              <input
-                id="mcp-desc"
-                className="form-input"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                placeholder={t("serverDescPlaceholder")}
-              />
-            </div>
-            <div>
-              <label className="form-label" htmlFor="mcp-transport">{t("transport")}</label>
-              <select
-                id="mcp-transport"
-                className="form-select"
-                value={formTransportType}
-                onChange={(e) => setFormTransportType(e.target.value)}
-              >
-                <option value="stdio">{t("transportStdio")}</option>
-                <option value="sse">{t("transportSSE")}</option>
-              </select>
-            </div>
-            {formTransportType === "stdio" && (
-              <div>
-                <label className="form-label" htmlFor="mcp-command">{t("command")}</label>
-                <input
-                  id="mcp-command"
-                  className="form-input"
-                  value={formCommand}
-                  onChange={(e) => setFormCommand(e.target.value)}
-                  placeholder={t("commandPlaceholder")}
-                />
-              </div>
-            )}
-            {formTransportType === "sse" && (
-              <div>
-                <label className="form-label" htmlFor="mcp-url">{t("url")}</label>
-                <input
-                  id="mcp-url"
-                  className="form-input"
-                  type="url"
-                  value={formURL}
-                  onChange={(e) => setFormURL(e.target.value)}
-                  placeholder={t("urlPlaceholder")}
-                />
-              </div>
-            )}
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={resetForm}>
-                {tc("cancel")}
-              </button>
-              <button type="submit" className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {isSubmitting ? <><Spinner size="sm" /> {t("creating")}</> : t("create")}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+        </form>
+      </Drawer>
 
       {showPermissionForm && (
         <div className="form-panel">
@@ -489,7 +480,7 @@ export default function MCPPage() {
             Register an MCP server to enable AI agent tool integration.
           </p>
           <div className="empty-state-action" style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={() => setShowCreateForm(true)}>
+            <button className="btn btn-primary" onClick={() => setShowCreateDrawer(true)}>
               <Plus size={16} aria-hidden="true" />
               {t("newServer")}
             </button>
@@ -574,10 +565,12 @@ export default function MCPPage() {
                           <button
                             className={`mcp-toggle-btn ${server.is_enabled ? "mcp-toggle-btn-on" : "mcp-toggle-btn-off"}`}
                             onClick={() => void handleToggleEnabled(server)}
+                            disabled={togglingId === server.id}
                             title={server.is_enabled ? tc("disable") || "Disable" : tc("enable") || "Enable"}
                             aria-label={server.is_enabled ? "Disable server" : "Enable server"}
+                            style={{ opacity: togglingId === server.id ? 0.5 : 1, cursor: togglingId === server.id ? "not-allowed" : "pointer" }}
                           >
-                            {server.is_enabled ? <Power size={14} aria-hidden="true" /> : <PowerOff size={14} aria-hidden="true" />}
+                            {togglingId === server.id ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : server.is_enabled ? <Power size={14} aria-hidden="true" /> : <PowerOff size={14} aria-hidden="true" />}
                           </button>
                         </td>
                         <td>
@@ -649,12 +642,24 @@ export default function MCPPage() {
                               ) : (
                                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                                   {perms.map((perm) => (
-                                    <span key={perm.id} className="badge badge-muted" style={{ fontSize: "var(--text-xs)" }}>
-                                      {perm.user_id ? `user:${perm.user_id.slice(0, 8)}` : ""}
-                                      {perm.api_key_id ? `key:${perm.api_key_id.slice(0, 8)}` : ""}
-                                      {perm.skill_id ? `skill:${perm.skill_id.slice(0, 8)}` : ""}
-                                      : {perm.permission_type}
-                                    </span>
+                                    <Tooltip
+                                      key={perm.id}
+                                      content={
+                                        [
+                                          perm.user_id ? `user:${perm.user_id}` : "",
+                                          perm.api_key_id ? `key:${perm.api_key_id}` : "",
+                                          perm.skill_id ? `skill:${perm.skill_id}` : "",
+                                        ].filter(Boolean).join(" / ") + ` : ${perm.permission_type}`
+                                      }
+                                      position="bottom"
+                                    >
+                                      <span className="badge badge-muted" style={{ fontSize: "var(--text-xs)", cursor: "default" }}>
+                                        {perm.user_id ? `user:${perm.user_id.slice(0, 8)}` : ""}
+                                        {perm.api_key_id ? `key:${perm.api_key_id.slice(0, 8)}` : ""}
+                                        {perm.skill_id ? `skill:${perm.skill_id.slice(0, 8)}` : ""}
+                                        : {perm.permission_type}
+                                      </span>
+                                    </Tooltip>
                                   ))}
                                 </div>
                               )}

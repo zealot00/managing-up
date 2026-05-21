@@ -8,6 +8,7 @@ import { createSkill, getSkills } from "../lib/api";
 import { useApiMutation } from "../lib/use-mutations";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
+import { QueryError } from "./layout/QueryError";
 import { FormModal } from "./ui/FormModal";
 import { TableSkeleton } from "./layout/Skeleton";
 
@@ -16,7 +17,7 @@ export default function SkillsPageClient() {
   const tc = useTranslations("common");
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const { data: skillsData, isLoading, isFetching } = useQuery({
+  const { data: skillsData, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["skills"],
     queryFn: getSkills,
     placeholderData: (previousData) => previousData,
@@ -58,12 +59,10 @@ export default function SkillsPageClient() {
       />
 
       <div className="panel">
-        <div className="panel-header">
-          <p className="section-kicker">{t("eyebrow")}</p>
-          <h2 className="panel-title">{t("title")}</h2>
-        </div>
         {isLoading ? (
           <TableSkeleton rows={5} columns={4} />
+        ) : isError ? (
+          <QueryError onRetry={() => refetch()} />
         ) : (
           <div style={{ opacity: isFetching && !isLoading ? 0.5 : 1, transition: "opacity 0.2s" }}>
             <div className="table-wrapper">

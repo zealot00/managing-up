@@ -19,11 +19,11 @@ export function BulkActionBar({ selectedCount, onClear, actions }: BulkActionBar
   if (selectedCount === 0) return null;
 
   return (
-    <div className="bulk-action-bar">
+    <div className="bulk-action-bar" role="toolbar" aria-label={`Bulk actions for ${selectedCount} selected items`}>
       <div className="bulk-action-bar-info">
-        <span className="bulk-action-count">{selectedCount} selected</span>
-        <button type="button" onClick={onClear} className="bulk-action-clear">
-          <X size={16} />
+        <span className="bulk-action-count" aria-live="polite" aria-atomic="true">{selectedCount} selected</span>
+        <button type="button" onClick={onClear} className="bulk-action-clear" aria-label="Clear selection">
+          <X size={16} aria-hidden="true" />
         </button>
       </div>
       <div className="bulk-action-bar-actions">

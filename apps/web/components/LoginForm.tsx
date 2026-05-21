@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Spinner } from "../app/components/ui/Spinner";
+import { PasswordInput } from "../app/components/ui/PasswordInput";
 
 export default function LoginForm() {
   const t = useTranslations("login");
@@ -56,13 +57,12 @@ export default function LoginForm() {
 
         <div className="login-form-field">
           <label className="login-form-field-label" htmlFor="login-password">{t("password")}</label>
-          <input
+          <PasswordInput
             id="login-password"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="login-form-input"
+            inputClassName="login-form-input"
             autoComplete="current-password"
             placeholder={t("passwordPlaceholder")}
           />

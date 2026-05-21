@@ -53,7 +53,7 @@ export default function Sidebar() {
       items: [
         { href: "/skills", labelKey: "skills", icon: <Package size={18} aria-hidden="true" /> },
         { href: "/executions", labelKey: "executions", icon: <Play size={18} aria-hidden="true" /> },
-        { href: "/tasks", labelKey: "tasks", icon: <ListChecks size={18} aria-hidden="true" />, children: [{ href: "/tasks/from-trace", labelKey: "taskBuilder" }] },
+        { href: "/tasks", labelKey: "tasks", icon: <ListChecks size={18} aria-hidden="true" /> },
         { href: "/evaluations", labelKey: "evaluations", icon: <Target size={18} aria-hidden="true" /> },
         { href: "/experiments", labelKey: "experiments", icon: <FlaskConical size={18} aria-hidden="true" /> },
       ],
@@ -113,6 +113,17 @@ export default function Sidebar() {
     }
     void loadPrefs();
   }, []);
+
+  // Close mobile sidebar on Escape
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && isOpen) {
+        close();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, close]);
 
   async function handleLogout() {
     await logout();
@@ -195,6 +206,7 @@ export default function Sidebar() {
                           className={`sidebar-link sidebar-link-collapsed ${isActive ? "sidebar-link-active" : ""}`}
                           title={t(item.labelKey)}
                           onClick={handleLinkClick}
+                          aria-current={isActive ? "page" : undefined}
                         >
                           <span className="sidebar-link-icon">{item.icon}</span>
                         </Link>
@@ -236,6 +248,7 @@ export default function Sidebar() {
                                   href={child.href}
                                   className={`sidebar-flyout-item ${isChildActive ? "active" : ""}`}
                                   onClick={handleLinkClick}
+                                  aria-current={isChildActive ? "page" : undefined}
                                 >
                                   {t(child.labelKey)}
                                 </Link>
@@ -254,6 +267,7 @@ export default function Sidebar() {
                         className={`sidebar-link sidebar-link-collapsed ${isActive ? "sidebar-link-active" : ""}`}
                         title={t(item.labelKey)}
                         onClick={handleLinkClick}
+                        aria-current={isActive ? "page" : undefined}
                       >
                         <span className="sidebar-link-icon">{item.icon}</span>
                       </Link>
@@ -273,6 +287,7 @@ export default function Sidebar() {
                         handleLinkClick();
                       }}
                       aria-expanded={hasChildren ? isExpanded : undefined}
+                      aria-current={isActive ? "page" : undefined}
                     >
                       <span className="sidebar-link-icon">{item.icon}</span>
                       <span className="sidebar-link-label">{t(item.labelKey)}</span>
@@ -296,6 +311,7 @@ export default function Sidebar() {
                               href={child.href}
                               className={`sidebar-link sidebar-child-link ${isChildActive ? "sidebar-link-active" : ""}`}
                               onClick={handleLinkClick}
+                              aria-current={isChildActive ? "page" : undefined}
                             >
                               {t(child.labelKey)}
                             </Link>

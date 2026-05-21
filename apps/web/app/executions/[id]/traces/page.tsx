@@ -100,17 +100,18 @@ async function TraceContent({ id }: { id: string }) {
 
       {execution ? (
         <>
-          <PageHeader
-            eyebrow={t("eyebrow")}
-            title={execution.skill_name}
-            description={
-              <>
-                <span className={`badge badge-${execution.status}`}>{execution.status}</span>
-                {" · "}
-                {tc("id")}: {execution.id}
-              </>
-            }
-          />
+          <header className="detail-header">
+            <div className="detail-header-main">
+              <h1 className="detail-header-title">{execution.skill_name}</h1>
+              <span className={`badge badge-${execution.status}`}>{execution.status}</span>
+            </div>
+            <div className="detail-header-chips">
+              <span className="detail-chip">
+                <span className="detail-chip-dot" style={{ background: "var(--muted)" }} aria-hidden="true" />
+                <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)" }}>{execution.id.slice(0, 8)}…</span>
+              </span>
+            </div>
+          </header>
 
           <article className="panel">
             <div className="panel-header">

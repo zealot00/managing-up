@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { useToast } from "../../components/ToastProvider";
 import Breadcrumb from "../../components/Breadcrumb";
+import { Drawer } from "../components/ui/Drawer";
 import {
   SweepConfig,
   SweepMatrixCell,
@@ -53,7 +54,7 @@ export default function SweepsPageClient() {
     min_score: number;
   } | null>(null);
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formName, setFormName] = useState("");
@@ -115,7 +116,7 @@ export default function SweepsPageClient() {
     setFormTemperatures([0.0]);
     setFormMaxTokens([512]);
     setFormPrompts([{ id: "prompt_1", label: "Default", content: "" }]);
-    setShowCreateForm(false);
+    setShowCreateDrawer(false);
   }
 
   function addModel() {
@@ -264,7 +265,7 @@ export default function SweepsPageClient() {
         <div className="page-header-actions">
           <button
             className="btn btn-primary"
-            onClick={() => setShowCreateForm(true)}
+            onClick={() => setShowCreateDrawer(true)}
           >
             <Plus size={16} aria-hidden="true" />
             {t("newSweep")}
@@ -278,191 +279,179 @@ export default function SweepsPageClient() {
         </div>
       )}
 
-      {showCreateForm && (
-        <div className="form-panel">
-          <div className="form-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Drawer
+        isOpen={showCreateDrawer}
+        onClose={resetForm}
+        title={t("createSweep")}
+      >
+        <form className="form-fields" onSubmit={(e) => void handleCreate(e)}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
-              <p className="section-kicker">{t("title")}</p>
-              <h2 className="form-title">{t("createSweep")}</h2>
-            </div>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={resetForm}
-              aria-label={tc("close")}
-            >
-              <X size={18} aria-hidden="true" />
-            </button>
-          </div>
-          <form className="form-fields" onSubmit={(e) => void handleCreate(e)}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div>
-                <label className="form-label" htmlFor="sweep-name">{t("sweepName")}</label>
-                <input
-                  id="sweep-name"
-                  className="form-input"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder={t("sweepNamePlaceholder")}
-                  required
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="form-label" htmlFor="sweep-task">{t("taskID")}</label>
-                <input
-                  id="sweep-task"
-                  className="form-input"
-                  value={formTaskID}
-                  onChange={(e) => setFormTaskID(e.target.value)}
-                  placeholder={t("taskIDPlaceholder")}
-                  required
-                />
-              </div>
-            </div>
-            <div>
-              <label className="form-label" htmlFor="sweep-desc">{tc("description")}</label>
+              <label className="form-label" htmlFor="sweep-name">{t("sweepName")}</label>
               <input
-                id="sweep-desc"
+                id="sweep-name"
                 className="form-input"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                placeholder={t("sweepDescPlaceholder")}
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder={t("sweepNamePlaceholder")}
+                required
               />
             </div>
+            <div>
+              <label className="form-label" htmlFor="sweep-task">{t("taskID")}</label>
+              <input
+                id="sweep-task"
+                className="form-input"
+                value={formTaskID}
+                onChange={(e) => setFormTaskID(e.target.value)}
+                placeholder={t("taskIDPlaceholder")}
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="form-label" htmlFor="sweep-desc">{tc("description")}</label>
+            <input
+              id="sweep-desc"
+              className="form-input"
+              value={formDescription}
+              onChange={(e) => setFormDescription(e.target.value)}
+              placeholder={t("sweepDescPlaceholder")}
+            />
+          </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16 }}>
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <label className="form-label" style={{ marginBottom: 0 }}>{t("models")}</label>
-                  <button type="button" className="btn btn-sm btn-ghost" onClick={addModel}>
-                    <Plus size={12} />
-                  </button>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {formModels.map((model, i) => (
-                    <div key={i} style={{ display: "flex", gap: 4 }}>
-                      <select
-                        className="form-select"
-                        value={model}
-                        onChange={(e) => updateModel(i, e.target.value)}
-                        style={{ flex: 1 }}
-                      >
-                        {DEFAULT_MODELS.map((m) => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
-                      {formModels.length > 1 && (
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeModel(i)}>
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16 }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>{t("models")}</label>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={addModel}>
+                  <Plus size={12} />
+                </button>
               </div>
-
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <label className="form-label" style={{ marginBottom: 0 }}>{t("temperature")}</label>
-                  <button type="button" className="btn btn-sm btn-ghost" onClick={addTemperature}>
-                    <Plus size={12} />
-                  </button>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {formTemperatures.map((temp, i) => (
-                    <div key={i} style={{ display: "flex", gap: 4 }}>
-                      <input
-                        type="number"
-                        className="form-input"
-                        value={temp}
-                        onChange={(e) => updateTemperature(i, parseFloat(e.target.value) || 0)}
-                        step="0.1"
-                        min="0"
-                        max="2"
-                        style={{ flex: 1 }}
-                      />
-                      {formTemperatures.length > 1 && (
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeTemperature(i)}>
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <label className="form-label" style={{ marginBottom: 0 }}>{t("maxTokens")}</label>
-                  <button type="button" className="btn btn-sm btn-ghost" onClick={addMaxTokens}>
-                    <Plus size={12} />
-                  </button>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {formMaxTokens.map((tokens, i) => (
-                    <div key={i} style={{ display: "flex", gap: 4 }}>
-                      <input
-                        type="number"
-                        className="form-input"
-                        value={tokens}
-                        onChange={(e) => updateMaxTokens(i, parseInt(e.target.value) || 0)}
-                        step="64"
-                        min="1"
-                        style={{ flex: 1 }}
-                      />
-                      {formMaxTokens.length > 1 && (
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeMaxTokens(i)}>
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <label className="form-label" style={{ marginBottom: 0 }}>{t("prompts")}</label>
-                  <button type="button" className="btn btn-sm btn-ghost" onClick={addPrompt}>
-                    <Plus size={12} />
-                  </button>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {formPrompts.map((prompt, i) => (
-                    <div key={i} style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                      <input
-                        className="form-input"
-                        value={prompt.label}
-                        onChange={(e) => updatePrompt(i, { label: e.target.value })}
-                        placeholder={t("promptLabel")}
-                        style={{ flex: 1 }}
-                      />
-                      {formPrompts.length > 1 && (
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => removePrompt(i)}>
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {formModels.map((model, i) => (
+                  <div key={i} style={{ display: "flex", gap: 4 }}>
+                    <select
+                      className="form-select"
+                      value={model}
+                      onChange={(e) => updateModel(i, e.target.value)}
+                      style={{ flex: 1 }}
+                    >
+                      {DEFAULT_MODELS.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    {formModels.length > 1 && (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeModel(i)}>
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div style={{ padding: 12, background: "var(--surface)", borderRadius: 4, fontSize: "var(--text-sm)" }}>
-              <strong>{t("totalRuns")}:</strong> {totalRuns} ({formModels.length} × {formTemperatures.length} × {formMaxTokens.length} × {formPrompts.length})
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>{t("temperature")}</label>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={addTemperature}>
+                  <Plus size={12} />
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {formTemperatures.map((temp, i) => (
+                  <div key={i} style={{ display: "flex", gap: 4 }}>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={temp}
+                      onChange={(e) => updateTemperature(i, parseFloat(e.target.value) || 0)}
+                      step="0.1"
+                      min="0"
+                      max="2"
+                      style={{ flex: 1 }}
+                    />
+                    {formTemperatures.length > 1 && (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeTemperature(i)}>
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={resetForm}>
-                {tc("cancel")}
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                {isSubmitting ? t("creating") : <><Play size={14} /> {t("create")}</>}
-              </button>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>{t("maxTokens")}</label>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={addMaxTokens}>
+                  <Plus size={12} />
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {formMaxTokens.map((tokens, i) => (
+                  <div key={i} style={{ display: "flex", gap: 4 }}>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={tokens}
+                      onChange={(e) => updateMaxTokens(i, parseInt(e.target.value) || 0)}
+                      step="64"
+                      min="1"
+                      style={{ flex: 1 }}
+                    />
+                    {formMaxTokens.length > 1 && (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeMaxTokens(i)}>
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </form>
-        </div>
-      )}
+
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>{t("prompts")}</label>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={addPrompt}>
+                  <Plus size={12} />
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {formPrompts.map((prompt, i) => (
+                  <div key={i} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <input
+                      className="form-input"
+                      value={prompt.label}
+                      onChange={(e) => updatePrompt(i, { label: e.target.value })}
+                      placeholder={t("promptLabel")}
+                      style={{ flex: 1 }}
+                    />
+                    {formPrompts.length > 1 && (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => removePrompt(i)}>
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: 12, background: "var(--surface)", borderRadius: 4, fontSize: "var(--text-sm)" }}>
+            <strong>{t("totalRuns")}:</strong> {totalRuns} ({formModels.length} × {formTemperatures.length} × {formMaxTokens.length} × {formPrompts.length})
+          </div>
+
+          <div className="form-actions">
+            <button type="button" className="btn btn-secondary" onClick={resetForm}>
+              {tc("cancel")}
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? t("creating") : <><Play size={14} /> {t("create")}</>}
+            </button>
+          </div>
+        </form>
+      </Drawer>
 
       {sweeps.length === 0 ? (
         <div className="empty-state">
@@ -474,7 +463,7 @@ export default function SweepsPageClient() {
             {t("noSweepsDescription")}
           </p>
           <div className="empty-state-action" style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={() => setShowCreateForm(true)}>
+            <button className="btn btn-primary" onClick={() => setShowCreateDrawer(true)}>
               <Plus size={16} aria-hidden="true" />
               {t("newSweep")}
             </button>

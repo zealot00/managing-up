@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useRef, ReactNode } from "react";
 import { X, CheckCircle, AlertCircle, AlertTriangle } from "lucide-react";
 
 type ToastType = "success" | "error" | "warning" | "info";
@@ -9,6 +9,7 @@ interface Toast {
   id: string;
   message: string;
   type: ToastType;
+  dismissing?: boolean;
 }
 
 interface ToastContextType {
@@ -44,8 +45,13 @@ function ToastIcon({ type }: { type: ToastType }) {
 }
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
+  // Error toasts use role="alert" (aria-live=assertive) for immediate screen reader announcement.
+  // Other types inherit aria-live="polite" from the container.
   return (
-    <div className={`toast toast-${toast.type}`} role="alert">
+    <div
+      className={`toast toast-${toast.type}${toast.dismissing ? " toast-exit" : ""}`}
+      role={toast.type === "error" ? "alert" : undefined}
+    >
       <div className="toast-icon">
         <ToastIcon type={toast.type} />
       </div>
@@ -63,21 +69,38 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const dismissToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    // Clear any pending auto-dismiss timer
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
+
+    // Start exit animation
+    setToasts((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, dismissing: true } : t)),
+    );
+
+    // Remove from DOM after animation completes
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 250);
   }, []);
 
   const addToast = useCallback((message: string, type: ToastType = "info") => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newToast: Toast = { id, message, type };
-    
+
     setToasts((prev) => [...prev, newToast]);
 
     // Auto-dismiss after 4 seconds
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       dismissToast(id);
     }, 4000);
+    timersRef.current.set(id, timer);
   }, [dismissToast]);
 
   const toast = useCallback((message: string, type: ToastType = "info") => {
@@ -103,7 +126,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast, success, error, warning, info }}>
       {children}
-      <div className="toast-container" aria-live="polite">
+      <div className="toast-container" aria-live="polite" aria-atomic="false">
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} onDismiss={dismissToast} />
         ))}

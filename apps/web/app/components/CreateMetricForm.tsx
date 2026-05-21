@@ -59,11 +59,6 @@ export default function CreateMetricForm({ onCreated }: Props) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
-      <div className="panel-header">
-        <p className="section-kicker">{t("eyebrow")}</p>
-        <h2>{t("createMetric")}</h2>
-      </div>
-
       {createMetricMutation.error && <p className="form-error">{createMetricMutation.error.message}</p>}
 
       <div className="form-fields">

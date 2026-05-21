@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, ReactNode } from "react";
+import { useEffect, useRef, ReactNode } from "react";
 import { X } from "lucide-react";
+import { useFocusTrap } from "../../hooks/use-focus-trap";
 
 interface DrawerProps {
   isOpen: boolean;
@@ -12,6 +13,9 @@ interface DrawerProps {
 }
 
 export function Drawer({ isOpen, onClose, title, description, children }: DrawerProps) {
+  const titleId = useRef(`drawer-title-${Math.random().toString(36).slice(2, 9)}`).current;
+  const setContainerRef = useFocusTrap(isOpen);
+
   useEffect(() => {
     function handleEsc(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -30,6 +34,7 @@ export function Drawer({ isOpen, onClose, title, description, children }: Drawer
 
   return (
     <div
+      role="presentation"
       style={{
         position: "fixed",
         inset: 0,
@@ -48,6 +53,10 @@ export function Drawer({ isOpen, onClose, title, description, children }: Drawer
         onClick={onClose}
       />
       <aside
+        ref={setContainerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         style={{
           position: "relative",
           width: "100%",
@@ -68,7 +77,7 @@ export function Drawer({ isOpen, onClose, title, description, children }: Drawer
           borderBottom: "1px solid var(--line)",
         }}>
           <div>
-            <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--ink-strong)", marginBottom: "var(--space-1)" }}>
+            <h2 id={titleId} style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--ink-strong)", marginBottom: "var(--space-1)" }}>
               {title}
             </h2>
             {description && (
@@ -77,6 +86,7 @@ export function Drawer({ isOpen, onClose, title, description, children }: Drawer
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             style={{
               background: "none",
               border: "none",

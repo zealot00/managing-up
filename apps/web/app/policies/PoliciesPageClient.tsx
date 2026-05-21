@@ -15,12 +15,12 @@ import {
 import {
   Shield,
   Plus,
-  X,
   ChevronDown,
   ChevronRight,
   Save,
   Trash2,
 } from "lucide-react";
+import { Drawer } from "../components/ui/Drawer";
 
 export default function PoliciesPageClient() {
   const t = useTranslations("policies");
@@ -33,7 +33,7 @@ export default function PoliciesPageClient() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedPolicy, setSelectedPolicy] = useState<PolicyVersion | null>(null);
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formName, setFormName] = useState("");
@@ -82,7 +82,7 @@ export default function PoliciesPageClient() {
     setFormVersion("v1");
     setFormDescription("");
     setFormRules([]);
-    setShowCreateForm(false);
+    setShowCreateDrawer(false);
   }
 
   function addRule() {
@@ -158,7 +158,7 @@ export default function PoliciesPageClient() {
         <div className="page-header-actions">
           <button
             className="btn btn-primary"
-            onClick={() => setShowCreateForm(true)}
+            onClick={() => setShowCreateDrawer(true)}
           >
             <Plus size={16} aria-hidden="true" />
             {t("newPolicy")}
@@ -172,114 +172,98 @@ export default function PoliciesPageClient() {
         </div>
       )}
 
-      {showCreateForm && (
-        <div className="form-panel">
-          <div className="form-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Drawer isOpen={showCreateDrawer} onClose={() => setShowCreateDrawer(false)} title={t("createPolicy")}>
+        <form className="form-fields" onSubmit={(e) => void handleCreate(e)}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
-              <p className="section-kicker">{t("title")}</p>
-              <h2 className="form-title">{t("createPolicy")}</h2>
-            </div>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={resetForm}
-              aria-label={tc("close")}
-            >
-              <X size={18} aria-hidden="true" />
-            </button>
-          </div>
-          <form className="form-fields" onSubmit={(e) => void handleCreate(e)}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div>
-                <label className="form-label" htmlFor="policy-name">{t("policyName")}</label>
-                <input
-                  id="policy-name"
-                  className="form-input"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  placeholder={t("policyNamePlaceholder")}
-                  required
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="form-label" htmlFor="policy-version">{t("version")}</label>
-                <input
-                  id="policy-version"
-                  className="form-input"
-                  value={formVersion}
-                  onChange={(e) => setFormVersion(e.target.value)}
-                  placeholder="v1"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="form-label" htmlFor="policy-desc">{tc("description")}</label>
+              <label className="form-label" htmlFor="policy-name">{t("policyName")}</label>
               <input
-                id="policy-desc"
+                id="policy-name"
                 className="form-input"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                placeholder={t("policyDescPlaceholder")}
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder={t("policyNamePlaceholder")}
+                required
               />
             </div>
-
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <label className="form-label" style={{ marginBottom: 0 }}>{t("rules")}</label>
-                <button type="button" className="btn btn-sm btn-secondary" onClick={addRule}>
-                  <Plus size={14} aria-hidden="true" /> {t("addRule")}
-                </button>
-              </div>
-              {formRules.length === 0 ? (
-                <p style={{ fontSize: "var(--text-xs)", color: "var(--muted)", padding: 12, background: "var(--surface)", borderRadius: 4 }}>
-                  {t("noRulesHint")}
-                </p>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {formRules.map((rule, index) => (
-                    <div key={rule.id} style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto", gap: 8, alignItems: "center", padding: 8, background: "var(--surface)", borderRadius: 4 }}>
-                      <input
-                        className="form-input"
-                        value={rule.condition}
-                        onChange={(e) => updateRule(index, { condition: e.target.value })}
-                        placeholder={t("conditionPlaceholder")}
-                      />
-                      <select
-                        className="form-select"
-                        value={rule.action}
-                        onChange={(e) => updateRule(index, { action: e.target.value })}
-                        style={{ width: "auto" }}
-                      >
-                        <option value="allow">{t("actionAllow")}</option>
-                        <option value="deny">{t("actionDeny")}</option>
-                        <option value="flag">{t("actionFlag")}</option>
-                      </select>
-                      <input
-                        className="form-input"
-                        value={rule.reason}
-                        onChange={(e) => updateRule(index, { reason: e.target.value })}
-                        placeholder={t("reasonPlaceholder")}
-                      />
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeRule(index)}>
-                        <Trash2 size={14} aria-hidden="true" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <label className="form-label" htmlFor="policy-version">{t("version")}</label>
+              <input
+                id="policy-version"
+                className="form-input"
+                value={formVersion}
+                onChange={(e) => setFormVersion(e.target.value)}
+                placeholder="v1"
+              />
             </div>
+          </div>
+          <div>
+            <label className="form-label" htmlFor="policy-desc">{tc("description")}</label>
+            <input
+              id="policy-desc"
+              className="form-input"
+              value={formDescription}
+              onChange={(e) => setFormDescription(e.target.value)}
+              placeholder={t("policyDescPlaceholder")}
+            />
+          </div>
 
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={resetForm}>
-                {tc("cancel")}
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                {isSubmitting ? t("creating") : t("create")}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <label className="form-label" style={{ marginBottom: 0 }}>{t("rules")}</label>
+              <button type="button" className="btn btn-sm btn-secondary" onClick={addRule}>
+                <Plus size={14} aria-hidden="true" /> {t("addRule")}
               </button>
             </div>
-          </form>
-        </div>
-      )}
+            {formRules.length === 0 ? (
+              <p style={{ fontSize: "var(--text-xs)", color: "var(--muted)", padding: 12, background: "var(--surface)", borderRadius: 4 }}>
+                {t("noRulesHint")}
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {formRules.map((rule, index) => (
+                  <div key={rule.id} style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto", gap: 8, alignItems: "center", padding: 8, background: "var(--surface)", borderRadius: 4 }}>
+                    <input
+                      className="form-input"
+                      value={rule.condition}
+                      onChange={(e) => updateRule(index, { condition: e.target.value })}
+                      placeholder={t("conditionPlaceholder")}
+                    />
+                    <select
+                      className="form-select"
+                      value={rule.action}
+                      onChange={(e) => updateRule(index, { action: e.target.value })}
+                      style={{ width: "auto" }}
+                    >
+                      <option value="allow">{t("actionAllow")}</option>
+                      <option value="deny">{t("actionDeny")}</option>
+                      <option value="flag">{t("actionFlag")}</option>
+                    </select>
+                    <input
+                      className="form-input"
+                      value={rule.reason}
+                      onChange={(e) => updateRule(index, { reason: e.target.value })}
+                      placeholder={t("reasonPlaceholder")}
+                    />
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeRule(index)}>
+                      <Trash2 size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="form-actions">
+            <button type="button" className="btn btn-secondary" onClick={resetForm}>
+              {tc("cancel")}
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? t("creating") : t("create")}
+            </button>
+          </div>
+        </form>
+      </Drawer>
 
       {policies.length === 0 ? (
         <div className="empty-state">
@@ -291,7 +275,7 @@ export default function PoliciesPageClient() {
             {t("noPoliciesDescription")}
           </p>
           <div className="empty-state-action" style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={() => setShowCreateForm(true)}>
+            <button className="btn btn-primary" onClick={() => setShowCreateDrawer(true)}>
               <Plus size={16} aria-hidden="true" />
               {t("newPolicy")}
             </button>
@@ -307,7 +291,7 @@ export default function PoliciesPageClient() {
 <th scope="col">{t("name")}</th>
                     <th scope="col">{t("version")}</th>
                     <th scope="col">{t("rules")}</th>
-                  <th style={{ width: 100 }}>{t("status")}</th>
+                  <th style={{ width: 100 }}>{tc("status")}</th>
                 </tr>
               </thead>
               <tbody>

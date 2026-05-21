@@ -68,7 +68,7 @@ async function DashboardContent() {
         </div>
         <div className="dashboard-list">
           {recentExecutions.length === 0 ? (
-            <EmptyState title={t("noExecutions", { namespace: "executions" })} />
+            <EmptyState title={t("noExecutions")} />
           ) : (
             recentExecutions.map((execution) => (
               <article className="dashboard-list-item" key={execution.id}>

@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { listGatewaySessions, GatewaySession } from "../lib/gateway-api";
+import { useDebounce } from "../hooks/use-debounce";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { ListSkeleton } from "./layout/Skeleton";
+import { RefreshIndicator } from "./ui/RefreshIndicator";
 import { Badge } from "./ui/Badge";
 import { Search } from "lucide-react";
 
@@ -79,11 +81,13 @@ function SessionCard({ session, t }: { session: GatewaySession; t: ReturnType<ty
 export default function SessionHistoryClient() {
   const t = useTranslations("sessionHistory");
   const [agentFilter, setAgentFilter] = useState("");
+  const debouncedAgentFilter = useDebounce(agentFilter, 300);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
-  const { data: sessionsData, isLoading, isError } = useQuery({
-    queryKey: ["gateway-sessions", agentFilter],
-    queryFn: () => listGatewaySessions({ agent_id: agentFilter || undefined, limit: 100 }),
+  const { data: sessionsData, isLoading, isFetching, isError } = useQuery({
+    queryKey: ["gateway-sessions", debouncedAgentFilter],
+    queryFn: () => listGatewaySessions({ agent_id: debouncedAgentFilter || undefined, limit: 100 }),
+    refetchInterval: 15_000,
   });
 
   const sessions = Array.isArray(sessionsData) ? sessionsData : sessionsData?.items ?? [];
@@ -94,7 +98,7 @@ export default function SessionHistoryClient() {
   return (
     <>
       <PageHeader
-        title={t("title")}
+        title={<>{t("title")} <RefreshIndicator isFetching={isFetching} isLoading={isLoading} /></>}
         description={t("description")}
       />
 
