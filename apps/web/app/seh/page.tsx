@@ -63,13 +63,7 @@ async function SEHDashboardContent() {
 function SkeletonSEHDashboard() {
   return (
     <main className="shell">
-      <header className="hero-page hero-compact">
-        <p className="eyebrow">Skill Evaluation Hub</p>
-        <h1>SEH Dashboard</h1>
-        <p className="lede">
-          Monitoring and management for datasets, evaluation runs, and governance policies.
-        </p>
-      </header>
+      <PageHeader eyebrow="Skill Evaluation Hub" title="SEH Dashboard" description="Monitoring and management for datasets, evaluation runs, and governance policies." />
 
       <div className="stats">
         {[...Array(4)].map((_, i) => (

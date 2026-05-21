@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getSEHRun } from "../../../lib/seh-api";
 import JsonFold from "../../../components/JsonFold";
+import Breadcrumb from "../../../../components/Breadcrumb";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -20,17 +20,27 @@ export default async function SEHRunDetailPage({ params }: Props) {
 
   return (
     <main className="shell">
-      <section className="toprail">
-        <Link href="/seh/runs" className="toprail-link">← {tc("back")} to {t("runs")}</Link>
-      </section>
+      <Breadcrumb />
 
-      <section className="hero-page hero-compact">
-        <p className="eyebrow">SEH</p>
-        <h1>{run.skill}</h1>
-        <p className="lede">
-          {run.dataset_id} · {t("score")}: {run.metrics.score.toFixed(2)} · {t("success")}: {(run.metrics.success_rate * 100).toFixed(0)}%
-        </p>
-      </section>
+      <header className="detail-header">
+        <div className="detail-header-main">
+          <h1 className="detail-header-title">{run.skill}</h1>
+        </div>
+        <div className="detail-header-chips">
+          <span className="detail-chip">
+            <span className="detail-chip-dot" style={{ background: "var(--muted)" }} aria-hidden="true" />
+            <span>{run.dataset_id}</span>
+          </span>
+          <span className="detail-chip">
+            <span className="detail-chip-dot" style={{ background: "var(--primary)" }} aria-hidden="true" />
+            <span>{t("score")}: {run.metrics.score.toFixed(2)}</span>
+          </span>
+          <span className="detail-chip">
+            <span className="detail-chip-dot" style={{ background: run.metrics.success_rate >= 0.8 ? "var(--success)" : run.metrics.success_rate >= 0.5 ? "var(--warning)" : "var(--danger)" }} aria-hidden="true" />
+            <span>{t("success")}: {(run.metrics.success_rate * 100).toFixed(0)}%</span>
+          </span>
+        </div>
+      </header>
 
       <section className="panel-grid panel-grid-wide">
         <article className="panel">

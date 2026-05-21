@@ -4,29 +4,38 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Task, Skill, getTasks, getSkills, deleteTask } from "../lib/api";
 import { useApiMutation } from "../lib/use-mutations";
+import { useDebounce } from "../hooks/use-debounce";
 import CreateTaskForm from "./CreateTaskForm";
+import TaskFromTraceWizard from "../../components/TaskFromTraceForm";
 import TaskCardWithActions from "./TaskCardWithActions";
 import EditTaskForm from "./EditTaskForm";
 import { useTranslations } from "next-intl";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
+import { QueryError } from "./layout/QueryError";
 import { CardGridSkeleton } from "./layout/Skeleton";
 import { BulkActionBar } from "./ui/BulkActionBar";
+import { ConfirmDialog } from "./ui/ConfirmDialog";
+import { RefreshIndicator } from "./ui/RefreshIndicator";
 import { SelectableCard } from "./ui/SelectableCard";
 import { LoadMore } from "./ui/LoadMore";
-import { Trash2 } from "lucide-react";
+import { Drawer } from "./ui/Drawer";
+import { Trash2, Search, ListChecks } from "lucide-react";
 
 const PAGE_SIZE = 20;
 
 export default function TaskManagerClient() {
   const t = useTranslations("tasks");
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
+  const [showBuildDrawer, setShowBuildDrawer] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [skillFilter, setSkillFilter] = useState<string>("all");
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   function toggleTaskSelection(taskId: string) {
     setSelectedTaskIds((prev) => {
@@ -54,12 +63,14 @@ export default function TaskManagerClient() {
     for (const id of selectedTaskIds) {
       await deleteTaskMutation.mutateAsync(id);
     }
+    setShowBulkDeleteConfirm(false);
   }
 
-  const { data: tasksData, isLoading, isFetching } = useQuery({
+  const { data: tasksData, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["tasks"],
     queryFn: getTasks,
     placeholderData: (previousData) => previousData,
+    refetchInterval: 30_000,
   });
 
   const tasks = tasksData?.items ?? [];
@@ -74,9 +85,9 @@ export default function TaskManagerClient() {
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
-      const matchesSearch = searchQuery === "" ||
-        task.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesSearch = debouncedSearchQuery === "" ||
+        task.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        (task.description && task.description.toLowerCase().includes(debouncedSearchQuery.toLowerCase()));
 
       const matchesDifficulty = difficultyFilter === "all" || task.difficulty === difficultyFilter;
 
@@ -84,7 +95,7 @@ export default function TaskManagerClient() {
 
       return matchesSearch && matchesDifficulty && matchesSkill;
     });
-  }, [tasks, searchQuery, difficultyFilter, skillFilter]);
+  }, [tasks, debouncedSearchQuery, difficultyFilter, skillFilter]);
 
   const displayedTasks = filteredTasks.slice(0, displayCount);
   const hasMore = displayCount < filteredTasks.length;
@@ -103,12 +114,16 @@ export default function TaskManagerClient() {
         title=""
         actions={
           <>
-            <a href="/tasks/from-trace" className="btn btn-secondary">
+            <RefreshIndicator isFetching={isFetching} isLoading={isLoading} />
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowBuildDrawer(true)}
+            >
               {t("buildFromTrace")}
-            </a>
+            </button>
             <button
               className="btn btn-primary"
-              onClick={() => { setShowCreate(true); setEditingTask(null); }}
+              onClick={() => { setShowCreateDrawer(true); setEditingTask(null); }}
             >
               {t("newTask")}
             </button>
@@ -185,12 +200,19 @@ export default function TaskManagerClient() {
         )}
       </div>
 
-      {showCreate && (
+      <Drawer isOpen={showCreateDrawer} onClose={() => { setShowCreateDrawer(false); setEditingTask(null); }} title={editingTask ? t("editTask", { name: editingTask.name }) : t("newTask")}>
         <CreateTaskForm
           skills={skills}
-          onCreated={() => setShowCreate(false)}
+          onCreated={() => setShowCreateDrawer(false)}
         />
-      )}
+      </Drawer>
+
+      <Drawer isOpen={showBuildDrawer} onClose={() => setShowBuildDrawer(false)} title={t("buildFromTrace")}>
+        <TaskFromTraceWizard
+          onTaskCreated={() => setShowBuildDrawer(false)}
+          hideHeader
+        />
+      </Drawer>
 
       {editingTask && (
         <EditTaskForm
@@ -204,6 +226,8 @@ export default function TaskManagerClient() {
       <section aria-label="Task list">
         {isLoading ? (
           <CardGridSkeleton count={6} columns={3} />
+        ) : isError ? (
+          <QueryError onRetry={() => refetch()} />
         ) : (
           <div style={{ opacity: isFetching && !isLoading ? 0.5 : 1, transition: "opacity 0.2s" }}>
             {displayedTasks.length > 0 ? (
@@ -231,7 +255,7 @@ export default function TaskManagerClient() {
               </>
             ) : tasks.length > 0 ? (
               <EmptyState
-                icon="🔍"
+                icon={<Search size={48} aria-hidden="true" />}
                 title="No matching tasks"
                 description="Try adjusting your search or filter criteria"
                 action={
@@ -250,17 +274,17 @@ export default function TaskManagerClient() {
               />
             ) : (
               <EmptyState
-                icon="◎"
+                icon={<ListChecks size={48} aria-hidden="true" />}
                 title={t("noTasks")}
                 description={t("noTasksDesc")}
                 action={
                   <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
-                    <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                    <button className="btn btn-primary" onClick={() => setShowCreateDrawer(true)}>
                       {t("createTask")}
                     </button>
-                    <a href="/tasks/from-trace" className="btn btn-secondary">
+                    <button className="btn btn-secondary" onClick={() => setShowBuildDrawer(true)}>
                       {t("buildFromTrace")}
-                    </a>
+                    </button>
                   </div>
                 }
               />
@@ -277,9 +301,20 @@ export default function TaskManagerClient() {
             label: `Delete (${selectedTaskIds.size})`,
             icon: <Trash2 size={16} />,
             variant: "danger",
-            onClick: handleBulkDelete,
+            onClick: () => setShowBulkDeleteConfirm(true),
           },
         ]}
+      />
+
+      <ConfirmDialog
+        isOpen={showBulkDeleteConfirm}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete tasks"
+        description={`Are you sure you want to delete ${selectedTaskIds.size} task${selectedTaskIds.size > 1 ? "s" : ""}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
       />
     </>
   );

@@ -40,7 +40,12 @@
     "enable": "启用",
     "disable": "禁用",
     "deleteConfirmTitle": "确定删除「{name}」？",
-    "deleteConfirmDescription": "此操作无法撤销。任务及其所有测试用例将被永久删除。"
+    "deleteConfirmDescription": "此操作无法撤销。任务及其所有测试用例将被永久删除。",
+    "optional": "可选",
+    "select": "选择",
+    "next": "下一步",
+    "back": "返回",
+    "notFound": "未找到"
   },
   "landing": {
     "eyebrow": "企业级 AI 质量基础设施",
@@ -118,6 +123,7 @@
     "medium": "中",
     "high": "高",
     "versions": "版本历史",
+    "version": "版本",
     "noVersions": "暂无版本",
     "createVersion": "创建版本",
     "creating": "创建中...",
@@ -130,7 +136,12 @@
     "statusBadge": "状态：{status}",
     "noSkills": "暂无技能",
     "noSkillsDesc": "注册第一个技能以开始管理 AI Agent 能力。",
-    "registerFirst": "注册技能"
+    "registerFirst": "注册技能",
+    "skill": "技能",
+    "selectSkill": "选择技能",
+    "status": "状态",
+    "approvalRequired": "需要审批",
+    "noApproval": "无需审批"
   },
   "skillMarket": {
     "title": "技能市场",
@@ -300,10 +311,13 @@
     "createTask": "创建任务",
     "taskName": "任务名称",
     "taskNamePlaceholder": "例如：parse_log_errors",
+    "description": "描述",
+    "descriptionPlaceholder": "可选的任务描述",
     "linkedSkill": "关联技能",
     "noSkill": "无关联技能",
     "difficulty": "难度等级",
     "easy": "简单",
+    "medium": "中等",
     "hard": "困难",
     "tags": "标签",
     "tagsPlaceholder": "例如：parsing, error-handling",
@@ -337,7 +351,18 @@
       "building": "构建中...",
       "generatedTask": "生成的任务",
       "preview": "预览",
-      "extractedTestCases": "提取的测试用例"
+      "extractedTestCases": "提取的测试用例",
+      "step1Label": "选择来源",
+      "step2Label": "确认构建",
+      "step3Label": "查看结果",
+      "confirmHint": "即将从以下来源构建评估任务：",
+      "willExtract": "系统将自动提取：",
+      "extractInput": "输入参数和预期输出",
+      "extractName": "任务名称和描述",
+      "extractDifficulty": "评估难度等级",
+      "buildSuccess": "任务构建成功",
+      "continueBuild": "继续构建",
+      "viewTask": "查看任务"
     }
   },
   "evaluations": {
@@ -372,7 +397,11 @@
     "config": "配置（JSON）",
     "configPlaceholder": "{\"threshold\": 0.8}",
     "createMetric": "创建指标",
-    "creating": "创建中..."
+    "creating": "创建中...",
+    "starting": "启动中...",
+    "startEvaluation": "启动评估",
+    "input": "输入参数（JSON）",
+    "inputPlaceholder": "{\"key\": \"value\"}"
   },
   "experiments": {
     "title": "实验对比",
@@ -538,7 +567,7 @@
     "usedThisMonth": "本月已用",
     "usedThisMonthTooltip": "基于 LLM 响应的实际 token 消耗",
     "dailyLimit": "每日限额",
-    "monthlyLimit": "每月限额",
+    "monthlyLimitBudget": "每月限额",
     "createProvider": "创建供应商",
     "creating": "创建中...",
     "updateProvider": "更新供应商",
@@ -582,7 +611,8 @@
     "permissionTargetHint": "至少需要一个目标（用户、API 密钥或技能）",
     "testInvoke": "测试调用",
     "invoke": "调用",
-    "invokeParams": "参数（JSON）"
+    "invokeParams": "参数（JSON）",
+    "grant": "授权"
   },
   "seh": {
     "title": "SEH 仪表盘",
@@ -695,7 +725,12 @@
     "triggerExecution": "触发执行",
     "viewApprovals": "查看审批",
     "runRegression": "运行回归检测",
-    "skillHealth": "技能健康度"
+    "skillHealth": "技能健康度",
+    "noExecutions": "暂无执行记录",
+    "capabilities": "能力概览",
+    "executions": {
+      "viewTrace": "查看追踪 →"
+    }
   },
   "login": {
     "title": "登录",
@@ -744,6 +779,7 @@
     "creating": "创建中...",
     "create": "创建",
     "sweepName": "扫描名称",
+    "name": "名称",
     "sweepNamePlaceholder": "例如：gpt4_temperature_sweep",
     "sweepDescPlaceholder": "可选的扫描目的描述",
     "taskID": "任务 ID",
@@ -752,6 +788,7 @@
     "temperature": "温度",
     "maxTokens": "最大 Token",
     "prompts": "提示词",
+    "prompt": "提示词",
     "promptLabel": "提示词标签",
     "totalRuns": "总运行次数",
     "noSweeps": "暂无配置扫描",
@@ -762,6 +799,7 @@
     "deleted": "扫描已删除",
     "createdWithRuns": "已创建，共 {count} 次运行",
     "progress": "进度",
+    "model": "模型",
     "pending": "等待中",
     "completed": "已完成",
     "running": "运行中",
@@ -771,7 +809,8 @@
     "maxScore": "最高分",
     "minScore": "最低分",
     "score": "分数",
-    "delete": "删除"
+    "delete": "删除",
+    "status": "状态"
   },
   "fallbackChains": {
     "title": "降级链",
@@ -854,5 +893,17 @@
     "selectTwoExperiments": "请选择两个实验进行对比",
     "selectDifferentExperiments": "请选择两个不同的实验",
     "executionOrTraceRequired": "请填写 execution_id 或 trace_id"
+  },
+  "commandPalette": {
+    "placeholder": "搜索页面...",
+    "noResults": "未找到结果",
+    "groupNavigation": "导航",
+    "groupSettings": "设置",
+    "navigate": "导航",
+    "select": "选择",
+    "close": "关闭"
+  },
+  "languageSwitcher": {
+    "reloadWarning": "切换语言将重新加载页面。"
   }
 }

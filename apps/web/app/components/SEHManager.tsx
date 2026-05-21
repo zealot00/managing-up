@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 import { deleteSEHDataset, createSEHRelease } from "../lib/seh-api";
 import { useApiMutation } from "../lib/use-mutations";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
+import { Drawer } from "./ui/Drawer";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { Database, Play, Target, LayoutDashboard } from "lucide-react";
@@ -28,8 +29,8 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
   const t = useTranslations("seh");
   const tc = useTranslations("common");
   const [activeTab, setActiveTab] = useState<"datasets" | "runs" | "policies">("datasets");
-  const [showCreateDataset, setShowCreateDataset] = useState(false);
-  const [showCreatePolicy, setShowCreatePolicy] = useState(false);
+  const [showDatasetDrawer, setShowDatasetDrawer] = useState(false);
+  const [showPolicyDrawer, setShowPolicyDrawer] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<Policy | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedCase, setExpandedCase] = useState<string | null>(null);
@@ -119,8 +120,8 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
                 className={`btn btn-sm ${activeTab === tab.key ? "btn-primary" : "btn-secondary"}`}
                 onClick={() => {
                   setActiveTab(tab.key);
-                  setShowCreateDataset(false);
-                  setShowCreatePolicy(false);
+                  setShowDatasetDrawer(false);
+                  setShowPolicyDrawer(false);
                   setEditingPolicy(null);
                   setSearchQuery("");
                 }}
@@ -134,26 +135,26 @@ export default function SEHManager({ summary, datasets, runs, policies }: Props)
         actions={
           <>
             {activeTab === "datasets" && (
-              <button className="btn btn-primary" onClick={() => { setShowCreateDataset(!showCreateDataset); setShowCreatePolicy(false); setEditingPolicy(null); }}>
-                {showCreateDataset ? tc("cancel") : t("newDataset")}
+              <button className="btn btn-primary" onClick={() => { setShowDatasetDrawer(!showDatasetDrawer); setShowPolicyDrawer(false); setEditingPolicy(null); }}>
+                {showDatasetDrawer ? tc("cancel") : t("newDataset")}
               </button>
             )}
             {activeTab === "policies" && !editingPolicy && (
-              <button className="btn btn-primary" onClick={() => { setShowCreatePolicy(!showCreatePolicy); setShowCreateDataset(false); }}>
-                {showCreatePolicy ? tc("cancel") : t("newPolicy")}
+              <button className="btn btn-primary" onClick={() => { setShowPolicyDrawer(!showPolicyDrawer); setShowDatasetDrawer(false); }}>
+                {showPolicyDrawer ? tc("cancel") : t("newPolicy")}
               </button>
             )}
           </>
         }
       />
 
-      {activeTab === "datasets" && showCreateDataset && (
-        <CreateDatasetForm onCreated={() => { setShowCreateDataset(false); }} />
-      )}
+      <Drawer isOpen={showDatasetDrawer} onClose={() => setShowDatasetDrawer(false)} title={t("createDataset")}>
+        <CreateDatasetForm onCreated={() => { setShowDatasetDrawer(false); }} />
+      </Drawer>
 
-      {activeTab === "policies" && showCreatePolicy && (
-        <CreatePolicyForm onCreated={() => { setShowCreatePolicy(false); }} />
-      )}
+      <Drawer isOpen={showPolicyDrawer} onClose={() => setShowPolicyDrawer(false)} title={t("createPolicy")}>
+        <CreatePolicyForm onCreated={() => { setShowPolicyDrawer(false); }} />
+      </Drawer>
 
       {activeTab === "policies" && editingPolicy && (
         <EditPolicyForm

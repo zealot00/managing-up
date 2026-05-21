@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ChevronRight, Home } from "lucide-react";
 
 interface BreadcrumbItem {
   label: string;
@@ -66,23 +65,21 @@ export default function Breadcrumb() {
   }
 
   return (
-    <nav className="toprail" aria-label="Breadcrumb">
+    <nav className="breadcrumb" aria-label="Breadcrumb">
       {breadcrumbs.map((crumb, index) => {
         const isLast = index === breadcrumbs.length - 1;
 
-        if (isLast) {
-          return (
-            <span key={crumb.label} className="toprail-chip" aria-current="page">
-              {crumb.label}
-            </span>
-          );
-        }
-
         return (
-          <Link key={crumb.label} href={crumb.href || "/"} className="toprail-link">
-            {index === 0 && <Home size={12} aria-hidden="true" />}
-            <span>{crumb.label}</span>
-          </Link>
+          <span key={crumb.label} className="breadcrumb-item">
+            {index > 0 && <span className="breadcrumb-sep" aria-hidden="true">/</span>}
+            {isLast ? (
+              <span className="breadcrumb-current" aria-current="page">{crumb.label}</span>
+            ) : (
+              <Link href={crumb.href || "/"} className="breadcrumb-link">
+                {crumb.label}
+              </Link>
+            )}
+          </span>
         );
       })}
     </nav>

@@ -5,15 +5,17 @@ import { useTranslations } from "next-intl";
 import { getMCPRouterCatalog, matchMCPRouter, type MCPRouterCatalogEntry } from "../lib/api";
 import { PageHeader } from "../components/layout/PageHeader";
 import { EmptyState } from "../components/layout/EmptyState";
+import { RefreshIndicator } from "../components/ui/RefreshIndicator";
 import Breadcrumb from "../../components/Breadcrumb";
 import { useState } from "react";
 import { Server } from "lucide-react";
 
 export function MCPRouterDashboardClient() {
   const t = useTranslations("mcpRouter");
-  const { data: catalog, isLoading, isError } = useQuery({
+  const { data: catalog, isLoading, isFetching, isError } = useQuery({
     queryKey: ["mcp-router-catalog"],
     queryFn: getMCPRouterCatalog,
+    refetchInterval: 15_000,
   });
 
   const stats = {
@@ -70,7 +72,7 @@ export function MCPRouterDashboardClient() {
       <Breadcrumb />
       <PageHeader
         eyebrow={t("eyebrow")}
-        title={t("title")}
+        title={<>{t("title")} <RefreshIndicator isFetching={isFetching} isLoading={isLoading} /></>}
         description={t("description")}
       />
 

@@ -17,6 +17,7 @@ type Props = {
 export default function TriggerExecutionForm({ skills }: Props) {
   const t = useTranslations("executions");
   const tc = useTranslations("common");
+  const te = useTranslations("errors");
   const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -49,7 +50,7 @@ export default function TriggerExecutionForm({ skills }: Props) {
       try {
         parsedInput = JSON.parse(data.input);
       } catch {
-        toast.error(tc("errors.inputInvalid"));
+        toast.error(te("inputInvalid"));
         return;
       }
     }

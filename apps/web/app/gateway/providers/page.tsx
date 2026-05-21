@@ -17,17 +17,18 @@ import { useToast } from "../../../components/ToastProvider";
 import Breadcrumb from "../../../components/Breadcrumb";
 import { EmptyState } from "../../components/layout/EmptyState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { Drawer } from "../../components/ui/Drawer";
+import { PasswordInput } from "../../components/ui/PasswordInput";
 import {
   Server,
   Plus,
-  X,
   Power,
   PowerOff,
   Trash2,
   Key,
   Calculator,
-  ChevronDown,
-  ChevronUp,
+  Edit3,
+  Loader2,
 } from "lucide-react";
 
 const PROVIDERS = [
@@ -43,161 +44,36 @@ const PROVIDERS = [
   { value: "alibaba", label: "Alibaba" },
 ];
 
-function BudgetInline({
+function BudgetBar({
   budget,
-  expanded,
-  onToggle,
   onEdit,
 }: {
   budget: UserBudget | null;
-  expanded: boolean;
-  onToggle: () => void;
   onEdit: () => void;
 }) {
   const t = useTranslations("providers");
-  const tc = useTranslations("common");
 
   return (
-    <div className="panel">
-      <button
-        className="panel-header-button"
-        onClick={onToggle}
-        style={{
-          width: "100%",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "12px 16px",
-          cursor: "pointer",
-          background: "transparent",
-          border: "none",
-          borderBottom: expanded ? "1px solid var(--line)" : "1px solid transparent",
-          marginBottom: expanded ? 0 : -1,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Calculator size={16} aria-hidden="true" style={{ color: "var(--muted)" }} />
-          <span style={{ fontWeight: 600, fontSize: "var(--text-sm)", color: "var(--ink)" }}>
-            {t("budget")}
-          </span>
-        </div>
-        {expanded ? (
-          <ChevronUp size={16} aria-hidden="true" />
-        ) : (
-          <ChevronDown size={16} aria-hidden="true" />
-        )}
-      </button>
-
-      {expanded && (
-        <div style={{ padding: "12px 16px" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 16,
-              marginBottom: 16,
-            }}
-          >
-            <div>
-              <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
-                {t("usedThisMonth")}
-                <span title={t("usedThisMonthTooltip")} style={{ cursor: "help" }}>?</span>
-              </div>
-              <div style={{ fontWeight: 700, fontSize: "var(--text-base)", color: "var(--ink)" }}>
-                {budget?.used_this_month.toLocaleString() || 0}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginBottom: 4 }}>
-                {t("monthlyLimit")}
-              </div>
-              <div style={{ fontWeight: 700, fontSize: "var(--text-base)", color: "var(--ink)" }}>
-                {budget?.monthly_limit.toLocaleString() || 0}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginBottom: 4 }}>
-                {t("dailyLimit")}
-              </div>
-              <div style={{ fontWeight: 700, fontSize: "var(--text-base)", color: "var(--ink)" }}>
-                {budget?.daily_limit.toLocaleString() || 0}
-              </div>
-            </div>
-          </div>
-          <button className="btn btn-sm btn-secondary" onClick={onEdit}>
-            {tc("edit")}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function BudgetEditForm({
-  budget,
-  onSave,
-  onCancel,
-  isSubmitting,
-}: {
-  budget: UserBudget | null;
-  onSave: (monthly: number, daily: number) => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
-}) {
-  const t = useTranslations("providers");
-  const tc = useTranslations("common");
-  const [monthly, setMonthly] = useState(budget?.monthly_limit ?? 0);
-  const [daily, setDaily] = useState(budget?.daily_limit ?? 0);
-
-  return (
-    <div className="panel" style={{ padding: 16 }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr auto",
-          gap: 12,
-          alignItems: "end",
-        }}
-      >
-        <div>
-          <label className="form-label" htmlFor="budget-monthly">
-            {t("monthlyLimit")}
-          </label>
-          <input
-            id="budget-monthly"
-            type="number"
-            className="form-input"
-            value={monthly}
-            onChange={(e) => setMonthly(parseInt(e.target.value) || 0)}
-            min={0}
-          />
-        </div>
-        <div>
-          <label className="form-label" htmlFor="budget-daily">
-            {t("dailyLimit")}
-          </label>
-          <input
-            id="budget-daily"
-            type="number"
-            className="form-input"
-            value={daily}
-            onChange={(e) => setDaily(parseInt(e.target.value) || 0)}
-            min={0}
-          />
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-sm btn-secondary" onClick={onCancel}>
-            {tc("cancel")}
-          </button>
-          <button
-            className="btn btn-sm btn-primary"
-            disabled={isSubmitting}
-            onClick={() => onSave(monthly, daily)}
-          >
-            {tc("save")}
-          </button>
-        </div>
+    <div className="budget-bar">
+      <div className="budget-bar-stats">
+        <Calculator size={14} aria-hidden="true" className="budget-bar-icon" />
+        <span className="budget-bar-label">{t("budget")}</span>
+        <span className="budget-bar-stat">
+          {t("usedThisMonth")} <strong>{budget?.used_this_month.toLocaleString() || 0}</strong>
+        </span>
+        <span className="budget-bar-separator">·</span>
+        <span className="budget-bar-stat">
+          {t("monthlyLimitBudget")} <strong>{budget?.monthly_limit.toLocaleString() || 0}</strong>
+        </span>
+        <span className="budget-bar-separator">·</span>
+        <span className="budget-bar-stat">
+          {t("dailyLimit")} <strong>{budget?.daily_limit.toLocaleString() || 0}</strong>
+        </span>
       </div>
+      <button className="btn btn-sm btn-secondary" onClick={onEdit}>
+        <Edit3 size={14} aria-hidden="true" />
+        {t("budget")}
+      </button>
     </div>
   );
 }
@@ -206,10 +82,12 @@ function ProviderTable({
   items,
   onToggle,
   onDelete,
+  togglingId,
 }: {
   items: GatewayProviderKey[];
   onToggle: (id: string, current: boolean) => void;
   onDelete: (id: string) => void;
+  togglingId: string | null;
 }) {
   const t = useTranslations("providers");
   const tc = useTranslations("common");
@@ -290,10 +168,14 @@ function ProviderTable({
                     <button
                       className={`mcp-toggle-btn ${p.is_enabled ? "mcp-toggle-btn-on" : "mcp-toggle-btn-off"}`}
                       onClick={() => onToggle(p.id, p.is_enabled)}
+                      disabled={togglingId === p.id}
                       title={p.is_enabled ? t("disable") : t("enable")}
                       aria-label={p.is_enabled ? t("disable") : t("enable")}
+                      style={{ opacity: togglingId === p.id ? 0.5 : 1, cursor: togglingId === p.id ? "not-allowed" : "pointer" }}
                     >
-                      {p.is_enabled ? (
+                      {togglingId === p.id ? (
+                        <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                      ) : p.is_enabled ? (
                         <Power size={14} aria-hidden="true" />
                       ) : (
                         <PowerOff size={14} aria-hidden="true" />
@@ -317,147 +199,6 @@ function ProviderTable({
   );
 }
 
-function CreateProviderForm({
-  onClose,
-  onSuccess,
-  isSubmitting,
-}: {
-  onClose: () => void;
-  onSuccess: () => void;
-  isSubmitting: boolean;
-}) {
-  const t = useTranslations("providers");
-  const tc = useTranslations("common");
-  const toast = useToast();
-  const [provider, setProvider] = useState("openai");
-  const [apiKey, setApiKey] = useState("");
-  const [modelPattern, setModelPattern] = useState("");
-  const [monthlyLimit, setMonthlyLimit] = useState(0);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!apiKey.trim()) return;
-    try {
-      await createProviderKey({
-        provider,
-        api_key: apiKey.trim(),
-        model: modelPattern.trim() || undefined,
-        monthly_limit: monthlyLimit,
-      });
-      toast.success(tc("success") + ": " + t("createProvider"));
-      onSuccess();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create provider");
-    }
-  }
-
-  return (
-    <div className="panel">
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "12px 16px",
-          borderBottom: "1px solid var(--line)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Key size={16} aria-hidden="true" style={{ color: "var(--muted)" }} />
-          <h2 className="form-title" style={{ margin: 0 }}>
-            {t("newProvider")}
-          </h2>
-        </div>
-        <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label={tc("close")}>
-          <X size={18} aria-hidden="true" />
-        </button>
-      </div>
-      <form className="form-fields" onSubmit={handleSubmit} style={{ padding: 16 }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: 12,
-            alignItems: "end",
-          }}
-        >
-          <div>
-            <label className="form-label" htmlFor="provider-select">
-              {t("provider")}
-            </label>
-            <select
-              id="provider-select"
-              className="form-select"
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-            >
-              {PROVIDERS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="form-label" htmlFor="api-key">
-              {t("apiKey")}
-            </label>
-            <input
-              id="api-key"
-              type="password"
-              className="form-input"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={t("apiKeyPlaceholder")}
-              required
-            />
-          </div>
-          <div>
-            <label className="form-label" htmlFor="model-pattern">
-              {t("modelPattern")}
-            </label>
-            <input
-              id="model-pattern"
-              type="text"
-              className="form-input"
-              value={modelPattern}
-              onChange={(e) => setModelPattern(e.target.value)}
-              placeholder={t("modelPatternPlaceholder")}
-            />
-          </div>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 8,
-            alignItems: "center",
-          }}
-        >
-          <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
-            {t("monthlyLimit")}: {monthlyLimit.toLocaleString()}
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={10000000}
-            step={10000}
-            value={monthlyLimit}
-            onChange={(e) => setMonthlyLimit(parseInt(e.target.value) || 0)}
-            style={{ width: 120 }}
-          />
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setMonthlyLimit(0)}>
-            {t("unlimited")}
-          </button>
-          <button type="submit" className="btn btn-primary btn-sm" disabled={isSubmitting || !apiKey.trim()}>
-            {isSubmitting ? t("creating") : t("createProvider")}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
 export default function ProvidersPage() {
   const t = useTranslations("providers");
   const tc = useTranslations("common");
@@ -468,12 +209,22 @@ export default function ProvidersPage() {
   const [providers, setProviders] = useState<GatewayProviderKey[]>([]);
   const [budget, setBudget] = useState<UserBudget | null>(null);
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const [budgetExpanded, setBudgetExpanded] = useState(true);
-  const [budgetEditing, setBudgetEditing] = useState(false);
+  const [showBudgetDrawer, setShowBudgetDrawer] = useState(false);
   const [isBudgetSubmitting, setIsBudgetSubmitting] = useState(false);
+
+  // Create form state
+  const [provider, setProvider] = useState("openai");
+  const [apiKey, setApiKey] = useState("");
+  const [modelPattern, setModelPattern] = useState("");
+  const [monthlyLimit, setMonthlyLimit] = useState(0);
+
+  // Budget edit state
+  const [budgetMonthly, setBudgetMonthly] = useState(0);
+  const [budgetDaily, setBudgetDaily] = useState(0);
 
   async function loadData() {
     setIsLoading(true);
@@ -494,18 +245,51 @@ export default function ProvidersPage() {
     }
   }, [isAuthLoading]);
 
-  async function handleCreateSuccess() {
-    setShowCreateForm(false);
-    await loadData();
+  async function handleCreateSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!apiKey.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await createProviderKey({
+        provider,
+        api_key: apiKey.trim(),
+        model: modelPattern.trim() || undefined,
+        monthly_limit: monthlyLimit,
+      });
+      toast.success(tc("success") + ": " + t("createProvider"));
+      setShowCreateDrawer(false);
+      resetCreateForm();
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create provider");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function resetCreateForm() {
+    setProvider("openai");
+    setApiKey("");
+    setModelPattern("");
+    setMonthlyLimit(0);
+  }
+
+  function handleOpenBudgetDrawer() {
+    setBudgetMonthly(budget?.monthly_limit ?? 0);
+    setBudgetDaily(budget?.daily_limit ?? 0);
+    setShowBudgetDrawer(true);
   }
 
   async function handleToggle(id: string, currentEnabled: boolean) {
+    setTogglingId(id);
     try {
       await toggleProviderKey(id, !currentEnabled);
       toast.success(tc("success") + ": " + (!currentEnabled ? t("enable") : t("disable")));
       await loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to toggle provider");
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -519,12 +303,12 @@ export default function ProvidersPage() {
     }
   }
 
-  async function handleBudgetSave(monthly: number, daily: number) {
+  async function handleBudgetSave() {
     setIsBudgetSubmitting(true);
     try {
-      await updateBudget({ monthly_limit: monthly, daily_limit: daily });
+      await updateBudget({ monthly_limit: budgetMonthly, daily_limit: budgetDaily });
       toast.success(tc("success") + ": Budget updated");
-      setBudgetEditing(false);
+      setShowBudgetDrawer(false);
       await loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update budget");
@@ -556,44 +340,153 @@ export default function ProvidersPage() {
           </p>
         </div>
         <div className="page-header-actions">
-          <button className="btn btn-primary" onClick={() => setShowCreateForm(true)}>
+          <button className="btn btn-primary" onClick={() => setShowCreateDrawer(true)}>
             <Plus size={16} aria-hidden="true" />
             {t("newProvider")}
           </button>
         </div>
       </div>
 
-      {budgetEditing ? (
-        <BudgetEditForm
-          budget={budget}
-          onSave={handleBudgetSave}
-          onCancel={() => setBudgetEditing(false)}
-          isSubmitting={isBudgetSubmitting}
-        />
-      ) : (
-        <BudgetInline
-          budget={budget}
-          expanded={budgetExpanded}
-          onToggle={() => setBudgetExpanded((v) => !v)}
-          onEdit={() => setBudgetEditing(true)}
-        />
-      )}
-
-      {showCreateForm && (
-        <CreateProviderForm
-          onClose={() => setShowCreateForm(false)}
-          onSuccess={handleCreateSuccess}
-          isSubmitting={isSubmitting}
-        />
-      )}
+      <BudgetBar budget={budget} onEdit={handleOpenBudgetDrawer} />
 
       <div className="panel" style={{ padding: 0 }}>
         <ProviderTable
           items={providers}
           onToggle={handleToggle}
           onDelete={handleDelete}
+          togglingId={togglingId}
         />
       </div>
+
+      {/* Create Provider Drawer */}
+      <Drawer
+        isOpen={showCreateDrawer}
+        onClose={() => { setShowCreateDrawer(false); resetCreateForm(); }}
+        title={t("newProvider")}
+        description={t("lede")}
+      >
+        <form onSubmit={handleCreateSubmit}>
+          <div style={{ display: "grid", gap: "var(--space-4)" }}>
+            <div>
+              <label className="form-label" htmlFor="provider-select">{t("provider")}</label>
+              <select
+                id="provider-select"
+                className="form-select"
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+              >
+                {PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="api-key">{t("apiKey")}</label>
+              <PasswordInput
+                id="api-key"
+                inputClassName="form-input"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={t("apiKeyPlaceholder")}
+                required
+              />
+            </div>
+            <div>
+              <label className="form-label" htmlFor="model-pattern">{t("modelPattern")}</label>
+              <input
+                id="model-pattern"
+                type="text"
+                className="form-input"
+                value={modelPattern}
+                onChange={(e) => setModelPattern(e.target.value)}
+                placeholder={t("modelPatternPlaceholder")}
+              />
+            </div>
+            <div>
+              <label className="form-label">{t("monthlyLimit")}</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="range"
+                  min={0}
+                  max={10000000}
+                  step={10000}
+                  value={monthlyLimit}
+                  onChange={(e) => setMonthlyLimit(parseInt(e.target.value) || 0)}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, minWidth: 80, textAlign: "right" }}>
+                  {monthlyLimit > 0 ? monthlyLimit.toLocaleString() : t("unlimited")}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: "var(--space-4)" }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => { setShowCreateDrawer(false); resetCreateForm(); }}
+              >
+                {tc("cancel")}
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isSubmitting || !apiKey.trim()}
+              >
+                {isSubmitting ? t("creating") : t("createProvider")}
+              </button>
+            </div>
+          </div>
+        </form>
+      </Drawer>
+
+      {/* Budget Edit Drawer */}
+      <Drawer
+        isOpen={showBudgetDrawer}
+        onClose={() => setShowBudgetDrawer(false)}
+        title={t("budget")}
+      >
+        <div style={{ display: "grid", gap: "var(--space-4)" }}>
+          <div>
+            <label className="form-label" htmlFor="budget-monthly">{t("monthlyLimit")}</label>
+            <input
+              id="budget-monthly"
+              type="number"
+              className="form-input"
+              value={budgetMonthly}
+              onChange={(e) => setBudgetMonthly(parseInt(e.target.value) || 0)}
+              min={0}
+            />
+          </div>
+          <div>
+            <label className="form-label" htmlFor="budget-daily">{t("dailyLimit")}</label>
+            <input
+              id="budget-daily"
+              type="number"
+              className="form-input"
+              value={budgetDaily}
+              onChange={(e) => setBudgetDaily(parseInt(e.target.value) || 0)}
+              min={0}
+            />
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: "var(--space-4)" }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowBudgetDrawer(false)}
+            >
+              {tc("cancel")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={isBudgetSubmitting}
+              onClick={handleBudgetSave}
+            >
+              {isBudgetSubmitting ? tc("loading") : tc("save")}
+            </button>
+          </div>
+        </div>
+      </Drawer>
     </div>
   );
 }

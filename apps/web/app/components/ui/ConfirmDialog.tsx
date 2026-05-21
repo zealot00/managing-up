@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, useRef, ReactNode } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { useFocusTrap } from "../../hooks/use-focus-trap";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -27,12 +28,34 @@ export function ConfirmDialog({
   children,
 }: ConfirmDialogProps) {
   const [loading, setLoading] = useState(false);
+  const titleId = useRef(`confirm-title-${Math.random().toString(36).slice(2, 9)}`).current;
+  const descId = useRef(`confirm-desc-${Math.random().toString(36).slice(2, 9)}`).current;
+  const setContainerRef = useFocusTrap(isOpen);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setLoading(false);
+      // Auto-focus the cancel button (recommended for destructive actions)
+      requestAnimationFrame(() => {
+        cancelRef.current?.focus();
+      });
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape" && !loading) onClose();
+    }
+    if (isOpen) {
+      document.addEventListener("keydown", handleEsc);
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, loading, onClose]);
 
   async function handleConfirm() {
     setLoading(true);
@@ -64,8 +87,11 @@ export function ConfirmDialog({
     ? "var(--warning)"
     : "var(--primary)";
 
+  const hasDescription = !!(description || children);
+
   return (
     <div
+      role="presentation"
       style={{
         position: "fixed",
         inset: 0,
@@ -82,6 +108,11 @@ export function ConfirmDialog({
       }}
     >
       <div
+        ref={setContainerRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={hasDescription ? descId : undefined}
         style={{
           background: "var(--surface-raised)",
           borderRadius: "var(--radius-lg)",
@@ -110,6 +141,7 @@ export function ConfirmDialog({
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3
+              id={titleId}
               style={{
                 fontSize: "var(--text-lg)",
                 fontWeight: 700,
@@ -119,21 +151,24 @@ export function ConfirmDialog({
             >
               {title}
             </h3>
-            {description && (
-              <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", lineHeight: 1.6 }}>
-                {description}
-              </p>
-            )}
-            {children && (
-              <div style={{ marginTop: "var(--space-4)" }}>
-                {children}
-              </div>
-            )}
+            <div id={descId}>
+              {description && (
+                <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", lineHeight: 1.6 }}>
+                  {description}
+                </p>
+              )}
+              {children && (
+                <div style={{ marginTop: "var(--space-4)" }}>
+                  {children}
+                </div>
+              )}
+            </div>
           </div>
 
           <button
             onClick={() => !loading && onClose()}
             disabled={loading}
+            aria-label="Close"
             style={{
               background: "none",
               border: "none",
@@ -157,6 +192,7 @@ export function ConfirmDialog({
           }}
         >
           <button
+            ref={cancelRef}
             onClick={() => !loading && onClose()}
             disabled={loading}
             className="btn btn-secondary"

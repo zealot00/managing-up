@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Drawer } from "./ui/Drawer";
-import TaskFromTraceForm from "../../components/TaskFromTraceForm";
+import TaskFromTraceWizard from "../../components/TaskFromTraceForm";
 import { useTranslations } from "next-intl";
 import type { Task } from "../lib/api";
 
@@ -31,12 +30,11 @@ export function TaskFromTraceDrawer({ executionId, isOpen, onClose }: TaskFromTr
       title={t("taskBuilder.title")}
       description={t("taskBuilder.drawerDescription")}
     >
-      <div style={{ maxWidth: 480 }}>
-        <TaskFromTraceForm
-          initialExecutionId={executionId}
-          onTaskCreated={handleTaskCreated}
-        />
-      </div>
+      <TaskFromTraceWizard
+        initialExecutionId={executionId}
+        onTaskCreated={handleTaskCreated}
+        hideHeader
+      />
     </Drawer>
   );
 }

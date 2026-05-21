@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { listSnapshots, getSnapshot, SkillCapabilitySnapshot } from "../lib/gateway-api";
+import { useDebounce } from "../hooks/use-debounce";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { ListSkeleton } from "./layout/Skeleton";
@@ -132,12 +133,13 @@ function SnapshotChecker({ t }: { t: ReturnType<typeof useTranslations<"snapshot
 export default function SnapshotHistoryClient() {
   const t = useTranslations("snapshots");
   const [skillFilter, setSkillFilter] = useState("");
+  const debouncedSkillFilter = useDebounce(skillFilter, 300);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
   const { data: snapshotsData, isLoading, isError } = useQuery({
-    queryKey: ["snapshots", skillFilter],
-    queryFn: () => listSnapshots({ skill_id: skillFilter, limit: 100 }),
-    enabled: !!skillFilter,
+    queryKey: ["snapshots", debouncedSkillFilter],
+    queryFn: () => listSnapshots({ skill_id: debouncedSkillFilter, limit: 100 }),
+    enabled: !!debouncedSkillFilter,
   });
 
   const snapshots = Array.isArray(snapshotsData) ? snapshotsData : snapshotsData?.items ?? [];

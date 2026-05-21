@@ -127,7 +127,7 @@ export default function EditPolicyForm({ policy, onCancel, onUpdated }: Props) {
           {loading ? t("saving") : t("saveChanges")}
         </button>
         <button type="button" onClick={onCancel} className="btn btn-secondary" style={{ flex: 1 }}>
-          {t("cancel") || "Cancel"}
+          {tc("cancel")}
         </button>
       </div>
     </form>

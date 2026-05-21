@@ -4,29 +4,22 @@ import { ReactNode } from "react";
 
 interface PageHeaderProps {
   eyebrow?: ReactNode;
-  title: string;
+  title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
 }
 
 export function PageHeader({ eyebrow, title, description, actions }: PageHeaderProps) {
+  const hasTitle = title !== undefined && title !== null && title !== "";
   return (
-    <header
-      className="hero-page hero-compact"
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        gap: "var(--space-6)",
-      }}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-        <h1>{title}</h1>
-        {description && <p className="lede">{description}</p>}
+    <header className="page-header">
+      <div className="page-header-text">
+        {eyebrow && <p className="page-header-eyebrow">{eyebrow}</p>}
+        {hasTitle && <h1 className="page-header-title">{title}</h1>}
+        {description && <p className="page-header-desc">{description}</p>}
       </div>
       {actions && (
-        <div className="page-header-actions" style={{ flexShrink: 0 }}>
+        <div className="page-header-actions">
           {actions}
         </div>
       )}

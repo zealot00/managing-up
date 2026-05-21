@@ -27,6 +27,7 @@ async function updateTaskWrapper(vars: UpdateTaskVariables) {
 
 export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Props) {
   const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const te = useTranslations("errors");
   const toast = useToast();
   const updateMutation = useApiMutation(updateTaskWrapper, {
@@ -158,7 +159,7 @@ export default function EditTaskForm({ task, skills, onCancel, onUpdated }: Prop
 
       <div className="form-actions">
         <button type="button" onClick={onCancel} className="form-cancel">
-          {t("cancel")}
+          {tc("cancel")}
         </button>
         <button type="submit" disabled={isSubmitting} className="form-submit" style={{ flex: 1 }}>
           {isSubmitting ? t("saving") : t("saveChanges")}

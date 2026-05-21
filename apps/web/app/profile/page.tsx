@@ -7,6 +7,8 @@ import { useToast } from "../../components/ToastProvider";
 import Breadcrumb from "../../components/Breadcrumb";
 import { getUserProfile, changePassword, UserProfile } from "../lib/user-api";
 import { User, Lock, Shield, Calendar } from "lucide-react";
+import { Skeleton } from "../components/layout/Skeleton";
+import { PasswordInput } from "../components/ui/PasswordInput";
 
 export default function ProfilePage() {
   const t = useTranslations("profile");
@@ -94,7 +96,22 @@ export default function ProfilePage() {
         </div>
         <div style={{ padding: "var(--space-4)" }}>
           {isLoading ? (
-            <p style={{ color: "var(--muted)" }}>{tc("loading")}</p>
+            <div style={{ display: "grid", gap: "var(--space-4)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                <Skeleton width={16} height={16} />
+                <div>
+                  <Skeleton width={80} height={12} style={{ marginBottom: 4 }} />
+                  <Skeleton width={120} height={16} />
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                <Skeleton width={16} height={16} />
+                <div>
+                  <Skeleton width={40} height={12} style={{ marginBottom: 4 }} />
+                  <Skeleton width={60} height={20} borderRadius="var(--radius-sm)" />
+                </div>
+              </div>
+            </div>
           ) : displayProfile ? (
             <div style={{ display: "grid", gap: "var(--space-4)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
@@ -139,10 +156,9 @@ export default function ProfilePage() {
           <div style={{ display: "grid", gap: "var(--space-4)", maxWidth: 400 }}>
             <div>
               <label className="form-label" htmlFor="current-password">{t("currentPassword")}</label>
-              <input
+              <PasswordInput
                 id="current-password"
-                type="password"
-                className="form-input"
+                inputClassName="form-input"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder={t("currentPasswordPlaceholder")}
@@ -151,10 +167,9 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="form-label" htmlFor="new-password">{t("newPassword")}</label>
-              <input
+              <PasswordInput
                 id="new-password"
-                type="password"
-                className="form-input"
+                inputClassName="form-input"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder={t("newPasswordPlaceholder")}
@@ -169,10 +184,9 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="form-label" htmlFor="confirm-password">{t("confirmPassword")}</label>
-              <input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
-                className="form-input"
+                inputClassName="form-input"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder={t("confirmPasswordPlaceholder")}

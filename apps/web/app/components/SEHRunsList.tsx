@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
+import Breadcrumb from "../../components/Breadcrumb";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 
@@ -39,9 +39,7 @@ export default function SEHRunsList({ runs, total, hasMore, error }: Props) {
 
   return (
     <main className="shell">
-      <section className="toprail">
-        <Link href="/seh" className="toprail-link">← {tc("back")} to SEH</Link>
-      </section>
+      <Breadcrumb />
 
       <PageHeader
         eyebrow="SEH"

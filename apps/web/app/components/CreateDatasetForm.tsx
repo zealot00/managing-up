@@ -44,11 +44,6 @@ export default function CreateDatasetForm({ onCreated }: Props) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
-      <div className="panel-header">
-        <p className="section-kicker">{t("eyebrow")}</p>
-        <h2>{t("createDataset")}</h2>
-      </div>
-
       {createDatasetMutation.error && <p className="form-error">{createDatasetMutation.error.message}</p>}
 
       <div className="form-fields">

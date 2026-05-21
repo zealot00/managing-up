@@ -6,6 +6,7 @@ import { useToast } from "../../components/ToastProvider";
 import Breadcrumb from "../../components/Breadcrumb";
 import { getUserPreferences, updateUserPreferences, UserPreferences } from "../lib/user-api";
 import { Globe, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Skeleton } from "../components/layout/Skeleton";
 
 export default function PreferencesPage() {
   const t = useTranslations("preferences");
@@ -80,9 +81,29 @@ export default function PreferencesPage() {
       </div>
 
       {isLoading ? (
-        <div className="panel" style={{ padding: "var(--space-4)" }}>
-          <p style={{ color: "var(--muted)" }}>Loading...</p>
-        </div>
+        <>
+          <div className="panel" style={{ marginBottom: "var(--space-6)" }}>
+            <div style={{ padding: "var(--space-4)", borderBottom: "1px solid var(--line)" }}>
+              <Skeleton width={100} height={16} />
+            </div>
+            <div style={{ padding: "var(--space-4)" }}>
+              <Skeleton width={280} height={14} style={{ marginBottom: "var(--space-3)" }} />
+              <div style={{ display: "flex", gap: "var(--space-3)" }}>
+                <Skeleton width={64} height={36} borderRadius="var(--radius-sm)" />
+                <Skeleton width={64} height={36} borderRadius="var(--radius-sm)" />
+              </div>
+            </div>
+          </div>
+          <div className="panel">
+            <div style={{ padding: "var(--space-4)", borderBottom: "1px solid var(--line)" }}>
+              <Skeleton width={100} height={16} />
+            </div>
+            <div style={{ padding: "var(--space-4)" }}>
+              <Skeleton width={200} height={14} style={{ marginBottom: "var(--space-2)" }} />
+              <Skeleton width={44} height={24} borderRadius="12px" />
+            </div>
+          </div>
+        </>
       ) : (
         <>
           {/* Language */}

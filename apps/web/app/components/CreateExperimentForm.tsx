@@ -45,11 +45,6 @@ export default function CreateExperimentForm({ tasks, onCreated }: Props) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="form-panel">
-      <div className="panel-header">
-        <p className="section-kicker">{t("eyebrow")}</p>
-        <h2>{t("createExperiment")}</h2>
-      </div>
-
       {createExperimentMutation.error && <p className="form-error">{createExperimentMutation.error.message}</p>}
 
       <div className="form-fields">

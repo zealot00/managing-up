@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useToast } from "../../components/ToastProvider";
+import { Drawer } from "../components/ui/Drawer";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import Breadcrumb from "../../components/Breadcrumb";
 import {
@@ -20,7 +21,6 @@ import {
   XCircle,
   Plus,
   Trash2,
-  X,
   Power,
   PowerOff,
 } from "lucide-react";
@@ -57,7 +57,7 @@ export default function FallbackChainsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedChainId, setExpandedChainId] = useState<string | null>(null);
 
@@ -88,7 +88,7 @@ export default function FallbackChainsPage() {
     setFormTargets([
       { provider: "openai", model: "", weight: 1, priority: 1, is_enabled: true },
     ]);
-    setShowCreateForm(false);
+    setShowCreateDrawer(false);
   }
 
   function addTargetRow() {
@@ -188,7 +188,7 @@ export default function FallbackChainsPage() {
         <div className="page-header-actions">
           <button
             className="btn btn-primary"
-            onClick={() => setShowCreateForm(true)}
+            onClick={() => setShowCreateDrawer(true)}
           >
             <Plus size={16} aria-hidden="true" />
             {t("newChain")}
@@ -202,103 +202,87 @@ export default function FallbackChainsPage() {
         </div>
       )}
 
-      {showCreateForm && (
-        <div className="form-panel">
-          <div className="form-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <p className="section-kicker">{t("title")}</p>
-              <h2 className="form-title">{t("createChain")}</h2>
+      <Drawer isOpen={showCreateDrawer} onClose={() => setShowCreateDrawer(false)} title={t("createChain")}>
+        <form className="form-fields" onSubmit={handleCreate}>
+          <div>
+            <label className="form-label" htmlFor="fc-model">{t("model")}</label>
+            <input
+              id="fc-model"
+              className="form-input"
+              value={formModel}
+              onChange={(e) => setFormModel(e.target.value)}
+              placeholder={t("modelPlaceholder")}
+              required
+            />
+          </div>
+
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <label className="form-label" id="fc-targets-label">{t("targets")}</label>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={addTargetRow}
+              >
+                <Plus size={14} aria-hidden="true" />
+                {t("addTarget")}
+              </button>
             </div>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={resetForm}
-              aria-label={tc("close")}
-            >
-              <X size={18} aria-hidden="true" />
+            {formTargets.map((target, index) => (
+              <div key={index} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                <select
+                  className="form-select"
+                  value={target.provider}
+                  onChange={(e) => updateTargetRow(index, "provider", e.target.value)}
+                  style={{ minWidth: 120 }}
+                  aria-label={`${t("provider")} ${index + 1}`}
+                >
+                  {PROVIDERS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                <input
+                  className="form-input"
+                  value={target.model}
+                  onChange={(e) => updateTargetRow(index, "model", e.target.value)}
+                  placeholder={t("targetModelPlaceholder")}
+                  style={{ flex: 1 }}
+                  aria-label={`${t("model")} ${index + 1}`}
+                />
+                <input
+                  className="form-input"
+                  type="number"
+                  value={target.priority}
+                  onChange={(e) => updateTargetRow(index, "priority", Number(e.target.value))}
+                  placeholder={t("priority")}
+                  style={{ width: 80 }}
+                  min={1}
+                  aria-label={`${t("priority")} ${index + 1}`}
+                />
+                {formTargets.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => removeTargetRow(index)}
+                    aria-label={tc("delete")}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="form-actions">
+            <button type="button" className="btn btn-secondary" onClick={resetForm}>
+              {tc("cancel")}
+            </button>
+            <button type="submit" className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {isSubmitting ? <><Spinner size="sm" /> {t("creating")}</> : t("create")}
             </button>
           </div>
-          <form className="form-fields" onSubmit={handleCreate}>
-            <div>
-              <label className="form-label" htmlFor="fc-model">{t("model")}</label>
-              <input
-                id="fc-model"
-                className="form-input"
-                value={formModel}
-                onChange={(e) => setFormModel(e.target.value)}
-                placeholder={t("modelPlaceholder")}
-                required
-                autoFocus
-              />
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <label className="form-label" id="fc-targets-label">{t("targets")}</label>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-secondary"
-                  onClick={addTargetRow}
-                >
-                  <Plus size={14} aria-hidden="true" />
-                  {t("addTarget")}
-                </button>
-              </div>
-              {formTargets.map((target, index) => (
-                <div key={index} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
-                  <select
-                    className="form-select"
-                    value={target.provider}
-                    onChange={(e) => updateTargetRow(index, "provider", e.target.value)}
-                    style={{ minWidth: 120 }}
-                    aria-label={`${t("provider")} ${index + 1}`}
-                  >
-                    {PROVIDERS.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  <input
-                    className="form-input"
-                    value={target.model}
-                    onChange={(e) => updateTargetRow(index, "model", e.target.value)}
-                    placeholder={t("targetModelPlaceholder")}
-                    style={{ flex: 1 }}
-                    aria-label={`${t("model")} ${index + 1}`}
-                  />
-                  <input
-                    className="form-input"
-                    type="number"
-                    value={target.priority}
-                    onChange={(e) => updateTargetRow(index, "priority", Number(e.target.value))}
-                    placeholder={t("priority")}
-                    style={{ width: 80 }}
-                    min={1}
-                    aria-label={`${t("priority")} ${index + 1}`}
-                  />
-                  {formTargets.length > 1 && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => removeTargetRow(index)}
-                      aria-label={tc("delete")}
-                    >
-                      <Trash2 size={14} aria-hidden="true" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={resetForm}>
-                {tc("cancel")}
-              </button>
-              <button type="submit" className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {isSubmitting ? <><Spinner size="sm" /> {t("creating")}</> : t("create")}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+        </form>
+      </Drawer>
 
       {chains.length === 0 ? (
         <div className="empty-state">
@@ -310,7 +294,7 @@ export default function FallbackChainsPage() {
             {t("noChainsDesc")}
           </p>
           <div className="empty-state-action" style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={() => setShowCreateForm(true)}>
+            <button className="btn btn-primary" onClick={() => setShowCreateDrawer(true)}>
               <Plus size={16} aria-hidden="true" />
               {t("newChain")}
             </button>
@@ -322,12 +306,12 @@ export default function FallbackChainsPage() {
             <table className="gateway-table">
               <thead>
                 <tr>
-                  <th scope="col"></th>
+                  <th scope="col" style={{ width: 40 }}></th>
                   <th>{t("model")}</th>
                   <th style={{ width: 100 }}>{tc("status")}</th>
-                  <th style={{ width: 100 }}>{t("targetCount")}</th>
-                  <th style={{ width: 80 }}>{t("enabled")}</th>
-                  <th style={{ width: 120 }}>{tc("actions")}</th>
+                  <th style={{ width: 80 }}>{t("targetCount")}</th>
+                  <th style={{ width: 60 }}>{t("enabled")}</th>
+                  <th style={{ width: 60 }}>{tc("actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -350,14 +334,9 @@ export default function FallbackChainsPage() {
                           </button>
                         </td>
                         <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <ArrowDownUp size={16} aria-hidden="true" style={{ color: "var(--muted)", flexShrink: 0 }} />
-                            <div>
-                              <div style={{ fontWeight: 600, color: "var(--ink-strong)", fontSize: "var(--text-sm)" }}>
-                                {chain.model}
-                              </div>
-                            </div>
-                          </div>
+                          <span style={{ fontWeight: 600, color: "var(--ink-strong)", fontSize: "var(--text-sm)" }}>
+                            {chain.model}
+                          </span>
                         </td>
                         <td>
                           <span className={chain.is_enabled ? "badge badge-completed" : "badge badge-pending"} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -414,12 +393,12 @@ export default function FallbackChainsPage() {
                                     <tr key={target.id}>
                                       <td>{target.priority}</td>
                                       <td>
-                                        <code style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                                        <code style={{ fontFamily: "'IBM Plex Mono', monospace", background: "none", padding: 0 }}>
                                           {target.provider}
                                         </code>
                                       </td>
                                       <td>
-                                        <code style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                                        <code style={{ fontFamily: "'IBM Plex Mono', monospace", background: "none", padding: 0 }}>
                                           {target.model}
                                         </code>
                                       </td>

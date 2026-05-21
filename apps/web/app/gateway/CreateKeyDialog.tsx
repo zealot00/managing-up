@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useState, useEffect, useCallback } from "react";
+import { FormEvent, useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { KeyRound, X, Copy, Check } from "lucide-react";
 import { createGatewayKey, GatewayKeyMeta } from "../lib/gateway-api";
+import { useFocusTrap } from "../hooks/use-focus-trap";
 
 type DialogState = "open" | "submitting" | "success";
 
@@ -22,6 +23,8 @@ export function CreateKeyDialog({ isOpen, onClose, onCreated, existingKeys }: Cr
   const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const titleId = useRef(`create-key-title-${Math.random().toString(36).slice(2, 9)}`).current;
+  const setContainerRef = useFocusTrap(isOpen);
 
   const activeKeyNames = existingKeys.filter((k) => !k.revoked_at).map((k) => k.name);
 
@@ -36,6 +39,20 @@ export function CreateKeyDialog({ isOpen, onClose, onCreated, existingKeys }: Cr
   useEffect(() => {
     if (isOpen) reset();
   }, [isOpen, reset]);
+
+  useEffect(() => {
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape" && state !== "submitting") handleClose();
+    }
+    if (isOpen) {
+      document.addEventListener("keydown", handleEsc);
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, state]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -82,6 +99,7 @@ export function CreateKeyDialog({ isOpen, onClose, onCreated, existingKeys }: Cr
 
   return (
     <div
+      role="presentation"
       style={{
         position: "fixed",
         inset: 0,
@@ -98,6 +116,10 @@ export function CreateKeyDialog({ isOpen, onClose, onCreated, existingKeys }: Cr
       }}
     >
       <div
+        ref={setContainerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         style={{
           background: "var(--surface-raised)",
           borderRadius: "var(--radius-lg)",
@@ -126,6 +148,7 @@ export function CreateKeyDialog({ isOpen, onClose, onCreated, existingKeys }: Cr
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3
+              id={titleId}
               style={{
                 fontSize: "var(--text-lg)",
                 fontWeight: 700,
@@ -145,6 +168,7 @@ export function CreateKeyDialog({ isOpen, onClose, onCreated, existingKeys }: Cr
                   <code>{newKeyValue}</code>
                   <button
                     onClick={handleCopy}
+                    aria-label={copied ? t("copied") : t("copyKey")}
                     style={{
                       position: "absolute",
                       top: "var(--space-2)",
@@ -184,7 +208,7 @@ export function CreateKeyDialog({ isOpen, onClose, onCreated, existingKeys }: Cr
                   autoFocus
                   style={{ width: "100%" }}
                 />
-                {error && <p className="form-error" style={{ marginTop: "var(--space-2)" }}>{error}</p>}
+                {error && <p className="form-error" role="alert" style={{ marginTop: "var(--space-2)" }}>{error}</p>}
               </form>
             )}
           </div>

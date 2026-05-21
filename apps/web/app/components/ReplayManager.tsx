@@ -5,6 +5,7 @@ import { ReplaySnapshot } from "../lib/api";
 import ReplayFilter from "./ReplayFilter";
 import ReplayDetail from "./ReplayDetail";
 import { useTranslations } from "next-intl";
+import { RotateCcw } from "lucide-react";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 
@@ -101,7 +102,7 @@ export default function ReplayManager({ snapshots }: Props) {
           ))
         ) : (
           <EmptyState
-            icon="◎"
+            icon={<RotateCcw size={48} aria-hidden="true" />}
             title={t("noSnapshots")}
             description={t("noSnapshotsDesc")}
           />

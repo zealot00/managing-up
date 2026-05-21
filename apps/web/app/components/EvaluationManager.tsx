@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { Play, ListChecks, Gauge, Loader } from "lucide-react";
 import { TaskExecution, Task, Metric } from "../lib/api";
 import { useTranslations } from "next-intl";
 import RunEvaluationForm from "./RunEvaluationForm";
 import CreateMetricForm from "./CreateMetricForm";
+import { Drawer } from "./ui/Drawer";
 import { PageHeader } from "./layout/PageHeader";
 import { EmptyState } from "./layout/EmptyState";
 import { Badge } from "./ui/Badge";
@@ -21,7 +23,7 @@ type Props = {
 export default function EvaluationManager({ executions, tasks, metrics }: Props) {
   const t = useTranslations("evaluations");
   const [showRunEval, setShowRunEval] = useState(false);
-  const [showCreateMetric, setShowCreateMetric] = useState(false);
+  const [showCreateDrawer, setShowCreateDrawer] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -67,10 +69,10 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
   const hasMoreTasks = taskDisplayCount < filteredTasks.length;
 
   const stats = [
-    { label: t("taskExecutions", { count: executions.length }), value: executions.length, icon: "▶", color: "var(--primary)" },
-    { label: t("tasks", { count: tasks.length }), value: tasks.length, icon: "☐", color: "var(--ink)" },
-    { label: t("metrics", { count: metrics.length }), value: metrics.length, icon: "◆", color: "var(--success)" },
-    { label: "Running", value: executions.filter(e => e.status === "running").length, icon: "●", color: "var(--warning)" },
+    { label: t("taskExecutions", { count: executions.length }), value: executions.length, Icon: Play, color: "var(--primary)" },
+    { label: t("tasks", { count: tasks.length }), value: tasks.length, Icon: ListChecks, color: "var(--ink)" },
+    { label: t("metrics", { count: metrics.length }), value: metrics.length, Icon: Gauge, color: "var(--success)" },
+    { label: "Running", value: executions.filter(e => e.status === "running").length, Icon: Loader, color: "var(--warning)" },
   ];
 
   return (
@@ -80,29 +82,33 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
         description={t("lede")}
         actions={
           <>
-            <button className="btn btn-secondary" onClick={() => { setShowCreateMetric(!showCreateMetric); setShowRunEval(false); }}>
-              {showCreateMetric ? "Cancel" : t("newMetric")}
+            <button className="btn btn-secondary" onClick={() => setShowCreateDrawer(true)}>
+              {t("newMetric")}
             </button>
-            <button className="btn btn-primary" onClick={() => { setShowRunEval(!showRunEval); setShowCreateMetric(false); }}>
-              {showRunEval ? "Cancel" : t("runEvaluation")}
+            <button className="btn btn-primary" onClick={() => setShowRunEval(true)}>
+              {t("runEvaluation")}
             </button>
           </>
         }
       />
 
-      {showCreateMetric && <CreateMetricForm onCreated={() => setShowCreateMetric(false)} />}
-      {showRunEval && <RunEvaluationForm tasks={tasks} onCreated={() => setShowRunEval(false)} />}
+      <Drawer isOpen={showCreateDrawer} onClose={() => setShowCreateDrawer(false)} title={t("newMetric")}>
+        <CreateMetricForm onCreated={() => setShowCreateDrawer(false)} />
+      </Drawer>
+      <Drawer isOpen={showRunEval} onClose={() => setShowRunEval(false)} title={t("runEvaluation")}>
+        <RunEvaluationForm tasks={tasks} onCreated={() => setShowRunEval(false)} />
+      </Drawer>
 
-      <div className="eval-sticky-header">
-        <div className="dashboard-stats">
-          {stats.map((stat) => (
-            <article className="dashboard-stat-card" key={stat.label}>
-              <div className="dashboard-stat-icon" style={{ color: stat.color }}>{stat.icon}</div>
-              <div className="dashboard-stat-value">{stat.value}</div>
-              <div className="dashboard-stat-label">{stat.label}</div>
-            </article>
-          ))}
-        </div>
+      <div className="dashboard-stats">
+        {stats.map((stat) => (
+          <article className="dashboard-stat-card" key={stat.label}>
+            <div className="dashboard-stat-icon" style={{ color: stat.color }}>
+              <stat.Icon size={18} />
+            </div>
+            <div className="dashboard-stat-value">{stat.value}</div>
+            <div className="dashboard-stat-label">{stat.label}</div>
+          </article>
+        ))}
       </div>
 
       {metrics.length > 0 && (
@@ -126,30 +132,18 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
             <h2 className="dashboard-section-title">
               {t("eyebrow")}
             </h2>
-            <div style={{ display: "flex", gap: "var(--space-2)" }}>
-              <select
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setExecDisplayCount(PAGE_SIZE); }}
-                className="form-select"
-                style={{ minWidth: 120, fontSize: "var(--text-sm)" }}
-              >
-                <option value="all">All Status</option>
-                <option value="running">Running</option>
-                <option value="pending">Pending</option>
-                <option value="completed">Completed</option>
-                <option value="failed">Failed</option>
-              </select>
-            </div>
-          </div>
-          <div style={{ marginBottom: "var(--space-4)" }}>
-            <input
-              type="text"
-              placeholder="Search executions..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setExecDisplayCount(PAGE_SIZE); }}
-              className="form-input"
-              style={{ width: "100%" }}
-            />
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setExecDisplayCount(PAGE_SIZE); }}
+              className="form-select"
+              style={{ minWidth: 120, fontSize: "var(--text-sm)" }}
+            >
+              <option value="all">All Status</option>
+              <option value="running">Running</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+            </select>
           </div>
           {displayedExecutions.length > 0 ? (
             <>
@@ -178,19 +172,17 @@ export default function EvaluationManager({ executions, tasks, metrics }: Props)
             <h2 className="dashboard-section-title">
               {t("taskOverview", { count: tasks.length })}
             </h2>
-            <div style={{ display: "flex", gap: "var(--space-2)" }}>
-              <select
-                value={difficultyFilter}
-                onChange={(e) => { setDifficultyFilter(e.target.value); setTaskDisplayCount(PAGE_SIZE); }}
-                className="form-select"
-                style={{ minWidth: 120, fontSize: "var(--text-sm)" }}
-              >
-                <option value="all">All Difficulties</option>
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </div>
+            <select
+              value={difficultyFilter}
+              onChange={(e) => { setDifficultyFilter(e.target.value); setTaskDisplayCount(PAGE_SIZE); }}
+              className="form-select"
+              style={{ minWidth: 120, fontSize: "var(--text-sm)" }}
+            >
+              <option value="all">All Difficulties</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
           </div>
           {displayedTasks.length > 0 ? (
             <>
@@ -234,15 +226,15 @@ function ExecutionRow({ exec, tasks }: { exec: TaskExecution; tasks: Task[] }) {
   const taskName = task?.name || exec.task_id;
 
   return (
-    <article className="list-card">
-      <div className="list-card-main">
-        <h3 className="list-card-title">{taskName}</h3>
-        <p className="list-card-meta">
+    <article className="dashboard-list-item">
+      <div className="dashboard-list-main">
+        <h3 className="dashboard-list-title">{taskName}</h3>
+        <p className="dashboard-list-meta">
           {t("agent")}: {exec.agent_id}
           {exec.duration_ms && ` · ${formatDurationMs(exec.duration_ms)}`}
         </p>
       </div>
-      <div className="list-card-actions">
+      <div className="dashboard-list-actions">
         <span>{formatRelativeTime(exec.created_at)}</span>
         <Badge variant={exec.status as "running" | "pending" | "completed" | "failed" | "muted"}>
           {exec.status}
